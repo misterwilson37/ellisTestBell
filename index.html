@@ -2,9 +2,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.34</title>
+    <title>Ellis Web Bell 2.35</title>
     <!-- NEW: SVG Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -340,7 +340,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.34</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.35</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -871,6 +871,35 @@
             }
         }
 
+        // NEW: Helper to format 24h time to 12h AM/PM
+        function formatTime12Hour(timeString) {
+            if (!timeString) return "--:--";
+            
+            try {
+                const parts = timeString.split(':');
+                if (parts.length < 2) return timeString; // Not a valid time
+
+                let [hours, minutes, seconds] = parts;
+                hours = parseInt(hours, 10);
+
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                
+                hours = hours % 12;
+                hours = hours ? hours : 12; // '0' (midnight) should be '12'
+
+                // 'hours' is now a number (1-12), so no leading zero.
+                
+                if (seconds) {
+                    return `${hours}:${minutes}:${seconds} ${ampm}`;
+                } else {
+                    return `${hours}:${minutes} ${ampm}`;
+                }
+            } catch (e) {
+                console.error("Error formatting time:", e);
+                return timeString; // Fallback to original
+            }
+        }
+
 
         // --- Audio Setup (Tone.js) ---
         async function startAudio() {
@@ -1238,7 +1267,7 @@
                         
                         <!-- Bell Info (Time, Name, Sound) (left) -->
                         <div class="flex items-center space-x-4 min-w-0 flex-grow">
-                            <span class="text-xl font-medium text-blue-600 tabular-nums">${bell.time}</span>
+                            <span class="text-xl font-medium text-blue-600 tabular-nums">${formatTime12Hour(bell.time)}</span>
                             <div class="min-w-0">
                                 <span class="font-medium text-gray-800 truncate block" title="${safeName}">${safeName}</span>
                                 <!-- MODIFIED: Updated sound display logic -->
@@ -1873,7 +1902,7 @@
         function openChangeSoundModal(bell) {
             currentChangingSoundBell = bell;
             changeSoundBellName.textContent = bell.name;
-            changeSoundBellTime.textContent = bell.time;
+            changeSoundBellTime.textContent = formatTime12Hour(bell.time);
             // Set dropdown to the *current* sound (which might be an override)
             changeSoundSelect.value = bell.sound;
             changeSoundModal.classList.remove('hidden');
@@ -2764,4 +2793,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 2.34 -->
+<!-- Version 2.35 -->
