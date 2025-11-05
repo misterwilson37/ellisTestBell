@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.21</title>
+    <title>Ellis Web Bell 2.22</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -276,7 +276,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.21</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.22</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2049,15 +2049,18 @@
                     <div class="flex flex-col sm:flex-row justify-between sm:items-center p-2 rounded-lg hover:bg-gray-100">
                         <span class="text-gray-800 truncate" title="${file.name}">${file.name}</span>
                         <div class="flex-shrink-0 flex items-center space-x-2 mt-2 sm:mt-0">
-                            ${isShared ? '<span class="text-xs font-medium text-green-600">(Published)</span>' : ''}
-                            <!-- MODIFIED: Changed button text from "Play" to icon -->
+                            <!-- MODIFIED: Replaced checkbox with button/span -->
+                            ${isShared ? 
+                                '<span class="text-xs font-medium text-green-600 w-20 text-center">(Published)</span>' : 
+                                `<button 
+                                    class="make-public-btn admin-only text-xs px-2 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 w-20" 
+                                    data-path="${file.path}" 
+                                    data-name="${file.name}">
+                                    Make Public
+                                 </button>`
+                            }
                             <button class="preview-audio-btn px-2 py-0 text-lg leading-none bg-gray-200 rounded-lg hover:bg-gray-300" data-url="${file.url}" aria-label="Play">&#9654;</button>
                             <button class="delete-audio-btn text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600" data-path="${file.path}" data-url="${file.url}">Delete</button>
-                            <!-- MODIFIED: Admin-only 'Make Public' button (removed flex from ternary) -->
-                            <label class="admin-only ${isShared ? 'hidden' : ''} items-center space-x-1 cursor-pointer">
-                                <input type="checkbox" class="make-public-check h-4 w-4 text-blue-600 rounded" data-path="${file.path}" data-name="${file.name}">
-                                <span class="text-xs">Make Public</span>
-                            </label>
                         </div>
                     </div>
                     `;
@@ -2216,47 +2219,44 @@
                 confirmDeleteAudioModal.classList.remove('hidden');
             }
             
-            // Handle Make Public (Admin)
-            if (target.classList.contains('make-public-check')) {
+            // MODIFIED: Handle Make Public (Admin) button click
+            if (target.classList.contains('make-public-btn')) {
                 if (!document.body.classList.contains('admin-mode')) return;
                 
                 const sourcePath = target.dataset.path;
                 const fileName = target.dataset.name;
                 const destPath = `sounds/public/${fileName}`;
                 
-                if (target.checked) {
-                    // Copy file from user folder to public folder
-                    target.disabled = true;
-                    audioUploadStatus.textContent = `Publishing ${fileName}...`;
-                    audioUploadStatus.classList.remove('hidden');
-                    try {
-                        const sourceRef = ref(storage, sourcePath);
-                        const destRef = ref(storage, destPath);
-                        
-                        // Get metadata from source to copy it
-                        const metadata = await getMetadata(sourceRef);
-                        
-                        // Get the file's bytes directly from storage
-                        const bytes = await getBytes(sourceRef);
-                        
-                        // Create the new metadata for the public file
-                        const publicMetadata = { 
-                            customMetadata: metadata.customMetadata || { 'owner': userId, 'ownerEmail': auth.currentUser.email || 'unknown' } 
-                        };
-                        
-                        // Upload the bytes data to the new public location
-                        await uploadBytes(destRef, bytes, publicMetadata);
-                        
-                        audioUploadStatus.textContent = `${fileName} is now public.`;
-                        await loadAllAudioFiles();
-                        setTimeout(() => audioUploadStatus.classList.add('hidden'), 3000);
+                // Copy file from user folder to public folder
+                target.disabled = true;
+                audioUploadStatus.textContent = `Publishing ${fileName}...`;
+                audioUploadStatus.classList.remove('hidden');
+                try {
+                    const sourceRef = ref(storage, sourcePath);
+                    const destRef = ref(storage, destPath);
+                    
+                    // Get metadata from source to copy it
+                    const metadata = await getMetadata(sourceRef);
+                    
+                    // Get the file's bytes directly from storage
+                    const bytes = await getBytes(sourceRef);
+                    
+                    // Create the new metadata for the public file
+                    const publicMetadata = { 
+                        customMetadata: metadata.customMetadata || { 'owner': userId, 'ownerEmail': auth.currentUser.email || 'unknown' } 
+                    };
+                    
+                    // Upload the bytes data to the new public location
+                    await uploadBytes(destRef, bytes, publicMetadata);
+                    
+                    audioUploadStatus.textContent = `${fileName} is now public.`;
+                    await loadAllAudioFiles();
+                    setTimeout(() => audioUploadStatus.classList.add('hidden'), 3000);
 
-                    } catch(error) {
-                        console.error("Failed to make file public:", error);
-                        audioUploadStatus.textContent = `Error: ${error.message}`;
-                        target.checked = false;
-                        target.disabled = false;
-                    }
+                } catch(error) {
+                    console.error("Failed to make file public:", error);
+                    audioUploadStatus.textContent = `Error: ${error.message}`;
+                    target.disabled = false;
                 }
             }
         }
@@ -2436,4 +2436,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 2.21 -->
+<!-- Version 2.22 -->
