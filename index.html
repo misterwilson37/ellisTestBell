@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.07</title>
+    <title>Ellis Web Bell 2.08</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -255,7 +255,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.07</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.08</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -519,8 +519,8 @@
         
         import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signOut, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, setLogLevel, deleteDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        // NEW: Firebase Storage Imports (FIXED: removed copyObject)
-        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll, getMetadata, updateMetadata } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        // NEW: Firebase Storage Imports (FIXED: removed copyObject, added getBytes)
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll, getMetadata, updateMetadata, getBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- DOM Elements ---
         const welcomeOverlay = document.getElementById('welcome-overlay');
@@ -1049,7 +1049,7 @@
                     apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
                     authDomain: "ellisbell-c185c.firebaseapp.com",
                     projectId: "ellisbell-c185c",
-                    storageBucket: "ellisbell-c185c.firebasestorage.app",
+                    storageBucket: "ellisbell-c185c.appspot.com", // Corrected bucket name
                     messagingSenderId: "441560045695",
                     appId: "1:441560045695:web:94e51a006663404b8f474a",
                     measurementId: "G-D6TX4YRBSD"
@@ -2032,16 +2032,16 @@
                         // Get metadata from source to copy it
                         const metadata = await getMetadata(sourceRef);
                         
-                        // Get the file's blob data by fetching its download URL
-                        const blob = await (await fetch(target.closest('.flex-col, .flex-row').querySelector('.preview-audio-btn').dataset.url)).blob();
+                        // Get the file's bytes directly from storage
+                        const bytes = await getBytes(sourceRef);
                         
                         // Create the new metadata for the public file
                         const publicMetadata = { 
                             customMetadata: metadata.customMetadata || { 'owner': userId, 'ownerEmail': auth.currentUser.email || 'unknown' } 
                         };
                         
-                        // Upload the blob data to the new public location
-                        await uploadBytes(destRef, blob, publicMetadata);
+                        // Upload the bytes data to the new public location
+                        await uploadBytes(destRef, bytes, publicMetadata);
                         
                         audioUploadStatus.textContent = `${fileName} is now public.`;
                         await loadAllAudioFiles();
