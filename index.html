@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.14</title>
+    <title>Ellis Web Bell 2.15</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -71,7 +71,7 @@
         }
         /* Show when in admin mode */
         body.admin-mode .admin-only {
-            display: inline-block; /* Or block, flex, etc. as needed */
+            display: inline-flex; /* MODIFIED: Use inline-flex to work with flex properties */
         }
 
     </style>
@@ -255,7 +255,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.14</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.15</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1152,14 +1152,37 @@
                            userIdElement.textContent = `Signed in as: ${user.displayName || user.email}`;
                         }
  
-                        // Admin Check
+                        // MODIFIED: Admin Check is now async and checks Firestore
+                        let isAdmin = false; // Local admin flag
                         if (ADMIN_EMAIL_LIST.includes(user.email)) {
-                            console.log("Admin user detected:", user.email);
+                            console.log("Admin email detected:", user.email);
+                            
+                            // NEW: Server-side admin check
+                            try {
+                                const adminDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'admins', user.uid);
+                                const adminDocSnap = await getDoc(adminDocRef);
+                                
+                                if (adminDocSnap.exists()) {
+                                    console.log("Server admin status confirmed.");
+                                    isAdmin = true;
+                                } else {
+                                    console.warn("Admin email found, but server-side admin document is missing.");
+                                    console.warn(`Please create a document at: /artifacts/${appId}/public/data/admins/${user.uid}`);
+                                }
+                            } catch (err) {
+                                console.error("Error checking admin status:", err);
+                            }
+                            
+                        } else {
+                            console.log("Standard user detected.");
+                        }
+
+                        // NEW: Enable admin toggle *only* if server-side check passed
+                        if (isAdmin) {
                             adminToggleBtn.disabled = false;
                             adminToggleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                             adminToggleBtn.title = "Toggle administrator controls";
                         } else {
-                            console.log("Standard user detected.");
                             adminToggleBtn.disabled = true;
                             adminToggleBtn.classList.add('opacity-50', 'cursor-not-allowed');
                             adminToggleBtn.title = "Admin access required";
@@ -1966,8 +1989,8 @@
                             ${isShared ? '<span class="text-xs font-medium text-green-600">(Published)</span>' : ''}
                             <button class="preview-audio-btn text-xs px-2 py-1 bg-gray-200 rounded-lg hover:bg-gray-300" data-url="${file.url}">Preview</button>
                             <button class="delete-audio-btn text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600" data-path="${file.path}">Delete</button>
-                            <!-- Admin-only 'Make Public' button -->
-                            <label class="admin-only ${isShared ? 'hidden' : 'flex'} items-center space-x-1 cursor-pointer">
+                            <!-- MODIFIED: Admin-only 'Make Public' button (removed flex from ternary) -->
+                            <label class="admin-only ${isShared ? 'hidden' : ''} items-center space-x-1 cursor-pointer">
                                 <input type="checkbox" class="make-public-check h-4 w-4 text-blue-600 rounded" data-path="${file.path}" data-name="${file.name}">
                                 <span class="text-xs">Make Public</span>
                             </label>
@@ -2202,8 +2225,6 @@
             importSchedulesBtn.addEventListener('click', handleImportSchedules);
             importFileInput.addEventListener('change', handleFileInputChange);
 
-// Version 2.14
-
             // NEW: Audio Manager Listeners
             audioUploadInput.addEventListener('change', handleFileSelected);
             audioUploadBtn.addEventListener('click', handleAudioUpload);
@@ -2220,3 +2241,5 @@
     </script>
 </body>
 </html>
+
+<!-- Version 2.15 -->
