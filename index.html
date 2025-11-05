@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.12</title>
+    <title>Ellis Web Bell 2.13</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -255,7 +255,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.12</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.13</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -519,8 +519,8 @@
         
         import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signOut, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, setLogLevel, deleteDoc, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        // NEW: Firebase Storage Imports (FIXED: removed copyObject, added getBytes, ADDED refFromURL)
-        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll, getMetadata, updateMetadata, getBytes, refFromURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        // MODIFIED: Removed refFromURL, which was causing the error.
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll, getMetadata, updateMetadata, getBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- DOM Elements ---
         const welcomeOverlay = document.getElementById('welcome-overlay');
@@ -772,8 +772,8 @@
                     // Create and cache the promise *immediately* to prevent re-fetch
                     const loadPromise = (async () => {
                         try {
-                            // Use refFromURL to get the storage reference from the URL
-                            const soundRef = refFromURL(storage, soundName); 
+                            // MODIFIED: Use ref(storage, url) instead of refFromURL()
+                            const soundRef = ref(storage, soundName); 
                             
                             // Use getBytes (which is authenticated) to fetch the file
                             const bytes = await getBytes(soundRef);
