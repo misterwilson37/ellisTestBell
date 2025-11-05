@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.22</title>
+    <title>Ellis Web Bell 2.23</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -46,11 +46,23 @@
         #combined-bell-list .edit-custom-btn {
             display: inline-block;
         }
+
+        /* NEW: Sound override button is always visible for shared bells */
+        #combined-bell-list .sound-btn {
+            display: inline-block;
+        }
+        /* Hide sound override button for custom bells (they use 'Edit') */
+        #combined-bell-list .sound-custom-btn {
+            display: none;
+        }
+
+
         /* Fix for modal z-index issues */
         #edit-bell-modal { z-index: 50; }
+        #change-sound-modal { z-index: 50; } /* NEW */
         #confirm-linked-edit-modal { z-index: 60; }
         #confirm-delete-bell-modal { z-index: 55; }
-        #confirm-delete-audio-modal { z-index: 55; } /* NEW */
+        #confirm-delete-audio-modal { z-index: 55; }
         
         /* NEW: Hide file input, style the button */
         #import-file-input, #audio-upload-input {
@@ -166,7 +178,7 @@
         </form>
     </div>
 
-    <!-- NEW: Edit Bell Modal -->
+    <!-- NEW: Edit Bell Modal (Admin) -->
     <div id="edit-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="edit-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Edit Bell</h3>
@@ -204,6 +216,46 @@
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" id="edit-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                 <button type="submit" id="edit-bell-submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- **** NEW: Change Bell SOUND Modal (All Users) **** -->
+    <div id="change-sound-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <form id="change-sound-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-2xl font-medium mb-6">Change Bell Sound</h3>
+            
+            <!-- Bell Info (Read-only) -->
+            <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                <p class="text-sm font-medium text-gray-700">Bell:</p>
+                <p id="change-sound-bell-name" class="text-lg font-semibold text-gray-900"></p>
+                <p id="change-sound-bell-time" class="text-lg font-semibold text-gray-900"></p>
+            </div>
+
+            <!-- Sound Select -->
+            <div>
+                <label for="change-sound-select" class="block text-sm font-medium text-gray-700">Sound</label>
+                <select id="change-sound-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <optgroup label="Default Sounds">
+                        <option value="Bell">Bell</option>
+                        <option value="Chime">Chime</option>
+                        <option value="Beep">Beep</option>
+                        <option value="Alarm">Alarm</option>
+                        <option value="ellisBell.mp3" selected>Ellis Bell</option>
+                    </optgroup>
+                    <optgroup label="My Sounds" id="change-my-sounds-optgroup"></optgroup>
+                    <optgroup label="Shared Sounds" id="change-shared-sounds-optgroup"></optgroup>
+                </select>
+            </div>
+
+            <!-- Warning Message -->
+            <div class="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-400 rounded">
+                <p class="text-sm text-yellow-800">Are you sure you want to change this bell's sound? Your sound should be a brief but obvious indication of transition.</p>
+            </div>
+            
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="change-sound-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" id="change-sound-submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Sound</button>
             </div>
         </form>
     </div>
@@ -276,7 +328,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.22</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.23</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -614,6 +666,14 @@
         const editBellSubmitBtn = document.getElementById('edit-bell-submit');
         const editBellStatus = document.getElementById('edit-bell-status');
 
+        // NEW: Change Sound Modal
+        const changeSoundModal = document.getElementById('change-sound-modal');
+        const changeSoundForm = document.getElementById('change-sound-form');
+        const changeSoundBellName = document.getElementById('change-sound-bell-name');
+        const changeSoundBellTime = document.getElementById('change-sound-bell-time');
+        const changeSoundSelect = document.getElementById('change-sound-select');
+        const changeSoundCancelBtn = document.getElementById('change-sound-cancel');
+
         // Linked Edit Modal
         const confirmLinkedEditModal = document.getElementById('confirm-linked-edit-modal');
         const linkedScheduleList = document.getElementById('linked-schedule-list');
@@ -682,11 +742,13 @@
         let clockIntervalId = null; 
         
         let currentEditingBell = null; 
+        let currentChangingSoundBell = null; // NEW: State for sound change
         let linkedEditData = null; 
         let bellToDelete = null; 
         let audioToDelete = null; // NEW: State for audio deletion
 
         let mutedBellIds = new Set(); 
+        let bellSoundOverrides = {}; // NEW: Store local sound overrides
 
         let appId; 
         let isAudioReady = false; 
@@ -722,6 +784,35 @@
                 localStorage.setItem('mutedBellIds', JSON.stringify([...mutedBellIds]));
             } catch (e) {
                 console.error("Failed to save muted bells", e);
+            }
+        }
+
+        // --- NEW: Sound Override Functions ---
+        function getBellOverrideKey(scheduleId, bell) {
+            if (!scheduleId || !bell) return null;
+            const bellId = getBellId(bell);
+            if (!bellId) return null;
+            return `${scheduleId}-${bellId}`;
+        }
+
+        function loadSoundOverrides() {
+            try {
+                const stored = localStorage.getItem('bellSoundOverrides');
+                if (stored) {
+                    bellSoundOverrides = JSON.parse(stored);
+                    console.log(`Loaded ${Object.keys(bellSoundOverrides).length} sound overrides.`);
+                }
+            } catch (e) {
+                console.error("Failed to load sound overrides", e);
+                bellSoundOverrides = {};
+            }
+        }
+
+        function saveSoundOverrides() {
+            try {
+                localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
+            } catch (e) {
+                console.error("Failed to save sound overrides", e);
             }
         }
 
@@ -1011,8 +1102,10 @@
                 const safeName = bell.name.replace(/"/g, '&quot;');
                 const bellId = getBellId(bell);
                 const isMuted = mutedBellIds.has(bellId);
-                
-                // NEW: Truncate long sound URLs for display
+                const originalSound = bell.originalSound || bell.sound; // NEW: Get original sound
+                const isOverridden = bell.sound !== originalSound; // NEW: Check if overridden
+
+                // Truncate long sound URLs for display
                 let soundDisplay = bell.sound;
                 if (soundDisplay && soundDisplay.startsWith('http')) {
                     try {
@@ -1022,21 +1115,30 @@
                         soundDisplay = "Custom Sound";
                     }
                 } else if (soundDisplay === 'ellisBell.mp3') {
-                    soundDisplay = "Ellis Bell"; // MODIFIED: Show 'Ellis Bell'
+                    soundDisplay = "Ellis Bell";
                 } else if (!soundDisplay) {
                     soundDisplay = "No Sound";
                 }
+                
+                // NEW: Add prefix if overridden
+                if (isOverridden) {
+                    soundDisplay = `Custom: ${soundDisplay}`;
+                }
+
 
                 return `
                     <div class="bell-item flex items-center justify-between p-4 ${!isFirst ? 'border-t border-gray-200' : ''} hover:bg-gray-50 transition-colors"
-                         data-time="${bell.time}" data-name="${safeName}" data-sound="${bell.sound}" data-type="${bell.type}">
+                         data-time="${bell.time}" data-name="${safeName}" 
+                         data-sound="${bell.sound}" data-type="${bell.type}"
+                         data-original-sound="${originalSound}"> <!-- NEW: Store original sound -->
                         
                         <!-- Bell Info (Time, Name, Sound) (left) -->
                         <div class="flex items-center space-x-4 min-w-0 flex-grow">
                             <span class="text-xl font-medium text-blue-600 tabular-nums">${bell.time}</span>
                             <div class="min-w-0">
                                 <span class="font-medium text-gray-800 truncate block" title="${safeName}">${safeName}</span>
-                                <span class="text-sm text-gray-500 truncate block" title="${bell.sound}">(${soundDisplay})</span>
+                                <!-- MODIFIED: Updated sound display logic -->
+                                <span class="text-sm ${isOverridden ? 'text-blue-600' : 'text-gray-500'} truncate block" title="${bell.sound}">(${soundDisplay})</span>
                                 ${isCustom ? '<span class="ml-2 text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">CUSTOM</span>' : ''}
                             </div>
                         </div>
@@ -1054,16 +1156,29 @@
 
                             <!-- Edit/Delete Buttons -->
                             <div class="flex-shrink-0 space-x-2">
+                                <!-- NEW: "Sound" button for all users on shared bells -->
+                                <button class="sound-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                                        style="${isCustom ? 'display: none;' : ''}"
+                                        aria-label="Change sound for ${safeName}"
+                                        title="Change sound">Sound</button>
+                                
+                                <!-- Admin-only Edit (Time/Name) button -->
                                 <button class="edit-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
                                         aria-label="Edit shared bell ${safeName}"
                                         title="Edit shared bell">Edit</button>
+                                
+                                <!-- Admin-only Delete button -->
                                 <button class="delete-btn px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
                                         aria-label="Delete shared bell ${safeName}"
                                         title="Delete shared bell">Delete</button>
+                                
+                                <!-- Custom Bell Edit (Time/Name/Sound) button -->
                                 <button class="edit-custom-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
                                         style="${!isCustom ? 'display: none;' : ''}"
                                         aria-label="Edit custom bell ${safeName}"
                                         title="Edit custom bell">Edit</button>
+                                
+                                <!-- Custom Bell Delete button -->
                                 <button class="delete-custom-btn px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
                                         style="${!isCustom ? 'display: none;' : ''}"
                                         aria-label="Delete custom bell ${safeName}"
@@ -1216,7 +1331,7 @@
  
                         // MODIFIED: Admin Check is now async and checks Firestore
                         let isAdmin = false; // Local admin flag
-                        if (ADMIN_EMAIL_LIST.includes(user.email)) {
+                        if (user.email && ADMIN_EMAIL_LIST.includes(user.email)) {
                             console.log("Admin email detected:", user.email);
                             
                             // NEW: Server-side admin check
@@ -1357,10 +1472,25 @@
                 if (docSnap.exists()) {
                     const scheduleData = docSnap.data();
                     scheduleTitle.textContent = scheduleData.name;
-                    localSchedule = (scheduleData.bells || []).map(bell => ({
+                    
+                    // Get original bells from Firestore
+                    const originalBells = (scheduleData.bells || []).map(bell => ({
                         ...bell,
                         type: 'shared' 
                     }));
+                    
+                    // NEW: Apply local sound overrides
+                    localSchedule = originalBells.map(bell => {
+                        const overrideKey = getBellOverrideKey(activeScheduleId, bell);
+                        const overrideSound = bellSoundOverrides[overrideKey];
+                        if (overrideSound) {
+                            // Return a new object with the overridden sound
+                            return { ...bell, sound: overrideSound, originalSound: bell.sound };
+                        }
+                        // Return the original bell
+                        return bell;
+                    });
+                    
                     console.log("Active schedule updated:", localSchedule.length, "bells");
                     
                     const scheduleIndex = allSchedules.findIndex(s => s.id === scheduleId);
@@ -1507,15 +1637,20 @@
             const bellElement = target.closest('[data-time]');
             if (!bellElement) return;
 
-            const time = bellElement.dataset.time;
-            const name = bellElement.dataset.name;
-            const sound = bellElement.dataset.sound;
-            const type = bellElement.dataset.type;
+            const bell = {
+                time: bellElement.dataset.time,
+                name: bellElement.dataset.name,
+                sound: bellElement.dataset.sound,
+                type: bellElement.dataset.type,
+                originalSound: bellElement.dataset.originalSound
+            };
 
             if (target.classList.contains('delete-btn') || target.classList.contains('delete-custom-btn')) {
-                handleDeleteBellClick(time, name, type);
+                handleDeleteBellClick(bell.time, bell.name, bell.type);
             } else if (target.classList.contains('edit-btn') || target.classList.contains('edit-custom-btn')) {
-                handleEditBellClick(time, name, sound, type);
+                handleEditBellClick(bell.time, bell.name, bell.sound, bell.type);
+            } else if (target.classList.contains('sound-btn')) { // NEW: Handle sound button
+                openChangeSoundModal(bell);
             }
         }
 
@@ -1534,6 +1669,13 @@
             if (mutedBellIds.has(bellId)) {
                 mutedBellIds.delete(bellId);
                 saveMutedBells();
+            }
+            
+            // NEW: Delete any sound overrides for this bell
+            const overrideKey = getBellOverrideKey(activeScheduleId, bellToDelete);
+            if (overrideKey && bellSoundOverrides[overrideKey]) {
+                delete bellSoundOverrides[overrideKey];
+                saveSoundOverrides();
             }
 
             if (type === 'custom') {
@@ -1560,7 +1702,7 @@
             bellToDelete = null;
         }
         
-        // --- Edit Bell Logic ---
+        // --- Edit Bell Logic (Admin) ---
         function handleEditBellClick(time, name, sound, type) {
             currentEditingBell = { 
                 time, 
@@ -1623,6 +1765,68 @@
             }
         }
 
+        // --- NEW: Change Sound Logic (All Users) ---
+        function openChangeSoundModal(bell) {
+            currentChangingSoundBell = bell;
+            changeSoundBellName.textContent = bell.name;
+            changeSoundBellTime.textContent = bell.time;
+            // Set dropdown to the *current* sound (which might be an override)
+            changeSoundSelect.value = bell.sound;
+            changeSoundModal.classList.remove('hidden');
+        }
+
+        function handleChangeSoundSubmit(e) {
+            e.preventDefault();
+            if (!currentChangingSoundBell) return;
+
+            const newSound = changeSoundSelect.value;
+            const originalSound = currentChangingSoundBell.originalSound || currentChangingSoundBell.sound;
+            const overrideKey = getBellOverrideKey(activeScheduleId, currentChangingSoundBell);
+
+            if (!overrideKey) {
+                console.error("Could not generate override key.");
+                return;
+            }
+
+            if (newSound === originalSound) {
+                // If user selected the original sound, remove the override
+                delete bellSoundOverrides[overrideKey];
+                console.log("Removed sound override.");
+            } else {
+                // Otherwise, add/update the override
+                bellSoundOverrides[overrideKey] = newSound;
+                console.log("Set sound override:", newSound);
+            }
+
+            saveSoundOverrides();
+            
+            // Re-apply overrides to the in-memory localSchedule
+            const schedule = allSchedules.find(s => s.id === activeScheduleId);
+            if(schedule) {
+                 localSchedule = (schedule.bells || []).map(bell => ({
+                    ...bell,
+                    type: 'shared' 
+                })).map(bell => {
+                    const key = getBellOverrideKey(activeScheduleId, bell);
+                    const override = bellSoundOverrides[key];
+                    if (override) {
+                        return { ...bell, sound: override, originalSound: bell.sound };
+                    }
+                    return bell;
+                });
+            }
+            
+            renderCombinedList(); // Re-render the list with new override
+            closeChangeSoundModal();
+        }
+        
+        function closeChangeSoundModal() {
+            changeSoundModal.classList.add('hidden');
+            currentChangingSoundBell = null;
+        }
+
+
+        // --- Linked Edit Logic (Admin) ---
         function findLinkedSchedules(bellToFind) {
             const { time, name, sound } = bellToFind;
             const linked = [];
@@ -1850,6 +2054,7 @@
             }
             // NEW: Re-render audio list to show/hide admin controls
             renderAudioFileManager();
+            renderCombinedList(); // NEW: Re-render list to show/hide admin buttons
         }
         
         // --- Import/Export Logic ---
@@ -2093,7 +2298,8 @@
                 { el: customSoundInput, myGroup: 'custom-my-sounds-optgroup', sharedGroup: 'custom-shared-sounds-optgroup' },
                 { el: sharedSoundInput, myGroup: 'shared-my-sounds-optgroup', sharedGroup: 'shared-shared-sounds-optgroup' },
                 { el: multiBellSoundInput, myGroup: 'multi-my-sounds-optgroup', sharedGroup: 'multi-shared-sounds-optgroup' },
-                { el: editBellSoundInput, myGroup: 'edit-my-sounds-optgroup', sharedGroup: 'edit-shared-sounds-optgroup' }
+                { el: editBellSoundInput, myGroup: 'edit-my-sounds-optgroup', sharedGroup: 'edit-shared-sounds-optgroup' },
+                { el: changeSoundSelect, myGroup: 'change-my-sounds-optgroup', sharedGroup: 'change-shared-sounds-optgroup' } // NEW: Add change-sound modal
             ];
 
             // Create options HTML
@@ -2102,6 +2308,7 @@
 
             // Update all dropdowns
             selects.forEach(item => {
+                if (!item.el) return; // Guard clause
                 const myGroup = item.el.querySelector(`#${item.myGroup}`);
                 const sharedGroup = item.el.querySelector(`#${item.sharedGroup}`);
                 
@@ -2296,6 +2503,7 @@
         function init() {
             initFirebase(); 
             loadMutedBells(); 
+            loadSoundOverrides(); // NEW: Load sound overrides
 
             // Auth buttons
             googleStartBtn.addEventListener('click', signInWithGoogle);
@@ -2336,6 +2544,10 @@
                 confirmDeleteAudioModal.classList.add('hidden');
                 audioToDelete = null;
             });
+
+            // NEW: Modals (Change Sound)
+            changeSoundForm.addEventListener('submit', handleChangeSoundSubmit);
+            changeSoundCancelBtn.addEventListener('click', closeChangeSoundModal);
 
             // Modals (Multi-Add)
             showAddBellModalBtn.addEventListener('click', showMultiAddModal);
@@ -2436,4 +2648,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 2.22 -->
+<!-- Version 2.23 -->
