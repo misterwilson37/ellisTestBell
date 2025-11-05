@@ -2,7 +2,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.30</title>
+    <title>Ellis Web Bell 2.31</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -338,7 +338,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.30</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.31</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1354,23 +1354,22 @@
             if (auth) return; 
 
             try {
-                // MODIFIED: Remove hardcoded config and use environment variables
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                // MODIFIED: Restored hardcoded config.
+                // This is required for GitHub Pages.
+                // **** YOU MUST RESTRICT THIS API KEY IN THE GOOGLE CLOUD CONSOLE ****
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
+                    authDomain: "ellisbell-c185c.firebaseapp.com",
+                    projectId: "ellisbell-c185c",
+                    storageBucket: "ellisbell-c185c.appspot.com",
+                    appId: "1:441560045695:web:94e51a006663404b8f474a"
+                    // Other fields like messagingSenderId and measurementId are not needed
+                    // for Auth, Firestore, and Storage.
+                };
                 
-                // Check if firebaseConfig is empty (which means it wasn't provided)
-                if (!firebaseConfig.apiKey) {
-                    console.error("Firebase config is missing or invalid.");
-                    statusElement.textContent = "Error: Firebase configuration not found.";
-                    return; // Stop initialization
-                }
+                // MODIFIED: Restored hardcoded appId
+                appId = "1:441560045695:web:94e51a006663404b8f474a";
                 
-                // MODIFIED: Use environment variable for appId
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                if (appId === 'default-app-id') {
-                    console.error("Firebase appId is missing from config!");
-                    statusElement.textContent = "Error: Firebase config missing App ID.";
-                }
-
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -2762,8 +2761,5 @@ HOW TO ADD A NEW ADMIN:
 
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
-
-<!-- Version 2.28 -->
-
-<!-- Version 2.29 -->
 <!-- Version 2.30 -->
+<!-- Version 2.31 -->
