@@ -1,7 +1,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.26</title>
+    <title>Ellis Web Bell 2.27</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -85,7 +85,8 @@
             display: inline-flex; /* MODIFIED: Use inline-flex to work with flex properties */
         }
 
-        /* NEW: Style for the quick bell buttons */
+        /* DELETED: These rules don't work with the CDN build */
+        /*
         .quick-bell-btn {
             @apply bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg;
         }
@@ -93,6 +94,7 @@
         .quick-bell-btn:active {
             @apply transform scale-95;
         }
+        */
 
     </style>
 </head>
@@ -335,7 +337,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.26</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.27</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -380,12 +382,13 @@
             <div class="flex items-center space-x-3">
                 <span class="font-semibold text-gray-700">Quick Bell:</span>
                 <div class="flex flex-wrap gap-2">
-                    <button data-minutes="1" class="quick-bell-btn">1</button>
-                    <button data-minutes="2" class="quick-bell-btn">2</button>
-                    <button data-minutes="3" class="quick-bell-btn">3</button>
-                    <button data-minutes="5" class="quick-bell-btn">5</button>
-                    <button data-minutes="10" class="quick-bell-btn">10</button>
-                    <button data-minutes="15" class="quick-bell-btn">15</button>
+                    <!-- ADDED: All styling classes directly to each button -->
+                    <button data-minutes="1" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">1</button>
+                    <button data-minutes="2" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">2</button>
+                    <button data-minutes="3" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">3</button>
+                    <button data-minutes="5" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">5</button>
+                    <button data-minutes="10" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">10</button>
+                    <button data-minutes="15" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">15</button>
                 </div>
             </div>
             <div class="flex items-center space-x-2">
@@ -2758,4 +2761,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 2.26 -->
+<!-- Version 2.27 -->
