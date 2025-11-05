@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.15</title>
+    <title>Ellis Web Bell 2.18</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -255,14 +255,12 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.15</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.18</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
             <div class="mt-4 flex flex-col sm:flex-row justify-center items-center gap-4">
-                <p class="text-sm text-gray-500">
-                    <code id="userIdDisplay" class="bg-gray-200 px-2 py-1 rounded">...</code>
-                </p>
+                <!-- REMOVED: User ID display p tag -->
                 <button id="signout-btn" class="w-full sm:w-auto px-4 py-1 text-sm bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors hidden">
                     Sign Out
                 </button>
@@ -509,6 +507,14 @@
 
             </div>
         </div>
+
+        <!-- NEW: Footer for User ID and Credit -->
+        <footer class="text-center p-4 mt-8 text-gray-500 text-sm border-t border-gray-200">
+            <p class="mb-2">Web app enhanced by Google Gemini</p>
+            <p>
+                <code id="userIdDisplay" class="bg-gray-200 px-2 py-1 rounded">...</code>
+            </p>
+        </footer>
 
     </div>
 
@@ -1149,7 +1155,8 @@
                         if (user.isAnonymous) {
                            userIdElement.textContent = `Anonymous ID: ${user.uid}`;
                         } else {
-                           userIdElement.textContent = `Signed in as: ${user.displayName || user.email}`;
+                           // MODIFIED: Display User ID in the footer, not the header
+                           userIdElement.textContent = `User ID: ${user.uid}`;
                         }
  
                         // MODIFIED: Admin Check is now async and checks Firestore
@@ -2242,4 +2249,27 @@
 </body>
 </html>
 
-<!-- Version 2.15 -->
+<!--
+HOW TO ADD A NEW ADMIN:
+
+1.  Ask the new admin to visit this web app and sign in with their Google account.
+2.  Have them find their "User ID" in the footer of this page (it looks like a long string of letters and numbers).
+3.  Have them send you their User ID.
+4.  Go to your Firebase Console: https://console.firebase.google.com/
+5.  Select your project: 'ellisbell-c185c'
+6.  Navigate to the Firestore Database: (Build -> Firestore Database)
+7.  Follow this path in the data viewer:
+    artifacts -> 1:441560045695:web:94e51a006663404b8f474a -> public -> data -> admins
+    (If the 'admins' collection doesn't exist under 'data', you will need to create it by clicking "+ Start collection" and naming it 'admins').
+8.  Click "+ Add document".
+9.  In the "Document ID" field, paste the new admin's User ID.
+10. In the "Fields" section, add a field:
+    * Field: email
+    * Type: string
+    * Value: (The new admin's email address)
+11. Click "Save".
+
+The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
+-->
+
+<!-- Version 2.18 -->
