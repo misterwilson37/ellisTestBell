@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.23</title>
+    <title>Ellis Web Bell 2.24</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -328,7 +328,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.23</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.24</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1110,7 +1110,9 @@
                 if (soundDisplay && soundDisplay.startsWith('http')) {
                     try {
                         const url = new URL(soundDisplay);
-                        soundDisplay = decodeURIComponent(url.pathname.split('/').pop());
+                        // MODIFICATION: Decode path, THEN split by '/' and get filename
+                        let path = decodeURIComponent(url.pathname.split('/').pop());
+                        soundDisplay = path.split('/').pop(); // Get just the filename
                     } catch (e) {
                         soundDisplay = "Custom Sound";
                     }
@@ -2648,4 +2650,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 2.23 -->
+<!-- Version 2.24 -->
