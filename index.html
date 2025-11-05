@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 2.13</title>
+    <title>Ellis Web Bell 2.14</title>
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -255,7 +255,7 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.13</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 2.14</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -776,10 +776,11 @@
                             const soundRef = ref(storage, soundName); 
                             
                             // Use getBytes (which is authenticated) to fetch the file
-                            const bytes = await getBytes(soundRef);
+                            const bytes = await getBytes(soundRef); // 'bytes' is an ArrayBuffer
                             
                             // Decode the raw bytes into an AudioBuffer
-                            const audioBuffer = await Tone.context.decodeAudioData(bytes.buffer);
+                            // MODIFIED: 'bytes' *is* the ArrayBuffer, so pass it directly.
+                            const audioBuffer = await Tone.context.decodeAudioData(bytes);
                             
                             // Create a Tone.Player with the loaded buffer
                             const player = new Tone.Player(audioBuffer).toDestination();
@@ -2200,6 +2201,8 @@
             exportSchedulesBtn.addEventListener('click', handleExportSchedules);
             importSchedulesBtn.addEventListener('click', handleImportSchedules);
             importFileInput.addEventListener('change', handleFileInputChange);
+
+// Version 2.14
 
             // NEW: Audio Manager Listeners
             audioUploadInput.addEventListener('change', handleFileSelected);
