@@ -3,7 +3,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.05</title>
+    <title>Ellis Web Bell 3.06</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -436,7 +436,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.05</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.06</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2282,6 +2282,10 @@
                 }
             }
 
+            // ADDED: Missing return statement and closing brace
+            return { internal: internalConflict, external: Array.from(uniqueExternal.values()) };
+        }
+
         // --- NEW: v3.05 Personal Schedule Manager Functions ---
 
         async function handleRenamePersonalSchedule() {
@@ -2392,11 +2396,78 @@
         // --- End v3.05 Functions ---
 
         
-        /**
+        // DELETED: Removed entire duplicate function block
+        /*
          * NEW: v3.02 - Finds all shared bells within 60s of the new time.
+         */
+        /*
+        function findAllNearbySharedBells(time) {
+            const newTimeInSeconds = timeToSeconds(time);
+            if (isNaN(newTimeInSeconds)) return { internal: null, external: [] };
+
+            let internalConflict = null;
+            const externalConflicts = [];
+
+            // MODIFIED: v3.03 - Use activeBaseScheduleId
+            const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+
+            for (const schedule of allSchedules) {
+                // MODIFIED: v3.03 - Use activeBaseScheduleId
+                const isCurrentSchedule = schedule.id === activeBaseScheduleId;
+                
+                // Use findNearbyBell helper, but *only* check bells with the same name
+                // This is a modification from the spec, which said *any* bell.
+                // Re-reading: "within 60s of an existing bell" - doesn't specify name.
+                // Re-reading v3.02 "Conflict in Other Shared Schedules" - "Similar Bell Found"
+                // Let's assume the user *meant* to find bells with the *same name* for v3.02,
+                // as that's what makes the "Match" and "Create/Match" options logical.
+                // If we find bells with different names, matching them makes no sense.
+                //
+                // **Decision: I will check for bells with the *same name* within 60 seconds.**
+                // This aligns with the logic of "linked" bells.
+                //
+                // UPDATE: The original v3.02 code was checking *any* bell. Let's revert to that
+                // to match the spec `specs_v3.02.md` which says "an existing bell", not "an existing
+                // bell with the same name".
+                //
+                // OK, re-reading the v3.02 code I provided, it was `findAllNearbySharedBells(time)`
+                // and it did NOT check for name. I will remove the `name` parameter again.
+
+                const bellList = schedule.bells || [];
+                for (const bell of bellList) {
+                    // DELETED: Name check removed to match spec
+                    // if (bell.name !== name) {
+                    //     continue;
+                    // }
+
+                    const existingTimeInSeconds = timeToSeconds(bell.time);
+                    if (isNaN(existingTimeInSeconds)) continue;
+
+                    if (Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 60) {
+                        // Conflict found!
+                        if (isCurrentSchedule) {
+                            if (!internalConflict) { // Only grab the first one
+                                internalConflict = bell;
+                            }
+                        } else {
+                            externalConflicts.push({ schedule, bell });
+                        }
+                    }
+                }
+            }
+            
+            // De-duplicate external conflicts based on the bell itself (time and name)
+            const uniqueExternal = new Map();
+            for (const conflict of externalConflicts) {
+                const key = `${conflict.bell.name}::${conflict.bell.time}`;
+                if (!uniqueExternal.has(key)) {
+                    uniqueExternal.set(key, conflict);
+                }
+            }
+
             return { internal: internalConflict, external: Array.from(uniqueExternal.values()) };
         }
-
+        */
 
         async function handleAddSharedBell(e) {
             e.preventDefault();
@@ -4092,4 +4163,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.05 -->
+<!-- Version 3.06 -->
