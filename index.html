@@ -3,7 +3,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.04</title>
+    <title>Ellis Web Bell 3.05</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -76,8 +76,11 @@
         #create-personal-schedule-modal { z-index: 50; }
         #confirm-delete-personal-modal { z-index: 55; }
         
+        /* NEW: v3.05 */
+        #confirm-restore-modal { z-index: 55; }
+        
         /* NEW: Hide file input, style the button */
-        #import-file-input, #audio-upload-input {
+        #import-file-input, #audio-upload-input, #restore-file-input {
             display: none;
         }
 
@@ -433,7 +436,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.04</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.05</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -576,6 +579,24 @@
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" id="delete-personal-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                     <button type="button" id="delete-personal-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: v3.03 - Confirm Delete Personal Schedule Modal -->
+        <div id="confirm-delete-personal-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+                <button type="button" id="delete-personal-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+            </div>
+        </div>
+        
+        <!-- NEW: v3.05 - Confirm Restore Personal Schedule Modal -->
+        <div id="confirm-restore-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+                <h3 class="text-xl font-medium mb-4">Overwrite Personal Schedule</h3>
+                <p id="confirm-restore-text" class="text-gray-700 mb-6">Are you sure?</p>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="restore-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="restore-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Overwrite</button>
                 </div>
             </div>
         </div>
@@ -724,11 +745,30 @@
             </form>
             
             <!-- NEW: v3.03 - Delete Personal Schedule Button -->
+            <!-- MODIFIED: v3.05 - Moved into new Manager section -->
             <div class="bg-white p-6 rounded-xl shadow-md mb-8">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Delete Current Personal Schedule</label>
-                <button type="button" id="delete-personal-schedule-btn" class="w-full px-4 py-2 bg-red-600 text-white font-medium rounded-lg shadow-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                    Delete Selected Personal Schedule
-                </button>
+                <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">My Personal Schedule Manager</h3>
+                
+                <div class="space-y-3">
+                    <button type="button" id="rename-personal-schedule-btn" class="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Rename Selected Personal Schedule
+                    </button>
+                    
+                    <button type="button" id="backup-personal-schedule-btn" class="w-full px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Back up Selected Personal Schedule
+                    </button>
+                    
+                    <button type="button" id="restore-personal-schedule-btn" class="w-full px-4 py-2 bg-yellow-500 text-black font-medium rounded-lg shadow-md hover:bg-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Load/Overwrite Selected from Backup
+                    </button>
+
+                    <div class="border-t pt-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Delete Current Personal Schedule</label>
+                        <button type="button" id="delete-personal-schedule-btn" class="w-full px-4 py-2 bg-red-600 text-white font-medium rounded-lg shadow-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            Delete Selected Personal Schedule
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -780,6 +820,9 @@
                 <code id="userIdDisplay" class="bg-gray-200 px-2 py-1 rounded">...</code>
             </p>
         </footer>
+        
+        <!-- NEW: v3.05 - Hidden file input for restore -->
+        <input type="file" id="restore-file-input" class="hidden" accept="application/json,.json">
 
     </div>
 
@@ -899,6 +942,18 @@
         const deletePersonalConfirmBtn = document.getElementById('delete-personal-confirm');
         const deletePersonalCancelBtn = document.getElementById('delete-personal-cancel');
 
+        // NEW: v3.05 - Personal Schedule Manager Buttons
+        const renamePersonalScheduleBtn = document.getElementById('rename-personal-schedule-btn');
+        const backupPersonalScheduleBtn = document.getElementById('backup-personal-schedule-btn');
+        const restorePersonalScheduleBtn = document.getElementById('restore-personal-schedule-btn');
+        const restoreFileInput = document.getElementById('restore-file-input');
+        
+        // NEW: v3.05 - Restore Modal
+        const confirmRestoreModal = document.getElementById('confirm-restore-modal');
+        const confirmRestoreText = document.getElementById('confirm-restore-text');
+        const restoreConfirmBtn = document.getElementById('restore-confirm');
+        const restoreCancelBtn = document.getElementById('restore-cancel');
+
 
         // Delete Bell Modal
         const confirmDeleteBellModal = document.getElementById('confirm-delete-bell-modal');
@@ -1013,7 +1068,8 @@
         // NEW: State for v3.02 logic
         let pendingSharedBell = null; // Stores { time, name, sound }
         let currentInternalConflict = null; // Stores the conflicting bell object
-        let currentExternalConflicts = []; // Stores [{ schedule, bell }]
+        let currentExternalConflicts = []; // Stores [{schedule, bell}]
+        let pendingRestoreData = null; // v3.05: For schedule restore
 
         // NEW: Quick Bell State
         let quickBellEndTime = null;
@@ -1982,17 +2038,17 @@
             localSchedule = [];
             personalBells = [];
             
-            // Default form states
-            addPersonalBellForm.reset();
-            personalTimeInput.disabled = true;
-            personalNameInput.disabled = true;
-            personalSoundInput.disabled = true;
-            previewPersonalSoundBtn.disabled = true;
-            addPersonalBellForm.querySelector('button[type="submit"]').disabled = true;
-            personalBellStatus.textContent = "Select a Personal Schedule to add bells.";
-            createPersonalScheduleBtn.disabled = true;
+                createPersonalScheduleBtn.disabled = true;
+                createPersonalScheduleBtn.textContent = 'Copy as Personal Schedule';
+            }
             deletePersonalScheduleBtn.disabled = true;
             deletePersonalScheduleBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            // v3.05: Disable manager buttons
+            renamePersonalScheduleBtn.disabled = true;
+            backupPersonalScheduleBtn.disabled = true;
+            restorePersonalScheduleBtn.disabled = true;
+            
             if (document.body.classList.contains('admin-mode')) {
                 addSharedBellForm.querySelector('button[type="submit"]').disabled = true;
             }
@@ -2019,6 +2075,7 @@
                     scheduleTitle.textContent = scheduleData.name;
                     // Enable copy button
                     createPersonalScheduleBtn.disabled = false;
+                    createPersonalScheduleBtn.textContent = 'Copy as Personal Schedule';
                     personalBaseScheduleName.textContent = scheduleData.name;
                     // Enable admin add shared bell
                     if (document.body.classList.contains('admin-mode')) {
@@ -2077,6 +2134,15 @@
                 personalBellStatus.textContent = `Adding bells to: ${personalSchedule.name}`;
                 deletePersonalScheduleBtn.disabled = false;
                 deletePersonalScheduleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                
+                // v3.05: Enable "Duplicate" button
+                createPersonalScheduleBtn.disabled = false;
+                createPersonalScheduleBtn.textContent = 'Duplicate as Another Personal Schedule';
+                
+                // v3.05: Enable manager buttons
+                renamePersonalScheduleBtn.disabled = false;
+                backupPersonalScheduleBtn.disabled = false;
+                restorePersonalScheduleBtn.disabled = false;
                 
                 // 1. Listen to the BASE shared schedule
                 scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
@@ -2216,6 +2282,118 @@
                 }
             }
 
+        // --- NEW: v3.05 Personal Schedule Manager Functions ---
+
+        async function handleRenamePersonalSchedule() {
+            if (!activePersonalScheduleId) return;
+            const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+            if (!schedule) return;
+
+            // Use prompt (since custom modals are complex for this)
+            // We'll replace this if the user wants a prettier modal
+            const newName = prompt("Enter new name for:", schedule.name);
+            
+            if (newName && newName.trim() !== "" && newName.trim() !== schedule.name) {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                try {
+                    await updateDoc(docRef, { name: newName.trim() });
+                    console.log("Personal schedule renamed.");
+                    await loadPersonalSchedules(); // Reload all
+                    // Reselect the renamed schedule
+                    scheduleSelector.value = `personal-${activePersonalScheduleId}`;
+                    setActiveSchedule(scheduleSelector.value);
+                } catch (error) {
+                    console.error("Error renaming schedule:", error);
+                    // We can't use alert(), so log to console
+                }
+            }
+        }
+
+        function handleBackupPersonalSchedule() {
+            if (!activePersonalScheduleId) return;
+            const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+            if (!schedule) return;
+
+            // Create a clean backup object
+            const backupData = {
+                type: "EllisWebBell_PersonalSchedule_v1",
+                name: schedule.name,
+                baseScheduleId: schedule.baseScheduleId,
+                bells: schedule.bells
+            };
+
+            try {
+                const dataStr = JSON.stringify(backupData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                const filename = (schedule.name || 'personal_schedule').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                a.download = `ellisbell_backup_${filename}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                 console.error("Error backing up schedule:", error);
+            }
+        }
+        
+        function handleRestoreFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    // Validate
+                    if (data.type !== "EllisWebBell_PersonalSchedule_v1" || data.name === undefined || data.baseScheduleId === undefined || !Array.isArray(data.bells)) {
+                        throw new Error("Invalid or corrupt backup file.");
+                    }
+                    pendingRestoreData = data; // Store data
+                    
+                    const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+                    
+                    confirmRestoreText.textContent = `Overwrite "${schedule.name}" with data from "${data.name}" (from file ${file.name})? This cannot be undone.`;
+                    confirmRestoreModal.classList.remove('hidden');
+
+                } catch (error) {
+                    console.error("Restore file read failed:", error);
+                } finally {
+                    restoreFileInput.value = ''; // Clear input
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function confirmRestorePersonalSchedule() {
+            if (!pendingRestoreData || !activePersonalScheduleId) return;
+
+            const { name, baseScheduleId, bells } = pendingRestoreData;
+            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+            
+            try {
+                // setDoc will overwrite
+                await setDoc(docRef, { name, baseScheduleId, bells });
+                console.log("Schedule restored.");
+                
+                await loadPersonalSchedules(); // Reload
+                scheduleSelector.value = `personal-${activePersonalScheduleId}`;
+                setActiveSchedule(scheduleSelector.value);
+
+            } catch (error) {
+                console.error("Error restoring schedule:", error);
+            } finally {
+                pendingRestoreData = null;
+                confirmRestoreModal.classList.add('hidden');
+            }
+        }
+
+        // --- End v3.05 Functions ---
+
+        
+        /**
+         * NEW: v3.02 - Finds all shared bells within 60s of the new time.
             return { internal: internalConflict, external: Array.from(uniqueExternal.values()) };
         }
 
@@ -3642,20 +3820,41 @@
             });
             createPersonalScheduleForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                if (!activeBaseScheduleId) return;
                 const name = newPersonalScheduleNameInput.value.trim();
                 if (!name) return;
 
                 createPersonalScheduleStatus.textContent = "Creating...";
                 createPersonalScheduleStatus.classList.remove('hidden');
                 
-                try {
-                    const personalSchedulesRef = collection(db, 'artifacts', appId, 'users', userId, 'personal_schedules');
-                    const newSchedule = {
+                let newSchedule;
+                
+                // v3.05: Check if we are duplicating or copying
+                if (activePersonalScheduleId) {
+                    // DUPLICATING
+                    const scheduleToDupe = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+                    if (!scheduleToDupe) {
+                         createPersonalScheduleStatus.textContent = "Error: Source schedule not found.";
+                         return;
+                    }
+                    newSchedule = {
+                        name: name,
+                        baseScheduleId: scheduleToDupe.baseScheduleId, // Use the dupe's base
+                        bells: [...scheduleToDupe.bells] // CRITICAL: new array copy of bells
+                    };
+                } else if (activeBaseScheduleId) {
+                    // COPYING (existing logic)
+                    newSchedule = {
                         name: name,
                         baseScheduleId: activeBaseScheduleId,
                         bells: [] // Starts empty
                     };
+                } else {
+                    createPersonalScheduleStatus.textContent = "Error: No base schedule selected.";
+                    return; // No schedule active
+                }
+
+                try {
+                    const personalSchedulesRef = collection(db, 'artifacts', appId, 'users', userId, 'personal_schedules');
                     const newDocRef = await addDoc(personalSchedulesRef, newSchedule);
                     
                     await loadPersonalSchedules(); // Reload
@@ -3695,6 +3894,17 @@
                     console.error("Error deleting personal schedule:", error);
                 }
                 confirmDeletePersonalModal.classList.add('hidden');
+            });
+            
+            // NEW: v3.05 - Manager Listeners
+            renamePersonalScheduleBtn.addEventListener('click', handleRenamePersonalSchedule);
+            backupPersonalScheduleBtn.addEventListener('click', handleBackupPersonalSchedule);
+            restorePersonalScheduleBtn.addEventListener('click', () => restoreFileInput.click());
+            restoreFileInput.addEventListener('change', handleRestoreFileSelect);
+            restoreConfirmBtn.addEventListener('click', confirmRestorePersonalSchedule);
+            restoreCancelBtn.addEventListener('click', () => {
+                confirmRestoreModal.classList.add('hidden');
+                pendingRestoreData = null;
             });
 
 
@@ -3882,4 +4092,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.04 -->
+<!-- Version 3.05 -->
