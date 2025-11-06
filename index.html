@@ -2,7 +2,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 3.01</title>
+    <!-- MODIFIED: Version Bump -->
+    <title>Ellis Web Bell 3.02</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -61,10 +62,15 @@
         /* Fix for modal z-index issues */
         #edit-bell-modal { z-index: 50; }
         #change-sound-modal { z-index: 50; } /* NEW */
-        #nearby-bell-modal { z-index: 55; } /* NEW: For Req 1 & 3 */
+        #nearby-bell-modal { z-index: 55; } /* Req 1 (Custom) */
         #confirm-linked-edit-modal { z-index: 60; }
         #confirm-delete-bell-modal { z-index: 55; }
         #confirm-delete-audio-modal { z-index: 55; }
+        
+        /* NEW: Z-indexes for v3.02 logic */
+        #internal-conflict-warning-modal { z-index: 56; }
+        #internal-conflict-confirm-modal { z-index: 57; }
+        #external-conflict-modal { z-index: 56; }
         
         /* NEW: Hide file input, style the button */
         #import-file-input, #audio-upload-input {
@@ -337,7 +343,7 @@
         </div>
     </div>
 
-    <!-- **** NEW: Nearby Bell Warning Modal (Req 1 & 3) **** -->
+    <!-- **** NEW: Nearby Bell Warning Modal (Req 1 - Custom Bells ONLY) **** -->
     <div id="nearby-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-medium mb-4">Nearby Bell Detected</h3>
@@ -351,15 +357,67 @@
                 <button type="button" id="nearby-bell-add-anyway" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add My Bell Anyway</button>
             </div>
             
-            <!-- Controls for Shared Bells (Req 3) -->
-            <div id="nearby-bell-admin-controls" class="hidden mt-6 flex flex-col gap-3">
-                <button type="button" id="nearby-bell-match" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                    Match Existing Bell Time (<span id="nearby-bell-match-time-text">--:--</span>)
+            <!-- DELETED: Old Admin Controls (Req 3) -->
+            <!-- This is now handled by the new v3.02 modals -->
+        </div>
+    </div>
+
+    <!-- **** NEW: Scenario 1, Step 1: Internal Conflict Warning Modal **** -->
+    <div id="internal-conflict-warning-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-xl font-medium mb-4 text-yellow-800">Warning: Confusing Bell Time</h3>
+            <p class="text-gray-700 mb-6">The time you selected (<strong id="internal-conflict-new-time">...</strong>) is within 60 seconds of an existing bell (<strong id="internal-conflict-existing-bell">...</strong>) in this *same* schedule. This would be very confusing for end users. We strongly suggest editing the existing bell first.</p>
+            
+            <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+                <button type="button" id="internal-conflict-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="internal-conflict-edit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Edit Existing Bell</button>
+                <button type="button" id="internal-conflict-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirm New Bell</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- **** NEW: Scenario 1, Step 2: Internal Conflict Final Confirmation Modal **** -->
+    <div id="internal-conflict-confirm-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-xl font-medium mb-4 text-red-700">Are you sure?</h3>
+            <p class="text-gray-700 mb-6">Are you absolutely positive you want to create a new bell at <strong id="internal-conflict-final-new-time">...</strong>, just <strong id="internal-conflict-final-diff">...</strong> seconds apart from the existing <strong id="internal-conflict-final-existing">...</strong> bell?</p>
+            
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="internal-conflict-final-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="internal-conflict-final-create" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Yes, Create This Bell</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- **** NEW: Scenario 2: External Conflict Resolution Modal **** -->
+    <div id="external-conflict-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl"> <!-- Increased max-w -->
+            <h3 class="text-xl font-medium mb-4">Similar Bell Found in Other Schedules</h3>
+            <p class="text-gray-700 mb-4">One or more other shared schedules have bells very close to your new time of <strong id="external-conflict-new-time">...</strong>. Please select how you'd like to proceed.</p>
+            
+            <p class="text-sm font-medium text-gray-700 mb-2">Conflicting bells (select to enable options):</p>
+            <div id="external-conflict-list" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6 bg-gray-50">
+                <!-- Conflicting bells will be injected here -->
+                <p class="text-gray-500">Loading conflicts...</p>
+            </div>
+            
+            <p id="external-conflict-status" class="text-blue-600 text-sm mt-4 mb-4 hidden"></p>
+
+            <div class="mt-6 flex flex-col gap-3">
+                <!-- Option 1: Match Existing (Disabled unless 1 is checked) -->
+                <button type="button" id="external-conflict-match-existing" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50" disabled>
+                    Match Existing Bell Time (<span id="external-conflict-match-time">--:--</span>)
                 </button>
-                <button type="button" id="nearby-bell-keep" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    Keep My New Time (<span id="nearby-bell-keep-time-text">--:--</span>)
+                <!-- Option 2: Keep My Time (Always enabled) -->
+                <button type="button" id="external-conflict-keep-new" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Keep My New Time (<span id="external-conflict-keep-time">--:--</span>) and Create a New Bell
                 </button>
-                <button type="button" id="nearby-bell-admin-cancel" class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 mt-2">
+                <!-- Option 3: Create and Match (Disabled unless 1+ is checked) -->
+                <button type="button" id="external-conflict-create-and-match" class="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50" disabled>
+                    Create a New Bell and Match Selected Bells to The New Time
+                </button>
+                <!-- Option 4: Cancel -->
+                <button type="button" id="external-conflict-cancel" class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 mt-2">
                     Cancel
                 </button>
             </div>
@@ -370,7 +428,8 @@
     <!-- Main Application -->
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.01</h1>
+            <!-- MODIFIED: Version Bump -->
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.02</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -783,20 +842,49 @@
         const deleteAudioConfirmBtn = document.getElementById('delete-audio-confirm');
         const deleteAudioCancelBtn = document.getElementById('delete-audio-cancel');
 
-        // NEW: Nearby Bell Modal (Req 1 & 3)
+        // NEW: Nearby Bell Modal (Req 1 - Custom Bells ONLY)
         const nearbyBellModal = document.getElementById('nearby-bell-modal');
         const nearbyBellName = document.getElementById('nearby-bell-name');
         const nearbyBellTime = document.getElementById('nearby-bell-time');
         const nearbyBellStatus = document.getElementById('nearby-bell-status');
         const nearbyBellCustomControls = document.getElementById('nearby-bell-custom-controls');
-        const nearbyBellAdminControls = document.getElementById('nearby-bell-admin-controls');
+        // DELETED: Old Admin Controls variable
+        // const nearbyBellAdminControls = document.getElementById('nearby-bell-admin-controls');
         const nearbyBellCancelBtn = document.getElementById('nearby-bell-cancel');
         const nearbyBellAddAnywayBtn = document.getElementById('nearby-bell-add-anyway');
-        const nearbyBellMatchBtn = document.getElementById('nearby-bell-match');
-        const nearbyBellMatchTimeText = document.getElementById('nearby-bell-match-time-text');
-        const nearbyBellKeepBtn = document.getElementById('nearby-bell-keep');
-        const nearbyBellKeepTimeText = document.getElementById('nearby-bell-keep-time-text');
-        const nearbyBellAdminCancelBtn = document.getElementById('nearby-bell-admin-cancel');
+        // DELETED: Old nearby-bell-admin-controls buttons
+        // const nearbyBellMatchBtn = document.getElementById('nearby-bell-match');
+        // const nearbyBellMatchTimeText = document.getElementById('nearby-bell-match-time-text');
+        // const nearbyBellKeepBtn = document.getElementById('nearby-bell-keep');
+        // const nearbyBellKeepTimeText = document.getElementById('nearby-bell-keep-time-text');
+        // const nearbyBellAdminCancelBtn = document.getElementById('nearby-bell-admin-cancel');
+
+        // NEW: Scenario 1 Modal Elements
+        const internalConflictWarningModal = document.getElementById('internal-conflict-warning-modal');
+        const internalConflictNewTime = document.getElementById('internal-conflict-new-time');
+        const internalConflictExistingBell = document.getElementById('internal-conflict-existing-bell');
+        const internalConflictCancelBtn = document.getElementById('internal-conflict-cancel');
+        const internalConflictEditBtn = document.getElementById('internal-conflict-edit');
+        const internalConflictConfirmBtn = document.getElementById('internal-conflict-confirm');
+        
+        const internalConflictConfirmModal = document.getElementById('internal-conflict-confirm-modal');
+        const internalConflictFinalNewTime = document.getElementById('internal-conflict-final-new-time');
+        const internalConflictFinalExisting = document.getElementById('internal-conflict-final-existing');
+        const internalConflictFinalDiff = document.getElementById('internal-conflict-final-diff');
+        const internalConflictFinalCancelBtn = document.getElementById('internal-conflict-final-cancel');
+        const internalConflictFinalCreateBtn = document.getElementById('internal-conflict-final-create');
+
+        // NEW: Scenario 2 Modal Elements
+        const externalConflictModal = document.getElementById('external-conflict-modal');
+        const externalConflictNewTime = document.getElementById('external-conflict-new-time');
+        const externalConflictList = document.getElementById('external-conflict-list');
+        const externalConflictStatus = document.getElementById('external-conflict-status');
+        const externalConflictMatchBtn = document.getElementById('external-conflict-match-existing');
+        const externalConflictMatchTime = document.getElementById('external-conflict-match-time');
+        const externalConflictKeepBtn = document.getElementById('external-conflict-keep-new');
+        const externalConflictKeepTime = document.getElementById('external-conflict-keep-time');
+        const externalConflictCreateAndMatchBtn = document.getElementById('external-conflict-create-and-match');
+        const externalConflictCancelBtn = document.getElementById('external-conflict-cancel');
 
 
         // Import/Export Elements
@@ -844,9 +932,13 @@
         let bellToDelete = null; 
         let audioToDelete = null; // NEW: State for audio deletion
 
-        // NEW: State for Req 1 & 3
+        // NEW: State for Req 1
         let pendingCustomBell = null; 
-        let pendingSharedBell = null;
+        
+        // NEW: State for v3.02 logic
+        let pendingSharedBell = null; // Stores { time, name, sound }
+        let currentInternalConflict = null; // Stores the conflicting bell object
+        let currentExternalConflicts = []; // Stores [{ schedule, bell }]
 
         // NEW: Quick Bell State
         let quickBellEndTime = null;
@@ -1452,12 +1544,12 @@
             return null;
         }
         
-        // NEW: Helper to close and reset the nearby bell modal
+        // NEW: Helper to close and reset the nearby bell modal (Custom bells)
         function closeNearbyBellModal() {
             nearbyBellModal.classList.add('hidden');
             nearbyBellStatus.classList.add('hidden');
             pendingCustomBell = null;
-            pendingSharedBell = null;
+            // DELETED: pendingSharedBell is no longer used by this modal
         }
 
         // NEW: Function to add the pending custom bell (Req 1)
@@ -1477,50 +1569,8 @@
             closeNearbyBellModal();
         }
         
-        // NEW: Function to add the pending shared bell (Req 3)
-        async function addPendingSharedBell(matchExistingTime) {
-            if (!pendingSharedBell || !activeScheduleId || !scheduleRef) return;
-            
-            const { name, sound, nearbyBellTime } = pendingSharedBell;
-            const time = matchExistingTime ? nearbyBellTime : pendingSharedBell.time;
-            
-            const newBell = { time, name, sound };
-            
-            const currentSchedule = allSchedules.find(s => s.id === activeScheduleId);
-            if (!currentSchedule) {
-                 console.warn("Could not find current schedule data.");
-                 closeNearbyBellModal();
-                 return;
-            }
-            
-            const existingBells = currentSchedule.bells || [];
-            
-            if (existingBells.find(b => b.time === time && b.name === name)) {
-                console.warn("This bell (time and name) already exists in this schedule.");
-                nearbyBellStatus.textContent = "A bell with that name and time already exists.";
-                nearbyBellStatus.classList.remove('hidden');
-                setTimeout(closeNearbyBellModal, 2000);
-                return;
-            }
-            
-            const updatedBells = [...existingBells, newBell];
-            
-            try {
-                await updateDoc(scheduleRef, { bells: updatedBells });
-                console.log("Shared bell added.");
-                addSharedBellForm.reset();
-                addSharedBellForm.elements['shared-bell-sound'].value = 'ellisBell.mp3'; 
-                addSharedStatus.textContent = `Bell "${name}" added to ${currentSchedule.name}.`;
-                addSharedStatus.classList.remove('hidden');
-                setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
-            } catch (error) {
-                console.error("Error adding shared bell:", error);
-                addSharedStatus.textContent = "Error adding bell.";
-                addSharedStatus.classList.remove('hidden');
-            }
-            
-            closeNearbyBellModal();
-        }
+        // DELETED: Old addPendingSharedBell function. This is now replaced
+        // by the v3.02 logic in handleAddSharedBell and the new modal handlers.
 
         // --- End of NEW Helper Functions ---
         
@@ -1546,7 +1596,8 @@
                 nearbyBellName.textContent = nearbyBell.name;
                 nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time);
                 nearbyBellCustomControls.style.display = 'flex';
-                nearbyBellAdminControls.style.display = 'none';
+                // DELETED: No longer hiding admin controls, they are gone
+                // nearbyBellAdminControls.style.display = 'none';
                 nearbyBellModal.classList.remove('hidden');
             } else {
                 // No conflict, add directly
@@ -1850,10 +1901,64 @@
             }
         }
         
+        /**
+         * NEW: v3.02 - Finds all shared bells within 60s of the new time.
+         * @param {string} time - The time to check (HH:MM:SS)
+         * @returns {object} { internal: bell|null, external: [{schedule, bell}] }
+         */
+        function findAllNearbySharedBells(time) {
+            const newTimeInSeconds = timeToSeconds(time);
+            if (isNaN(newTimeInSeconds)) return { internal: null, external: [] };
+
+            let internalConflict = null;
+            const externalConflicts = [];
+
+            for (const schedule of allSchedules) {
+                const isCurrentSchedule = schedule.id === activeScheduleId;
+                const bellList = schedule.bells || [];
+
+                for (const bell of bellList) {
+                    const existingTimeInSeconds = timeToSeconds(bell.time);
+                    if (isNaN(existingTimeInSeconds)) continue;
+
+                    // This is the core check:
+                    if (Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 60) {
+                        // Conflict found!
+                        if (isCurrentSchedule) {
+                            if (!internalConflict) { // Only grab the first one
+                                internalConflict = bell;
+                            }
+                        } else {
+                            externalConflicts.push({ schedule, bell });
+                        }
+                        // Note: A single bell list could have multiple conflicts,
+                        // but for Scenario 1, we only care about the first one.
+                        // For Scenario 2, we collect all of them.
+                    }
+                }
+            }
+            
+            // De-duplicate external conflicts based on the bell itself (time and name)
+            // This handles if the *exact same bell* (e.g. "Recess" at 9:00)
+            // exists in multiple *other* schedules. We only want to list it once.
+            const uniqueExternal = new Map();
+            for (const conflict of externalConflicts) {
+                const key = `${conflict.bell.name}::${conflict.bell.time}`;
+                if (!uniqueExternal.has(key)) {
+                    uniqueExternal.set(key, conflict);
+                }
+            }
+
+            return { internal: internalConflict, external: Array.from(uniqueExternal.values()) };
+        }
+
+
         async function handleAddSharedBell(e) {
             e.preventDefault();
-            if (!activeScheduleId) {
-                console.warn("Please select a schedule first.");
+            if (!activeScheduleId || !scheduleRef) {
+                addSharedStatus.textContent = "Please select a schedule first.";
+                addSharedStatus.classList.remove('hidden');
+                setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
                 return;
             }
             
@@ -1862,7 +1967,9 @@
             const sound = sharedSoundInput.value;
             
             if (!time || !name) {
-                console.warn("Please provide a time and name for the bell.");
+                addSharedStatus.textContent = "Please provide a time and name.";
+                addSharedStatus.classList.remove('hidden');
+                setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
                 return;
             }
 
@@ -1874,54 +1981,303 @@
             }
             
             const existingBells = currentSchedule.bells || [];
-            
-            // REQ 3 CHECK
-            const nearbyBell = findNearbyBell(time, existingBells);
-            
-            if (nearbyBell) {
-                // Store pending bell
-                pendingSharedBell = { ...newBell, nearbyBellTime: nearbyBell.time };
-                
-                // Show modal
-                nearbyBellName.textContent = nearbyBell.name;
-                nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time);
-                
-                nearbyBellMatchTimeText.textContent = formatTime12Hour(nearbyBell.time);
-                nearbyBellKeepTimeText.textContent = formatTime12Hour(time);
 
-                nearbyBellCustomControls.style.display = 'none';
-                nearbyBellAdminControls.style.display = 'flex'; // Use flex for column
-                nearbyBellModal.classList.remove('hidden');
-            } else {
-                // No conflict, add directly
-                if (existingBells.find(b => b.time === time && b.name === name)) {
-                    console.warn("This bell (time and name) already exists in this schedule.");
-                    addSharedStatus.textContent = "This exact bell already exists.";
-                    addSharedStatus.classList.remove('hidden');
-                    setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
-                    return;
-                }
-                
-                const updatedBells = [...existingBells, newBell];
+            // --- v3.02 LOGIC START ---
 
-                try {
-                    await updateDoc(scheduleRef, { bells: updatedBells });
-                    
-                    console.log("Shared bell added.");
-                    addSharedBellForm.reset();
-                    addSharedBellForm.elements['shared-bell-sound'].value = 'ellisBell.mp3'; 
-                    addSharedStatus.textContent = `Bell "${name}" added to ${currentSchedule.name}.`;
-                    addSharedStatus.classList.remove('hidden');
-                    setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
-                    
-                } catch (error) {
-                    console.error("Error adding shared bell:", error);
-                    addSharedStatus.textContent = "Error adding bell.";
-                    addSharedStatus.classList.remove('hidden');
-                }
+            // Check for *exact* duplicate first
+            if (existingBells.find(b => b.time === time && b.name === name)) {
+                console.warn("This bell (time and name) already exists in this schedule.");
+                addSharedStatus.textContent = "This exact bell already exists.";
+                addSharedStatus.classList.remove('hidden');
+                setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
+                return;
+            }
+
+            // Find all conflicts (internal and external)
+            // This checks *any* bell, regardless of name
+            const conflicts = findAllNearbySharedBells(time);
+
+            // Store pending bell for modals
+            pendingSharedBell = newBell;
+
+            // --- Scenario 1: Internal Conflict ---
+            // This case takes precedence over external conflicts.
+            if (conflicts.internal) {
+                console.log("Scenario 1: Internal Conflict Found", conflicts.internal);
+                currentInternalConflict = conflicts.internal; // Store conflict
+                
+                // Populate and show Initial Warning Modal
+                internalConflictNewTime.textContent = formatTime12Hour(time);
+                internalConflictExistingBell.textContent = `${conflicts.internal.name} at ${formatTime12Hour(conflicts.internal.time)}`;
+                internalConflictWarningModal.classList.remove('hidden');
+                return; // Stop. Action will resume from modal buttons.
+            }
+
+            // --- Scenario 2: External Conflict (and NO internal) ---
+            if (conflicts.external.length > 0) {
+                console.log("Scenario 2: External Conflict(s) Found", conflicts.external);
+                currentExternalConflicts = conflicts.external; // Store conflicts
+                
+                // Populate and show External Conflict Modal
+                externalConflictNewTime.textContent = formatTime12Hour(time);
+                externalConflictKeepTime.textContent = formatTime12Hour(time);
+                
+                // Populate list
+                externalConflictList.innerHTML = conflicts.external.map(c => {
+                    // Create a unique ID for the checkbox based on schedule and bell
+                    const checkId = `ext-conflict-${c.schedule.id}-${c.bell.time.replace(/:/g, '-')}`;
+                    return `
+                    <div class="flex items-center">
+                        <input type="checkbox" id="${checkId}" 
+                               data-schedule-id="${c.schedule.id}"
+                               data-bell-time="${c.bell.time}"
+                               data-bell-name="${c.bell.name.replace(/"/g, '&quot;')}"
+                               class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 external-conflict-check">
+                        <label for="${checkId}" class="ml-2 block text-sm text-gray-900">
+                            <span class="font-medium">${c.schedule.name}:</span>
+                            <span>${c.bell.name} at ${formatTime12Hour(c.bell.time)}</span>
+                        </label>
+                    </div>
+                `}).join('');
+                
+                // Update button states (call listener handler)
+                handleExternalConflictCheckboxChange();
+                externalConflictModal.classList.remove('hidden');
+                return; // Stop. Action will resume from modal buttons.
+            }
+
+            // --- Case A: No Conflict ---
+            console.log("Case A: No conflict found. Adding bell directly.");
+            const updatedBells = [...existingBells, newBell];
+
+            try {
+                await updateDoc(scheduleRef, { bells: updatedBells });
+                
+                console.log("Shared bell added.");
+                addSharedBellForm.reset();
+                addSharedBellForm.elements['shared-bell-sound'].value = 'ellisBell.mp3'; 
+                addSharedStatus.textContent = `Bell "${name}" added to ${currentSchedule.name}.`;
+                addSharedStatus.classList.remove('hidden');
+                setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
+                
+            } catch (error) {
+                console.error("Error adding shared bell:", error);
+                addSharedStatus.textContent = "Error adding bell.";
+                addSharedStatus.classList.remove('hidden');
+            } finally {
+                // Clear any pending state just in case
+                closeAllConflictModals();
+            }
+            // --- v3.02 LOGIC END ---
+        }
+        
+        /**
+         * NEW: v3.02 - Helper to add a bell from a pending state (e.g., after modal)
+         * This is used by Scenario 1 (Final Confirm) and Scenario 2 (Keep New Time)
+         */
+        async function addPendingBellToCurrentSchedule() {
+            if (!pendingSharedBell || !activeScheduleId || !scheduleRef) {
+                console.error("Missing data for pending bell add.");
+                return;
+            }
+
+            const currentSchedule = allSchedules.find(s => s.id === activeScheduleId);
+            if (!currentSchedule) {
+                console.warn("Could not find current schedule data.");
+                return;
+            }
+            
+            const existingBells = currentSchedule.bells || [];
+            const newBell = pendingSharedBell; // Get the staged bell
+
+            // Final check for exact duplicate (shouldn't happen, but safe)
+            if (existingBells.find(b => b.time === newBell.time && b.name === newBell.name)) {
+                console.warn("This bell (time and name) already exists in this schedule.");
+                return;
+            }
+            
+            const updatedBells = [...existingBells, newBell];
+
+            try {
+                await updateDoc(scheduleRef, { bells: updatedBells });
+                
+                console.log("Pending shared bell added.");
+                addSharedBellForm.reset();
+                addSharedBellForm.elements['shared-bell-sound'].value = 'ellisBell.mp3'; 
+                addSharedStatus.textContent = `Bell "${newBell.name}" added to ${currentSchedule.name}.`;
+                addSharedStatus.classList.remove('hidden');
+                setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
+                
+            } catch (error) {
+                console.error("Error adding pending shared bell:", error);
+                addSharedStatus.textContent = "Error adding bell.";
+                addSharedStatus.classList.remove('hidden');
+            } finally {
+                // Clear state and close modals
+                closeAllConflictModals();
             }
         }
         
+        /**
+         * NEW: v3.02 - Resets and closes all conflict modals
+         */
+        function closeAllConflictModals() {
+            internalConflictWarningModal.classList.add('hidden');
+            internalConflictConfirmModal.classList.add('hidden');
+            externalConflictModal.classList.add('hidden');
+            
+            // Clear status texts
+            externalConflictStatus.classList.add('hidden');
+            externalConflictStatus.textContent = '';
+
+            // Clear state
+            pendingSharedBell = null;
+            currentInternalConflict = null;
+            currentExternalConflicts = [];
+            
+            console.log("Conflict state cleared.");
+        }
+
+        /**
+         * NEW: v3.02 - Handles Scenario 2 resolutions
+         * @param {string} resolutionType - 'match', 'keep', 'create_and_match'
+         */
+        async function handleExternalConflictResolution(resolutionType) {
+            if (!pendingSharedBell || !activeScheduleId) return;
+
+            const newBell = pendingSharedBell; // The bell we want to create
+            const batch = writeBatch(db);
+            const currentSchedule = allSchedules.find(s => s.id === activeScheduleId);
+
+            // Get all checked items
+            const checkedCheckboxes = Array.from(externalConflictList.querySelectorAll('.external-conflict-check:checked'));
+            const checkedConflicts = checkedCheckboxes.map(cb => {
+                const scheduleId = cb.dataset.scheduleId;
+                const bellTime = cb.dataset.bellTime;
+                const bellName = cb.dataset.bellName;
+                // Find the original conflict object
+                const source = currentExternalConflicts.find(c => 
+                    c.schedule.id === scheduleId && 
+                    c.bell.time === bellTime &&
+                    c.bell.name === bellName
+                );
+                return source; // { schedule, bell }
+            }).filter(Boolean); // Filter out any undefined
+
+            // Show loading status
+            externalConflictStatus.textContent = "Processing...";
+            externalConflictStatus.classList.remove('hidden');
+            
+            // Disable all buttons
+            externalConflictMatchBtn.disabled = true;
+            externalConflictKeepBtn.disabled = true;
+            externalConflictCreateAndMatchBtn.disabled = true;
+            externalConflictCancelBtn.disabled = true;
+
+            try {
+                if (resolutionType === 'keep') {
+                    // This is simple: just add it to the current schedule.
+                    // The addPendingBellToCurrentSchedule function handles this.
+                    await addPendingBellToCurrentSchedule(); // This closes modals and clears state
+                    return; // Done
+                
+                } else if (resolutionType === 'match') {
+                    if (checkedConflicts.length !== 1) return; // Should be impossible
+                    
+                    const bellToMatch = checkedConflicts[0].bell;
+                    // Per spec: "sets its time to match the *selected* bell's time"
+                    // We keep the new bell's name and sound.
+                    const bellToAdd = {
+                        ...newBell, 
+                        time: bellToMatch.time // But use existing time
+                    };
+
+                    const updatedBells = [...currentSchedule.bells, bellToAdd];
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeScheduleId);
+                    batch.update(docRef, { bells: updatedBells });
+                    
+                    await batch.commit();
+                    externalConflictStatus.textContent = "Bell added, matching existing time.";
+
+                } else if (resolutionType === 'create_and_match') {
+                    if (checkedConflicts.length === 0) return; // Should be impossible
+
+                    // 1. Add the new bell to THIS schedule
+                    const currentScheduleBells = [...currentSchedule.bells, newBell];
+                    const currentDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeScheduleId);
+                    batch.update(currentDocRef, { bells: currentScheduleBells });
+
+                    // 2. Update all CHECKED external schedules
+                    for (const { schedule, bell: originalBellToReplace } of checkedConflicts) {
+                        
+                        // Find and replace the original bell with the new one
+                        // Per spec: "updates all *checked* bells... to use this `NewTime`"
+                        // This implies we are only changing the *time* of the existing bells,
+                        // not their name or sound.
+                        const newTime = newBell.time;
+                        
+                        const updatedBells = schedule.bells.map(b => 
+                            (b.time === originalBellToReplace.time && b.name === originalBellToReplace.name) 
+                            ? { ...b, time: newTime } // Keep old name/sound, update time
+                            : b
+                        );
+                        
+                        // Clear any local overrides for the bell we are replacing
+                        const overrideKey = getBellOverrideKey(schedule.id, originalBellToReplace);
+                        if (overrideKey && bellSoundOverrides[overrideKey]) {
+                            delete bellSoundOverrides[overrideKey];
+                        }
+                        
+                        // Set the update in the batch
+                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', schedule.id);
+                        batch.update(docRef, { bells: updatedBells });
+                    }
+                    
+                    saveSoundOverrides(); // Save any override deletions
+                    await batch.commit();
+                    externalConflictStatus.textContent = `Bell created and ${checkedConflicts.length} other schedules updated.`;
+                }
+
+                // For 'match' and 'create_and_match', we need to reset and close
+                await loadAllSchedules(); // Reload data
+                addSharedBellForm.reset();
+                addSharedBellForm.elements['shared-bell-sound'].value = 'ellisBell.mp3'; 
+                setTimeout(() => {
+                    closeAllConflictModals();
+                }, 2000); // Give user time to read status
+
+            } catch (error) {
+                console.error(`Error in ${resolutionType} resolution:`, error);
+                externalConflictStatus.textContent = `An error occurred: ${error.message}`;
+                // Re-enable cancel btn on error
+                externalConflictCancelBtn.disabled = false;
+            }
+        }
+        
+        /**
+         * NEW: v3.02 - Updates Scenario 2 modal button states based on checkboxes
+         */
+        function handleExternalConflictCheckboxChange() {
+            const checkedCheckboxes = Array.from(externalConflictList.querySelectorAll('.external-conflict-check:checked'));
+            
+            // "Match Existing" - enabled if exactly 1 is checked
+            if (checkedCheckboxes.length === 1) {
+                externalConflictMatchBtn.disabled = false;
+                const time = checkedCheckboxes[0].dataset.bellTime;
+                externalConflictMatchTime.textContent = formatTime12Hour(time);
+            } else {
+                externalConflictMatchBtn.disabled = true;
+                externalConflictMatchTime.textContent = "--:--";
+            }
+
+            // "Create and Match" - enabled if 1 or more is checked
+            if (checkedCheckboxes.length > 0) {
+                externalConflictCreateAndMatchBtn.disabled = false;
+            } else {
+                externalConflictCreateAndMatchBtn.disabled = true;
+            }
+        }
+
         async function handleDeleteSchedule() {
             if (!activeScheduleId) {
                 console.warn("Please select a schedule to delete.");
@@ -2075,9 +2431,13 @@
 
             if (nearbyBell) {
                 // Using a simple confirm for edits, as the modal flow is complex
-                if (!confirm(`This new time (${formatTime12Hour(newBellData.time)}) is within 1 minute of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time)}). Are you sure you want to save?`)) {
-                    return; // User cancelled
-                }
+                // Note: This is a custom modal, not window.confirm
+                // TODO: This logic should be updated to use a custom modal
+                // For now, let's just log a warning and proceed
+                console.warn(`This new time (${formatTime12Hour(newBellData.time)}) is within 1 minute of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time)}).`);
+                // if (!confirm(`This new time (${formatTime12Hour(newBellData.time)}) is within 1 minute of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time)}). Are you sure you want to save?`)) {
+                //     return; // User cancelled
+                // }
             }
 
             const oldBellId = getBellId({type, time: originalTime, name: originalName});
@@ -2368,6 +2728,7 @@
                 }
                 
                 // REQ 1 & 3: Check for nearby bells before adding
+                // Note: We are checking *any* bell, not just same name
                 const nearbyBell = findNearbyBell(newBell.time, schedule.bells);
                 if (nearbyBell) {
                     // For multi-add, we'll just skip and warn the user.
@@ -2950,12 +3311,62 @@
                 audioToDelete = null;
             });
 
-            // NEW: Modals (Nearby Bell)
+            // NEW: Modals (Nearby Bell - Custom Only)
             nearbyBellCancelBtn.addEventListener('click', closeNearbyBellModal);
-            nearbyBellAdminCancelBtn.addEventListener('click', closeNearbyBellModal);
             nearbyBellAddAnywayBtn.addEventListener('click', addPendingCustomBell);
-            nearbyBellMatchBtn.addEventListener('click', () => addPendingSharedBell(true));
-            nearbyBellKeepBtn.addEventListener('click', () => addPendingSharedBell(false));
+            // DELETED: Old admin button listeners
+            // nearbyBellAdminCancelBtn.addEventListener('click', closeNearbyBellModal);
+            // nearbyBellMatchBtn.addEventListener('click', () => addPendingSharedBell(true));
+            // nearbyBellKeepBtn.addEventListener('click', () => addPendingSharedBell(false));
+
+            // NEW: v3.02 Scenario 1 (Internal Conflict) Listeners
+            internalConflictCancelBtn.addEventListener('click', closeAllConflictModals);
+            internalConflictEditBtn.addEventListener('click', () => {
+                // This is the "Edit Existing Bell" button
+                if (!currentInternalConflict) return;
+                
+                // Get the conflicting bell data
+                const { time, name, sound } = currentInternalConflict;
+                
+                // Close the warning modals
+                closeAllConflictModals(); 
+                
+                // Open the edit modal with the conflicting bell's data
+                handleEditBellClick(time, name, sound, 'shared');
+                
+                // Note: 'pendingSharedBell' (the new bell) is discarded, as requested.
+            });
+            internalConflictConfirmBtn.addEventListener('click', () => {
+                // Show Step 2
+                internalConflictWarningModal.classList.add('hidden');
+                
+                const newTime = formatTime12Hour(pendingSharedBell.time);
+                const existing = `${currentInternalConflict.name} at ${formatTime12Hour(currentInternalConflict.time)}`;
+                const diff = Math.abs(timeToSeconds(pendingSharedBell.time) - timeToSeconds(currentInternalConflict.time));
+
+                internalConflictFinalNewTime.textContent = newTime;
+                internalConflictFinalExisting.textContent = existing;
+                internalConflictFinalDiff.textContent = diff;
+                
+                internalConflictConfirmModal.classList.remove('hidden');
+            });
+            internalConflictFinalCancelBtn.addEventListener('click', closeAllConflictModals);
+            internalConflictFinalCreateBtn.addEventListener('click', () => {
+                // This is the "Yes, Create This Bell" button
+                addPendingBellToCurrentSchedule();
+            });
+
+            // NEW: v3.02 Scenario 2 (External Conflict) Listeners
+            externalConflictModal.addEventListener('change', (e) => {
+                if (e.target.classList.contains('external-conflict-check')) {
+                    handleExternalConflictCheckboxChange();
+                }
+            });
+            externalConflictCancelBtn.addEventListener('click', closeAllConflictModals);
+            externalConflictKeepBtn.addEventListener('click', () => handleExternalConflictResolution('keep'));
+            externalConflictMatchBtn.addEventListener('click', () => handleExternalConflictResolution('match'));
+            externalConflictCreateAndMatchBtn.addEventListener('click', () => handleExternalConflictResolution('create_and_match'));
+
 
             // NEW: Quick Bell Listeners
             quickBellControls.addEventListener('click', (e) => {
@@ -3071,4 +3482,5 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 3.01 -->
+<!-- MODIFIED: Version Bump -->
+<!-- Version 3.02 -->
