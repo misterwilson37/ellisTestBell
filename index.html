@@ -1,9 +1,10 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.08</title>
+    <title>Ellis Web Bell 3.09</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -485,7 +486,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.08</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.09</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -774,7 +775,8 @@
         
         <!-- NEW: Audio Manager Panel (Hidden for anonymous users) -->
         <div id="audio-manager-panel" class="auth-required mt-12">
-            <h2 class="text-2xl font-semibold mb-4">My Audio Manager</h2>
+            <!-- MODIFIED: v3.09 - Made H2 a cursor-pointer -->
+            <h2 class="text-2xl font-semibold mb-4 cursor-pointer" title="Click to refresh file lists">My Audio Manager</h2>
             <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
                 
                 <!-- Audio Upload Form -->
@@ -1050,6 +1052,7 @@
         let activePersonalScheduleId = null; // NEW: ID of active personal schedule
         let activeScheduleListenerUnsubscribe = null; // For base schedule
         let activePersonalScheduleListenerUnsubscribe = null; // NEW: For personal schedule
+        let personalSchedulesListenerUnsubscribe = null; // NEW: v3.09 - For the collection
         let synths = {}; 
         let lastBellRingTime = null; 
         let lastRingTimestamp = 0; // NEW: For ring cooldown
@@ -1634,7 +1637,12 @@
             
             // If the lastSelectedId isn't in the list, default to the first shared schedule
             if (scheduleSelector.value) {
-                setActiveSchedule(scheduleSelector.value);
+                // MODIFIED: v3.09 - Only call setActiveSchedule if the value is *different*
+                // to prevent loops with the new listener
+                const currentActive = activePersonalScheduleId ? `personal-${activePersonalScheduleId}` : `shared-${activeBaseScheduleId}`;
+                if (scheduleSelector.value !== currentActive) {
+                    setActiveSchedule(scheduleSelector.value);
+                }
             } else if (allSchedules.length > 0) {
                 setActiveSchedule(`shared-${allSchedules[0].id}`);
             } else {
@@ -1910,7 +1918,8 @@
                         
                         // NEW: v3.03 - Also load personal schedules
                         if (!user.isAnonymous) {
-                            await loadPersonalSchedules();
+                            // MODIFIED: v3.09 - Start real-time listener instead of one-time load
+                            listenForPersonalSchedules(user.uid);
                         } else {
                             allPersonalSchedules = []; // Clear personal schedules
                         }
@@ -1945,6 +1954,12 @@
                             clearInterval(clockIntervalId);
                             clockIntervalId = null;
                         }
+
+                        // NEW: v3.09 - Unsubscribe from personal schedules
+                        if (personalSchedulesListenerUnsubscribe) {
+                            personalSchedulesListenerUnsubscribe();
+                            personalSchedulesListenerUnsubscribe = null;
+                        }
                         
                         document.body.classList.remove('authenticated', 'not-anonymous', 'admin-mode');
                         signOutBtn.classList.add('hidden');
@@ -1977,26 +1992,58 @@
             }
         }
         
-        // NEW: v3.03 - Loads user's private schedules
-        async function loadPersonalSchedules() {
+        // DELETED: v3.09 - loadPersonalSchedules() was removed and replaced by listenForPersonalSchedules()
+
+        // NEW: v3.09 - Replaces loadPersonalSchedules with a real-time listener
+        function listenForPersonalSchedules(userId) {
             if (isUserAnonymous || !userId) {
                 allPersonalSchedules = [];
+                renderScheduleSelector(); // Make sure to re-render
                 return;
             }
 
+            // Clean up old listener if it exists
+            if (personalSchedulesListenerUnsubscribe) {
+                personalSchedulesListenerUnsubscribe();
+            }
+
             const personalSchedulesRef = collection(db, 'artifacts', appId, 'users', userId, 'personal_schedules');
-            try {
-                const querySnapshot = await getDocs(personalSchedulesRef);
+            
+            console.log("Listening for real-time personal schedule updates...");
+            
+            personalSchedulesListenerUnsubscribe = onSnapshot(personalSchedulesRef, (querySnapshot) => {
                 allPersonalSchedules = querySnapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data() // name, baseScheduleId, bells[]
                 }));
                 allPersonalSchedules.sort((a, b) => a.name.localeCompare(b.name));
-                console.log("Loaded personal schedules:", allPersonalSchedules.length);
-                renderScheduleSelector();
-            } catch (error) {
-                console.error("Error loading personal schedules: ", error);
-            }
+                
+                console.log("Personal schedules updated from snapshot:", allPersonalSchedules.length);
+                
+                // CRITICAL: We must re-render the selector AND check if the active schedule still exists
+                const currentSelectedValue = scheduleSelector.value;
+                const activeScheduleExists = allPersonalSchedules.some(s => `personal-${s.id}` === currentSelectedValue);
+
+                renderScheduleSelector(); // This re-renders the list
+                
+                // If the currently selected schedule was a personal one and it still exists, keep it.
+                // If it was deleted, renderScheduleSelector's logic will pick a default.
+                if (currentSelectedValue.startsWith('personal-') && activeScheduleExists) {
+                    scheduleSelector.value = currentSelectedValue;
+                    // Note: We don't call setActiveSchedule here, as renderScheduleSelector's
+                    // default logic will handle picking the right schedule, and
+                    // we don't want to trigger a listener loop.
+                } else if (!currentSelectedValue.startsWith('personal-')) {
+                    // Do nothing, the shared schedule selection is fine
+                } else {
+                    // The active personal schedule was deleted, setActiveSchedule will be
+                    // called by renderScheduleSelector's default logic.
+                    console.log("Active personal schedule was deleted. Reverting to default.");
+                }
+
+            }, (error) => {
+                console.error("Error listening to personal schedules: ", error);
+            });
         }
 
 
@@ -2038,19 +2085,16 @@
             localSchedule = [];
             personalBells = [];
             
-            // DELETED: Stray code block that was causing the syntax error
-            /*
-                createPersonalScheduleBtn.disabled = true;
-                createPersonalScheduleBtn.textContent = 'Copy as Personal Schedule';
-            }
-            */
-            deletePersonalScheduleBtn.disabled = true;
-            deletePersonalScheduleBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            
             // v3.05: Disable manager buttons
             renamePersonalScheduleBtn.disabled = true;
             backupPersonalScheduleBtn.disabled = true;
             restorePersonalScheduleBtn.disabled = true;
+
+            // v3.03: Disable personal schedule buttons
+            createPersonalScheduleBtn.disabled = true;
+            createPersonalScheduleBtn.textContent = 'Copy as Personal Schedule';
+            deletePersonalScheduleBtn.disabled = true;
+            deletePersonalScheduleBtn.classList.add('opacity-50', 'cursor-not-allowed');
             
             if (document.body.classList.contains('admin-mode')) {
                 addSharedBellForm.querySelector('button[type="submit"]').disabled = true;
@@ -2305,7 +2349,9 @@
                 try {
                     await updateDoc(docRef, { name: newName.trim() });
                     console.log("Personal schedule renamed.");
-                    await loadPersonalSchedules(); // Reload all
+                    // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
+                    // The onSnapshot listener will handle the update automatically.
+                    
                     // Reselect the renamed schedule
                     scheduleSelector.value = `personal-${activePersonalScheduleId}`;
                     setActiveSchedule(scheduleSelector.value);
@@ -2384,7 +2430,8 @@
                 await setDoc(docRef, { name, baseScheduleId, bells });
                 console.log("Schedule restored.");
                 
-                await loadPersonalSchedules(); // Reload
+                // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
+                // The onSnapshot listener will handle the update.
                 scheduleSelector.value = `personal-${activePersonalScheduleId}`;
                 setActiveSchedule(scheduleSelector.value);
 
@@ -3711,7 +3758,8 @@
             if (personalSchedulesToUpdate > 0) {
                 console.log(`Updating ${personalSchedulesToUpdate} personal schedules...`);
                 await personalBatch.commit();
-                await loadPersonalSchedules(); // Reload personal schedules
+                // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
+                // The listener will pick up the change.
             }
             
 
@@ -3871,6 +3919,19 @@
                 });
             });
 
+            // NEW: v3.09 - Add click-to-refresh for Audio Manager
+            const audioManagerHeader = document.querySelector('#audio-manager-panel h2');
+            if (audioManagerHeader) {
+                audioManagerHeader.addEventListener('click', () => {
+                    console.log("User clicked audio manager header, refreshing file lists...");
+                    audioUploadStatus.textContent = "Refreshing file lists...";
+                    audioUploadStatus.classList.remove('hidden');
+                    loadAllAudioFiles().then(() => {
+                        setTimeout(() => audioUploadStatus.classList.add('hidden'), 1500);
+                    });
+                });
+            }
+
             scheduleSelector.addEventListener('change', () => setActiveSchedule(scheduleSelector.value));
             adminToggleBtn.addEventListener('click', toggleAdminMode);
 
@@ -3931,7 +3992,8 @@
                     const personalSchedulesRef = collection(db, 'artifacts', appId, 'users', userId, 'personal_schedules');
                     const newDocRef = await addDoc(personalSchedulesRef, newSchedule);
                     
-                    await loadPersonalSchedules(); // Reload
+                    // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
+                    // The listener will pick it up.
                     
                     // Automatically select the new schedule
                     scheduleSelector.value = `personal-${newDocRef.id}`;
@@ -3963,7 +4025,8 @@
                 try {
                     await deleteDoc(docRef);
                     console.log("Personal schedule deleted:", activePersonalScheduleId);
-                    await loadPersonalSchedules(); // Reloads and resets view
+                    // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
+                    // The listener will pick up the deletion and renderScheduleSelector will fix the view.
                 } catch (error) {
                     console.error("Error deleting personal schedule:", error);
                 }
@@ -4166,4 +4229,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.08 -->
+<!-- Version 3.09 -->
