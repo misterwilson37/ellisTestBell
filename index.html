@@ -3,7 +3,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.03</title>
+    <title>Ellis Web Bell 3.04</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -433,7 +433,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.03</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.04</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -545,6 +545,41 @@
             </button>
         </div>
         
+        <!-- NEW: v3.03 - Create Personal Schedule Modal -->
+        <div id="create-personal-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <form id="create-personal-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+                <h3 class="text-2xl font-medium mb-6">New Personal Schedule</h3>
+                
+                <p class="text-gray-700 mb-4">
+                    Base Schedule: <strong id="personal-base-schedule-name">...</strong>
+                </p>
+                
+                <div>
+                    <label for="new-personal-schedule-name" class="block text-sm font-medium text-gray-700">New Schedule Name</label>
+                    <input type="text" id="new-personal-schedule-name" placeholder="e.g. My A-Day Schedule" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <p id="create-personal-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="create-personal-schedule-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- NEW: v3.03 - Confirm Delete Personal Schedule Modal -->
+        <div id="confirm-delete-personal-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+                <h3 class="text-xl font-medium mb-4">Delete Personal Schedule</h3>
+                <p id="confirm-delete-personal-text" class="text-gray-700 mb-6">Are you sure?</p>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="delete-personal-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="delete-personal-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                </div>
+            </div>
+        </div>
+
         <!-- NEW: Admin Zone for creating schedules and adding bells -->
         <div class="admin-control bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
             <h3 class="text-xl font-semibold text-gray-800 border-b pb-2">Admin Zone</h3>
@@ -878,7 +913,7 @@
         const deleteAudioConfirmBtn = document.getElementById('delete-audio-confirm');
         const deleteAudioCancelBtn = document.getElementById('delete-audio-cancel');
 
-        // NEW: Nearby Bell Modal (Req 1 - Custom Bells ONLY)
+        // **** NEW: Nearby Bell Warning Modal (Req 1 - Custom Bells ONLY) ****
         const nearbyBellModal = document.getElementById('nearby-bell-modal');
         const nearbyBellName = document.getElementById('nearby-bell-name');
         const nearbyBellTime = document.getElementById('nearby-bell-time');
@@ -3847,4 +3882,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.03 -->
+<!-- Version 3.04 -->
