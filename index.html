@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.09</title>
+    <title>Ellis Web Bell 3.17</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -486,7 +486,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.09</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.17</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -587,11 +587,12 @@
                     Toggle Admin
                 </button>
             </div>
-            <select id="schedule-selector" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg">
-                <!-- MODIFIED: v3.03 - Will be populated with optgroups -->
+            
+            <!-- NEW (FIXED): Re-inserted the missing select element -->
+            <select id="schedule-selector" class="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
                 <option value="">Loading schedules...</option>
             </select>
-            
+ 
             <!-- NEW: v3.03 - Button to create personal schedule -->
             <button id="create-personal-schedule-btn" class="auth-required w-full mt-4 px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                 Copy as Personal Schedule
@@ -1033,7 +1034,8 @@
 
         // Admin Email List
         const ADMIN_EMAIL_LIST = [
-           'jacob.v.wilson@gmail.com'
+           'jacob.v.wilson@gmail.com',
+           'jacob.wilson@sumnerk12.net' // NEW: Added new admin email
            // Add more emails here in the future
         ];
 
@@ -1266,18 +1268,13 @@
                     // Create and cache the promise *immediately* to prevent re-fetch
                     const loadPromise = (async () => {
                         try {
-                            // MODIFIED: Use ref(storage, url) instead of refFromURL()
-                            const soundRef = ref(storage, soundName); 
+                            // FIX: Tone.Player can load the URL directly.
+                            // We don't need getBytes() or ref(). The download URL
+                            // from Firebase Storage is already public.
+                            const player = new Tone.Player(soundName).toDestination();
                             
-                            // Use getBytes (which is authenticated) to fetch the file
-                            const bytes = await getBytes(soundRef); // 'bytes' is an ArrayBuffer
-                            
-                            // Decode the raw bytes into an AudioBuffer
-                            // MODIFIED: 'bytes' *is* the ArrayBuffer, so pass it directly.
-                            const audioBuffer = await Tone.context.decodeAudioData(bytes);
-                            
-                            // Create a Tone.Player with the loaded buffer
-                            const player = new Tone.Player(audioBuffer).toDestination();
+                            // We must wait for it to be loaded
+                            await Tone.loaded();
                             
                             console.log(`Successfully loaded: ${soundName}`);
                             return player; // Promise resolves to a loaded player
@@ -1809,7 +1806,11 @@
                 // **** YOU MUST RESTRICT THIS API KEY IN THE GOOGLE CLOUD CONSOLE ****
                 const firebaseConfig = {
                     apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
-                    authDomain: "ellisbell-c185c.firebaseapp.com",
+                    // MODIFIED: v3.17 - Reverted authDomain.
+                    // The github.io domain caused a 404.
+                    // The "missing initial state" error in Firefox must be solved
+                    // by disabling Enhanced Tracking Protection (ETP) for the site.
+                    authDomain: "ellisbell-c185c.firebaseapp.com", 
                     projectId: "ellisbell-c185c",
                     storageBucket: "ellisbell-c185c.firebasestorage.app",
                     appId: "1:441560045695:web:94e51a006663404b8f474a"
@@ -4229,4 +4230,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.09 -->
+<!-- Version 3.17 -->
