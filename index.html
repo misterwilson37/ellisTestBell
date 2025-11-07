@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.11</title>
+    <title>Ellis Web Bell 3.14</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -486,7 +486,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.11</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.14</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -586,12 +586,7 @@
                 <button id="admin-toggle" class="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded-full hover:bg-gray-300 transition-colors opacity-50 cursor-not-allowed" disabled title="Sign in to see admin options">
                     Toggle Admin
                 </button>
-        <!-- Admin Email List -->
-        const ADMIN_EMAIL_LIST = [
-           'jacob.v.wilson@gmail.com',
-           'jacob.wilson@sumnerk12.net' // NEW: Added new admin email
-           // Add more emails here in the future
-        ];
+        <!-- DELETED: This entire block of raw JavaScript was breaking the HTML -->
  
             <!-- NEW: v3.03 - Button to create personal schedule -->
             <button id="create-personal-schedule-btn" class="auth-required w-full mt-4 px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -4226,4 +4221,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.11 -->
+<!-- Version 3.14 -->
