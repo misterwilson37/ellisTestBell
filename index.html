@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.18</title>
+    <title>Ellis Web Bell 3.19</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -259,21 +259,27 @@
                 <p id="change-sound-bell-time" class="text-lg font-semibold text-gray-900"></p>
             </div>
 
-            <!-- Sound Select -->
-            <div>
-                <label for="change-sound-select" class="block text-sm font-medium text-gray-700">Sound</label>
-                <select id="change-sound-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <optgroup label="Default Sounds">
-                        <option value="Bell">Bell</option>
-                        <option value="Chime">Chime</option>
-                        <option value="Beep">Beep</option>
-                        <option value="Alarm">Alarm</option>
-                        <option value="ellisBell.mp3" selected>Ellis Bell</option>
-                    </optgroup>
-                    <optgroup label="My Sounds" id="change-my-sounds-optgroup"></optgroup>
-                    <optgroup label="Shared Sounds" id="change-shared-sounds-optgroup"></optgroup>
-                </select>
+            <!-- MODIFIED: v3.19 - Sound Select + Play Button -->
+            <div class="flex items-end gap-2">
+                <div class="flex-grow">
+                    <label for="change-sound-select" class="block text-sm font-medium text-gray-700">Sound</label>
+                    <select id="change-sound-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <optgroup label="Default Sounds">
+                            <option value="Bell">Bell</option>
+                            <option value="Chime">Chime</option>
+                            <option value="Beep">Beep</option>
+                            <option value="Alarm">Alarm</option>
+                            <option value="ellisBell.mp3" selected>Ellis Bell</option>
+                        </optgroup>
+                        <optgroup label="My Sounds" id="change-my-sounds-optgroup"></optgroup>
+                        <optgroup label="Shared Sounds" id="change-shared-sounds-optgroup"></optgroup>
+                    </select>
+                </div>
+                <button type="button" id="preview-change-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                    &#9654;
+                </button>
             </div>
+            <!-- END MODIFICATION -->
 
             <!-- Warning Message -->
             <div class="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-400 rounded">
@@ -486,7 +492,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.18</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.19</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -914,6 +920,8 @@
         const changeSoundBellTime = document.getElementById('change-sound-bell-time');
         const changeSoundSelect = document.getElementById('change-sound-select');
         const changeSoundCancelBtn = document.getElementById('change-sound-cancel');
+        // NEW: v3.19 - Play button for change sound modal
+        const previewChangeSoundBtn = document.getElementById('preview-change-sound');
 
         // Linked Edit Modal
         const confirmLinkedEditModal = document.getElementById('confirm-linked-edit-modal');
@@ -1537,6 +1545,7 @@
                 }
 
 
+                // MODIFIED: v3.19 - Reordered controls
                 return `
                     <div class="bell-item flex items-center justify-between p-4 ${!isFirst ? 'border-t border-gray-200' : ''} hover:bg-gray-50 transition-colors"
                          data-time="${bell.time}" data-name="${safeName}" 
@@ -1554,25 +1563,34 @@
                             </div>
                         </div>
                         
-                        <!-- Right side controls (Mute + Edit/Delete) -->
-                        <div class="flex-shrink-0 flex items-center space-x-4">
+                        <!-- Right side controls (Audio + Admin) -->
+                        <div class="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-2 sm:gap-0">
                         
-                            <!-- Mute Control (Label + Checkbox) -->
-                            <label class="flex items-center space-x-2 cursor-pointer">
-                                <span class="text-sm font-medium text-gray-700">Mute</span>
-                                <input type="checkbox" class="bell-mute-toggle h-5 w-5 text-blue-600 rounded focus:ring-blue-500" 
-                                       data-bell-id="${bellId}" ${isMuted ? 'checked' : ''} 
-                                       aria-label="Mute this bell">
-                            </label>
-
-                            <!-- Edit/Delete Buttons -->
-                            <div class="flex-shrink-0 space-x-2">
-                                <!-- NEW: "Sound" button for all users on shared bells -->
+                            <!-- Group 1: Audio Controls (Sound, Play, Mute) -->
+                            <div class="flex items-center space-x-2">
+                                
+                                <!-- 1. "Sound" Button (Shared Bells only) -->
                                 <button class="sound-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                                         style="${isCustom ? 'display: none;' : ''}"
                                         aria-label="Change sound for ${safeName}"
                                         title="Change sound">Sound</button>
                                 
+                                <!-- 2. "Play" Button (NEW for all bells) -->
+                                <button class="preview-bell-btn px-2 py-0 text-lg leading-none bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300" 
+                                        aria-label="Play sound for ${safeName}"
+                                        title="Play Sound">&#9654;</button>
+
+                                <!-- 3. "Mute" Control (Label + Checkbox) -->
+                                <label class="flex items-center space-x-2 cursor-pointer p-1"> <!-- Added p-1 for better touch target -->
+                                    <span class="text-sm font-medium text-gray-700">Mute</span>
+                                    <input type="checkbox" class="bell-mute-toggle h-5 w-5 text-blue-600 rounded focus:ring-blue-500" 
+                                           data-bell-id="${bellId}" ${isMuted ? 'checked' : ''} 
+                                           aria-label="Mute this bell">
+                                </label>
+                            </div>
+
+                            <!-- Group 2: Admin/Edit Controls -->
+                            <div class="flex-shrink-0 space-x-2">
                                 <!-- Admin-only Edit (Time/Name) button -->
                                 <button class="edit-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
                                         aria-label="Edit shared bell ${safeName}"
@@ -2064,7 +2082,7 @@
                 allSchedules.sort((a, b) => a.name.localeCompare(b.name));
                 console.log("Loaded all shared schedules:", allSchedules.length);
 
-                // **** NEW: v3.18 - THIS IS THE FIX ****
+                // **** MODIFIED: v3.18 - This logic was moved from v3.18 ****
                 // The dropdown is disabled by default, we must enable it now.
                 scheduleSelector.disabled = false;
                 
@@ -2910,6 +2928,18 @@
                 saveMutedBells();
                 updateClock(); 
                 return; 
+            }
+            
+            // NEW: v3.19 - Handle Play Button
+            if (target.classList.contains('preview-bell-btn')) {
+                const bellElement = target.closest('[data-time]');
+                if (bellElement) {
+                    const soundToPlay = bellElement.dataset.sound;
+                    if (soundToPlay) {
+                        playBell(soundToPlay);
+                    }
+                }
+                return; // Stop processing
             }
 
             const bellElement = target.closest('[data-time]');
@@ -4133,7 +4163,9 @@
             // NEW: Modals (Change Sound)
             changeSoundForm.addEventListener('submit', handleChangeSoundSubmit);
             changeSoundCancelBtn.addEventListener('click', closeChangeSoundModal);
-
+            // NEW: v3.19 - Add play button listener
+            previewChangeSoundBtn.addEventListener('click', () => playBell(changeSoundSelect.value));
+            
             // Modals (Multi-Add)
             showAddBellModalBtn.addEventListener('click', showMultiAddModal);
             multiAddBellForm.addEventListener('submit', handleMultiAddSubmit);
@@ -4235,4 +4267,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.18 -->
+<!-- Version 3.19 -->
