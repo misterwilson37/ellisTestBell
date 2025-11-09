@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.28</title>
+    <title>Ellis Web Bell 3.29</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.28</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.29</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -3762,14 +3762,19 @@
             try {
                 const storageRef = ref(storage, `sounds/users/${userId}/${fileToUpload.name}`);
                 
-                // Add metadata (who uploaded it)
+                // MODIFIED: v3.29 - Add contentType to fix octet-stream issue
                 const metadata = {
+                    // Set the correct Content-Type (e.g., 'audio/mpeg')
+                    contentType: fileToUpload.type, 
+                    
+                    // Keep existing custom metadata
                     customMetadata: {
                         'owner': userId,
                         'ownerEmail': auth.currentUser.email || 'unknown'
                     }
                 };
                 
+                // Upload the file with the new, complete metadata
                 await uploadBytes(storageRef, fileToUpload, metadata);
 
                 audioUploadStatus.textContent = "Upload successful! Refreshing list...";
@@ -4093,7 +4098,9 @@
                     const bytes = await getBytes(sourceRef);
                     
                     // Create the new metadata for the public file
+                    // MODIFIED: v3.29 - Also copy the contentType
                     const publicMetadata = { 
+                        contentType: metadata.contentType, // <-- THE FIX
                         customMetadata: metadata.customMetadata || { 'owner': userId, 'ownerEmail': auth.currentUser.email || 'unknown' } 
                     };
                     
@@ -4496,4 +4503,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.28 -->
+<!-- Version 3.29 -->
