@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.24</title>
+    <title>Ellis Web Bell 3.25</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -371,7 +371,8 @@
             <!-- Controls for Custom Bells (Req 1) -->
             <div id="nearby-bell-custom-controls" class="mt-6 flex justify-end gap-3">
                 <button type="button" id="nearby-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="nearby-bell-add-anyway" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add My Bell Anyway</button>
+                <!-- MODIFIED: v3.25 - Text updated for clarity -->
+                <button type="button" id="nearby-bell-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirm Action Anyway</button>
             </div>
             
             <!-- DELETED: Old Admin Controls (Req 3) -->
@@ -495,7 +496,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.24</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.25</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -998,7 +999,8 @@
         // DELETED: Old Admin Controls variable
         // const nearbyBellAdminControls = document.getElementById('nearby-bell-admin-controls');
         const nearbyBellCancelBtn = document.getElementById('nearby-bell-cancel');
-        const nearbyBellAddAnywayBtn = document.getElementById('nearby-bell-add-anyway');
+        // MODIFIED: v3.25 - Renamed button ID for clarity
+        const nearbyBellConfirmBtn = document.getElementById('nearby-bell-confirm');
         // DELETED: Old nearby-bell-admin-controls buttons
         // const nearbyBellMatchBtn = document.getElementById('nearby-bell-match');
         // const nearbyBellMatchTimeText = document.getElementById('nearby-bell-match-time-text');
@@ -1084,6 +1086,9 @@
 
         // NEW: State for Req 1 (Now for Personal Bells)
         let pendingPersonalBell = null; 
+        // NEW: v3.25 - State for personal bell edit vs. add
+        let pendingPersonalBellAction = 'add';
+        let pendingPersonalBellOriginal = null;
         
         // NEW: State for v3.02 logic
         let pendingSharedBell = null; // Stores { time, name, sound }
@@ -1792,16 +1797,20 @@
         }
         
         // NEW: Helper to close and reset the nearby bell modal (Custom bells)
+        // MODIFIED: v3.25 - Reset new state variables
         function closeNearbyBellModal() {
             nearbyBellModal.classList.add('hidden');
             nearbyBellStatus.classList.add('hidden');
             pendingPersonalBell = null; // MODIFIED: v3.03
+            pendingPersonalBellAction = 'add';
+            pendingPersonalBellOriginal = null;
             // DELETED: pendingSharedBell is no longer used by this modal
         }
 
         // NEW: Function to add the pending custom bell (Req 1)
         // MODIFIED: v3.03 - Now adds to Firestore
-        async function addPendingPersonalBell() {
+        // MODIFIED: v3.25 - Renamed from addPendingPersonalBell, now part of confirmPending...
+        async function executeAddPersonalBell() {
             if (!pendingPersonalBell || !activePersonalScheduleId) return;
             const { time, name, sound, type } = pendingPersonalBell;
             
@@ -1838,6 +1847,7 @@
         // --- End of NEW Helper Functions ---
         
         // MODIFIED: v3.03 - handleAddCustomBell -> handleAddPersonalBell
+        // MODIFIED: v3.25 - Use nearby bell modal state
         async function handleAddPersonalBell(e) {
             e.preventDefault();
             if (!activePersonalScheduleId) {
@@ -1861,6 +1871,10 @@
             if (nearbyBell) {
                 // Store pending bell
                 pendingPersonalBell = { time, name, sound, type: 'custom' };
+                // v3.25: Set action type
+                pendingPersonalBellAction = 'add';
+                pendingPersonalBellOriginal = null;
+                
                 // Show modal
                 nearbyBellName.textContent = nearbyBell.name;
                 nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time, true); // v3.22
@@ -3078,6 +3092,59 @@
             editBellModal.classList.remove('hidden');
         }
 
+        // NEW: v3.25 - Helper function to execute the update for a personal bell
+        async function executePersonalBellUpdate(originalBell, newBellData) {
+            const { originalTime, originalName } = originalBell;
+            
+            if (!activePersonalScheduleId) {
+                console.error("No active personal schedule to update.");
+                return;
+            }
+            
+            const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+            try {
+                const docSnap = await getDoc(personalScheduleRef);
+                if (!docSnap.exists()) return;
+                
+                const existingBells = docSnap.data().bells || [];
+                const updatedBells = existingBells.map(b => 
+                    (b.time === originalTime && b.name === originalName) ? newBellData : b
+                );
+                
+                await updateDoc(personalScheduleRef, { bells: updatedBells });
+                console.log("Personal bell updated.");
+            } catch (error) {
+                console.error("Error updating personal bell:", error);
+            }
+        }
+
+        // NEW: v3.25 - Helper function to run after "confirm" on nearby modal
+        async function updatePendingPersonalBell() {
+            if (!pendingPersonalBell || !pendingPersonalBellOriginal || !activePersonalScheduleId) {
+                console.error("Missing data for pending personal bell update.");
+                return;
+            }
+            
+            const newBellData = {
+                time: pendingPersonalBell.time,
+                name: pendingPersonalBell.name,
+                sound: pendingPersonalBell.sound
+            };
+            
+            await executePersonalBellUpdate(pendingPersonalBellOriginal, newBellData);
+            closeNearbyBellModal();
+        }
+
+        // NEW: v3.25 - Central handler for the "Confirm" button on the nearby bell modal
+        async function confirmPendingPersonalBellAction() {
+            if (pendingPersonalBellAction === 'add') {
+                await executeAddPersonalBell();
+            } else if (pendingPersonalBellAction === 'edit') {
+                await updatePendingPersonalBell();
+            }
+        }
+
+        // MODIFIED: v3.25 - Updated to use nearby bell modal for personal edits
         async function handleEditBellSubmit(e) {
             e.preventDefault();
             if (!currentEditingBell) return;
@@ -3091,22 +3158,11 @@
             const { originalTime, originalName, type, sound: originalSound } = currentEditingBell;
 
             // REQ 1 (Applied to Edits): Check for nearby bells *before* saving
-            // MODIFIED: v3.03 - Check against merged list
             const allBells = [...localSchedule, ...personalBells];
             const excludeBell = { time: originalTime, name: originalName };
             const nearbyBell = findNearbyBell(newBellData.time, allBells, excludeBell);
 
-            if (nearbyBell) {
-                // Using a simple confirm for edits, as the modal flow is complex
-                // Note: This is a custom modal, not window.confirm
-                // TODO: This logic should be updated to use a custom modal
-                // For now, let's just log a warning and proceed
-                console.warn(`This new time (${formatTime12Hour(newBellData.time, true)}) is within 1 minute of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time, true)}).`); // v3.22
-                // if (!confirm(`This new time (${formatTime12Hour(newBellData.time)}) is within 1 minute of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time)}). Are you sure you want to save?`)) {
-                //     return; // User cancelled
-                // }
-            }
-
+            // Clear old mute ID if it exists
             const oldBellId = getBellId({type, time: originalTime, name: originalName});
             if (mutedBellIds.has(oldBellId)) {
                 mutedBellIds.delete(oldBellId);
@@ -3114,21 +3170,26 @@
             }
 
             if (type === 'custom') {
-                // MODIFIED: v3.03 - Update bell in Firestore personal schedule
-                if (!activePersonalScheduleId) return;
-                const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-                try {
-                    const docSnap = await getDoc(personalScheduleRef);
-                    if (!docSnap.exists()) return;
-                    const existingBells = docSnap.data().bells || [];
-                    const updatedBells = existingBells.map(b => 
-                        (b.time === originalTime && b.name === originalName) ? newBellData : b
-                    );
-                    await updateDoc(personalScheduleRef, { bells: updatedBells });
-                } catch (error) {
-                    console.error("Error updating personal bell:", error);
+                // MODIFIED: v3.25 - Check for nearby bell on edit
+                if (nearbyBell) {
+                    // Show the nearby bell modal and stop
+                    pendingPersonalBell = { ...newBellData, type: 'custom' };
+                    pendingPersonalBellAction = 'edit';
+                    pendingPersonalBellOriginal = currentEditingBell;
+                    
+                    nearbyBellName.textContent = nearbyBell.name;
+                    nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time, true);
+                    nearbyBellCustomControls.style.display = 'flex';
+                    nearbyBellModal.classList.remove('hidden');
+                    
+                    closeEditBellModal(); // Close the edit modal
+                    return; // Stop here, modal handler will take over
+                } else {
+                    // No conflict, update directly
+                    await executePersonalBellUpdate({ originalTime, originalName }, newBellData);
+                    closeEditBellModal();
                 }
-                closeEditBellModal();
+
             } else if (type === 'shared') {
                 // This is the bell we are matching against in other schedules
                 const originalBellForSearch = { time: originalTime, name: originalName, sound: originalSound };
@@ -3204,7 +3265,8 @@
                     if (override) {
                         return { ...bell, sound: override, originalSound: bell.sound };
                     }
-                    return bell;
+                    // MODIFIED: v3.25 - Need to set originalSound even if not overridden
+                    return { ...bell, originalSound: bell.sound };
                 });
             }
             
@@ -4132,8 +4194,8 @@
 
             // NEW: Modals (Nearby Bell - Custom Only)
             nearbyBellCancelBtn.addEventListener('click', closeNearbyBellModal);
-            // MODIFIED: v3.03 - Renamed
-            nearbyBellAddAnywayBtn.addEventListener('click', addPendingPersonalBell);
+            // MODIFIED: v3.25 - Changed listener
+            nearbyBellConfirmBtn.addEventListener('click', confirmPendingPersonalBellAction);
 
             // NEW: v3.02 Scenario 1 (Internal Conflict) Listeners
             internalConflictCancelBtn.addEventListener('click', closeAllConflictModals);
@@ -4302,4 +4364,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.24 -->
+<!-- Version 3.25 -->
