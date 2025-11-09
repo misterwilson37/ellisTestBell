@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.22</title>
+    <title>Ellis Web Bell 3.23</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Using Tone.js for web audio -->
@@ -492,7 +492,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.22</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.23</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1411,7 +1411,7 @@
             }
         }
 
-        // MODIFIED: v3.22 - Updated clock and next bell info logic
+        // MODIFIED: v3.22 -> v3.23 - Grammar changes
         function updateClock() {
             const now = new Date();
             const nowTimestamp = now.getTime(); // Get current time in ms
@@ -1423,7 +1423,8 @@
             // --- 1. Update Live Clock Display ---
             // Use (false) to ensure seconds are always shown for the clock
             const formattedTime = formatTime12Hour(currentTimeHHMMSS, false); 
-            clockElement.textContent = `The time is ${formattedTime}. There are.`;
+            // MODIFICATION: Removed period after "are"
+            clockElement.textContent = `The time is ${formattedTime}. There are`;
             
             // --- 2. Find Bells & Calculate Timers ---
             const allBells = [...localSchedule, ...personalBells];
@@ -1460,9 +1461,10 @@
                 const bellAfter = findBellAfter(scheduleBellObject, allBells);
                 if (bellAfter) {
                     // Use (true) to omit seconds if they are 00
-                    nextBellInfoString = `Next bell is ${bellAfter.name} at ${formatTime12Hour(bellAfter.time, true)}`;
+                    // MODIFICATION: Added period at the end
+                    nextBellInfoString = `Next bell is ${bellAfter.name} at ${formatTime12Hour(bellAfter.time, true)}.`;
                 } else {
-                    nextBellInfoString = "No more bells today.";
+                    nextBellInfoString = "No more bells today."; // Already has period
                 }
 
             } else if (millisToQuickBell < millisToScheduleBell) {
@@ -1474,9 +1476,10 @@
                 // The "next bell" info should be the next *schedule* bell
                 if (scheduleBellObject) {
                     // Use (true) to omit seconds if they are 00
-                    nextBellInfoString = `Next bell is ${scheduleBellObject.name} at ${formatTime12Hour(scheduleBellObject.time, true)}`;
+                    // MODIFICATION: Added period at the end
+                    nextBellInfoString = `Next bell is ${scheduleBellObject.name} at ${formatTime12Hour(scheduleBellObject.time, true)}.`;
                 } else {
-                    nextBellInfoString = "No more bells today.";
+                    nextBellInfoString = "No more bells today."; // Already has period
                 }
             }
             
@@ -1501,21 +1504,25 @@
                 countdownElement.textContent = countdownString;
                 
                 if (isMuting) {
-                    nextBellElement.textContent = `until ${activeTimerLabel} (MUTED)`;
+                    // MODIFICATION: Added period
+                    nextBellElement.textContent = `until ${activeTimerLabel} (MUTED).`;
                 } else {
-                    nextBellElement.textContent = `until ${activeTimerLabel}`;
+                    // MODIFICATION: Added period
+                    nextBellElement.textContent = `until ${activeTimerLabel}.`;
                 }
             } else {
                 // --- C. No active timer ---
                 countdownElement.textContent = "--:--";
+                // MODIFICATION: Added period
                 nextBellElement.textContent = "until the next bell.";
                 // "Next Bell" info is already set to "No more bells today."
                 // Or, if school is out, scheduleBellObject is the first bell tomorrow.
                 if (scheduleBellObject) {
-                    nextBellInfoString = `Next bell is ${scheduleBellObject.name} at ${formatTime12Hour(scheduleBellObject.time, true)}`;
+                    // MODIFICATION: Added period
+                    nextBellInfoString = `Next bell is ${scheduleBellObject.name} at ${formatTime12Hour(scheduleBellObject.time, true)}.`;
                     nextBellInfoElement.textContent = nextBellInfoString;
                 } else {
-                     nextBellInfoElement.textContent = "No bells scheduled.";
+                     nextBellInfoElement.textContent = "No bells scheduled."; // Already has period
                 }
             }
 
@@ -4340,4 +4347,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.22 -->
+<!-- Version 3.23 -->
