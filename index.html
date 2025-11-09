@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.29</title>
+    <title>Ellis Web Bell 3.30</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.29</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.30</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1290,7 +1290,18 @@
                 envelope: { attack: 0.1, decay: 0.2, release: 0.1 }
             }).toDestination();
             
-            synths['ellisBell.mp3'] = new Tone.Player("ellisBell.mp3").toDestination();
+            // MODIFIED: v3.30 - Cache a load promise for ellisBell.mp3 for Safari
+            synths['ellisBell.mp3'] = (async () => {
+                try {
+                    const player = new Tone.Player().toDestination();
+                    await player.load("ellisBell.mp3");
+                    console.log("ellisBell.mp3 pre-loaded.");
+                    return player;
+                } catch (e) {
+                    console.error("ellisBell.mp3 failed to pre-load", e);
+                    return null;
+                }
+            })();
         }
 
         async function playBell(soundName) {
@@ -1305,7 +1316,7 @@
             // configuration.
             //
             // See the chat for instructions on how to fix this using
-            // `gsutil` and a `cors.json` file.
+            // `gsutil` or the Google Cloud web portal.
             // --- End v3.28 Note ---
 
             if (!isAudioReady) {
@@ -1379,43 +1390,46 @@
                 return; // Handled http, now exit
             }
 
+            // --- MODIFIED: v3.30 - Handle 'ellisBell.mp3' (which is now a promise) ---
+            if (soundName === 'ellisBell.mp3') {
+                try {
+                    // synths['ellisBell.mp3'] is the promise from setupSynths()
+                    const player = await synths['ellisBell.mp3'];
+                    if (player && player.loaded) {
+                        player.start(now);
+                    } else {
+                        console.error("Ellis Bell player was not ready.");
+                    }
+                } catch (e) {
+                    console.error(`Error playing ${soundName}:`, e);
+                }
+                return; // Handled ellisBell.mp3, now exit
+            }
 
-            // --- Handle built-in synths (existing code) ---
+            // --- Handle built-in synths (Bell, Chime, Beep, Alarm) ---
             if (!synths[soundName]) {
                 console.warn(`Sound '${soundName}' not found.`);
                 return;
             }
 
-            const synth = synths[soundName];
+            const synth = synths[soundName]; // This is now *only* the synths
 
             try {
-                if (synth instanceof Tone.Player) {
-                    // This is for 'ellisBell.mp3'
-                    if (synth.loaded) {
-                        synth.start(now);
-                    } else {
-                        console.warn(`Sound ${soundName} not loaded yet. Attempting to load and play.`);
-                        synth.load(soundName).then(() => {
-                            synth.start(now);
-                        }).catch(err => {
-                            console.error(`Failed to load and play default audio: ${soundName}`, err);
-                        });
-                    }
-                } else {
-                     // Handle built-in synths
-                    if (soundName === 'Bell') {
-                        synth.triggerAttackRelease('C4', '0.5', now);
-                        synth.triggerAttackRelease('G4', '0.5', now + 0.3);
-                    } else if (soundName === 'Chime') {
-                        synth.triggerAttackRelease('G5', '0.8', now);
-                        synth.triggerAttackRelease('E6', '0.8', now + 0.5);
-                    } else if (soundName === 'Beep') {
-                        synth.triggerAttackRelease('A5', '0.1', now);
-                    } else if (soundName === 'Alarm') {
-                        synth.triggerAttackRelease("C5", "0.1", now);
-                        synth.triggerAttackRelease("C5", "0.1", now + 0.15);
-                        synth.triggerAttackRelease("C5", "0.1", now + 0.3);
-                    }
+                // DELETED: v3.30 - The 'if (synth instanceof Tone.Player)' block
+                
+                // Handle built-in synths
+                if (soundName === 'Bell') {
+                    synth.triggerAttackRelease('C4', '0.5', now);
+                    synth.triggerAttackRelease('G4', '0.5', now + 0.3);
+                } else if (soundName === 'Chime') {
+                    synth.triggerAttackRelease('G5', '0.8', now);
+                    synth.triggerAttackRelease('E6', '0.8', now + 0.5);
+                } else if (soundName === 'Beep') {
+                    synth.triggerAttackRelease('A5', '0.1', now);
+                } else if (soundName === 'Alarm') {
+                    synth.triggerAttackRelease("C5", "0.1", now);
+                    synth.triggerAttackRelease("C5", "0.1", now + 0.15);
+                    synth.triggerAttackRelease("C5", "0.1", now + 0.3);
                 }
             } catch (error) {
                 console.error("Error playing sound:", error);
@@ -4503,4 +4517,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.29 -->
+<!-- Version 3.30 -->
