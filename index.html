@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.23</title>
+    <title>Ellis Web Bell 3.24</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -60,25 +60,26 @@
         }
 
 
-        /* Fix for modal z-index issues */
+        /* MODIFIED: v3.24 - Consolidated Z-Indexing */
+        /* All standard modals are z-50 */
         #edit-bell-modal { z-index: 50; }
-        #change-sound-modal { z-index: 50; } /* NEW */
-        #nearby-bell-modal { z-index: 55; } /* Req 1 (Custom) */
-        #confirm-linked-edit-modal { z-index: 60; }
-        #confirm-delete-bell-modal { z-index: 55; }
-        #confirm-delete-audio-modal { z-index: 55; }
-        
-        /* NEW: Z-indexes for v3.02 logic */
-        #internal-conflict-warning-modal { z-index: 56; }
-        #internal-conflict-confirm-modal { z-index: 57; }
-        #external-conflict-modal { z-index: 56; }
-
-        /* NEW: Z-indexes for v3.03 logic */
+        #change-sound-modal { z-index: 50; }
+        #nearby-bell-modal { z-index: 50; }
+        #confirm-delete-bell-modal { z-index: 50; }
+        #confirm-delete-audio-modal { z-index: 50; }
+        #internal-conflict-warning-modal { z-index: 50; }
+        #external-conflict-modal { z-index: 50; }
         #create-personal-schedule-modal { z-index: 50; }
-        #confirm-delete-personal-modal { z-index: 55; }
+        #confirm-delete-personal-modal { z-index: 50; }
+        #confirm-restore-modal { z-index: 50; }
         
-        /* NEW: v3.05 */
-        #confirm-restore-modal { z-index: 55; }
+        /* Modals that appear ON TOP of other modals are z-60 */
+        #confirm-linked-edit-modal { z-index: 60; }
+        #internal-conflict-confirm-modal { z-index: 60; }
+        /* Note: Overlays (welcome, audio) and base modals 
+           (add-bell, confirm-delete) are set in HTML classes. */
+        /* END v3.24 Z-Index Cleanup */
+
         
         /* NEW: Hide file input, style the button */
         #import-file-input, #audio-upload-input, #restore-file-input {
@@ -150,7 +151,8 @@
     </div>
 
     <!-- NEW: Add Bell to Multiple Schedules Modal -->
-    <div id="add-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-40 hidden">
+    <!-- MODIFIED: v3.24 - Changed z-40 to z-50 -->
+    <div id="add-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="multi-add-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Add Bell to Schedules</h3>
             
@@ -316,7 +318,8 @@
 
 
     <!-- NEW: Confirm Delete Schedule Modal -->
-    <div id="confirm-delete-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-40 hidden">
+    <!-- MODIFIED: v3.24 - Changed z-40 to z-50 -->
+    <div id="confirm-delete-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
             <h3 class="text-xl font-medium mb-4">Delete Schedule</h3>
             <p id="confirm-delete-text" class="text-gray-700 mb-6">Are you sure you want to delete this schedule? This action cannot be undone.</p>
@@ -391,7 +394,7 @@
     </div>
 
     <!-- **** NEW: Scenario 1, Step 2: Internal Conflict Final Confirmation Modal **** -->
-    <div id="internal-conflict-confirm-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+    <div id="internal-conflict-confirm-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-medium mb-4 text-red-700">Are you sure?</h3>
             <p class="text-gray-700 mb-6">Are you absolutely positive you want to create a new bell at <strong id="internal-conflict-final-new-time">...</strong>, just <strong id="internal-conflict-final-diff">...</strong> seconds apart from the existing <strong id="internal-conflict-final-existing">...</strong> bell?</p>
@@ -492,7 +495,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.23</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.24</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1047,12 +1050,8 @@
 
         const signOutBtn = document.getElementById('signout-btn');
 
-        // Admin Email List
-        const ADMIN_EMAIL_LIST = [
-           'jacob.v.wilson@gmail.com',
-           'jacob.wilson@sumnerk12.net' // NEW: Added new admin email
-           // Add more emails here in the future
-        ];
+        // DELETED: v3.24 - Removed hardcoded admin list
+        // const ADMIN_EMAIL_LIST = [ ... ];
 
         // --- App State ---
         let db, auth, storage; // NEW: Added storage
@@ -1063,6 +1062,7 @@
         let personalBells = []; // NEW: Bells from the *active personal* schedule
         let scheduleRef; // For the *base* shared schedule
         let schedulesCollectionRef; // For *all* shared schedules
+        let sharedSchedulesListenerUnsubscribe = null; // NEW: v3.24 - For shared schedules
         let allSchedules = []; // Array of *all* shared schedules
         let allPersonalSchedules = []; // NEW: Array of *user's* personal schedules
         let activeBaseScheduleId = null; // MODIFIED: Renamed from activeScheduleId
@@ -1916,10 +1916,10 @@
                     // for Auth, Firestore, and Storage.
                 };
                 
-                // MODIFIED: Restored hardcoded appId
-                appId = "1:441560045695:web:94e51a006663404b8f474a";
-                
+                // MODIFIED: v3.24 - Removed duplicate hardcoded appId
                 const app = initializeApp(firebaseConfig);
+                appId = firebaseConfig.appId; // Set global appId from config
+                
                 db = getFirestore(app);
                 auth = getAuth(app);
                 storage = getStorage(app); // NEW: Initialize Storage
@@ -1979,29 +1979,24 @@
                            userDisplayNameElement.textContent = `Signed in as: ${displayName}`;
                         }
  
-                        // MODIFIED: Admin Check is now async and checks Firestore
+                        // MODIFIED: v3.24 - Admin Check now ONLY checks Firestore
                         let isAdmin = false; // Local admin flag
-                        if (user.email && ADMIN_EMAIL_LIST.includes(user.email)) {
-                            console.log("Admin email detected:", user.email);
-                            
-                            // NEW: Server-side admin check
+                        if (!user.isAnonymous && user.uid) { // Check for non-anonymous user
                             try {
                                 const adminDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'admins', user.uid);
                                 const adminDocSnap = await getDoc(adminDocRef);
                                 
                                 if (adminDocSnap.exists()) {
-                                    console.log("Server admin status confirmed.");
+                                    console.log("Server admin status confirmed for user:", user.email);
                                     isAdmin = true;
                                 } else {
-                                    console.warn("Admin email found, but server-side admin document is missing.");
-                                    console.warn(`Please create a document at: /artifacts/${appId}/public/data/admins/${user.uid}`);
+                                    console.log("Standard user detected:", user.email);
                                 }
                             } catch (err) {
                                 console.error("Error checking admin status:", err);
                             }
-                            
                         } else {
-                            console.log("Standard user detected.");
+                             console.log("Anonymous user, skipping admin check.");
                         }
 
                         // NEW: Enable admin toggle *only* if server-side check passed
@@ -2023,7 +2018,8 @@
                             allPersonalSchedules = []; // Clear personal schedules
                         }
                         schedulesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'schedules');
-                        await loadSharedSchedules(); // Renamed from loadAllSchedules
+                        // MODIFIED: v3.24 - Changed to real-time listener
+                        await listenForSharedSchedules(); 
                         
                         // NEW: Load audio files if not anonymous
                         if (!user.isAnonymous) {
@@ -2058,6 +2054,11 @@
                         if (personalSchedulesListenerUnsubscribe) {
                             personalSchedulesListenerUnsubscribe();
                             personalSchedulesListenerUnsubscribe = null;
+                        }
+                        // NEW: v3.24 - Unsubscribe from shared schedules
+                        if (sharedSchedulesListenerUnsubscribe) {
+                            sharedSchedulesListenerUnsubscribe();
+                            sharedSchedulesListenerUnsubscribe = null;
                         }
                         
                         document.body.classList.remove('authenticated', 'not-anonymous', 'admin-mode');
@@ -2146,31 +2147,50 @@
         }
 
 
-        // MODIFIED: v3.03 - Renamed from loadAllSchedules
-        async function loadSharedSchedules() {
+        // MODIFIED: v3.24 - Renamed from loadSharedSchedules, converted to onSnapshot
+        async function listenForSharedSchedules() {
+            if (sharedSchedulesListenerUnsubscribe) {
+                sharedSchedulesListenerUnsubscribe(); // Unsubscribe from old one if exists
+            }
             if (!schedulesCollectionRef) {
                  schedulesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'schedules');
             }
 
-            try {
-                const querySnapshot = await getDocs(schedulesCollectionRef);
+            console.log("Listening for real-time shared schedule updates...");
+
+            sharedSchedulesListenerUnsubscribe = onSnapshot(schedulesCollectionRef, (querySnapshot) => {
                 allSchedules = querySnapshot.docs.map(doc => ({
                     id: doc.id,
                     name: doc.data().name || "Unnamed Schedule",
                     bells: doc.data().bells || []
                 }));
                 allSchedules.sort((a, b) => a.name.localeCompare(b.name));
-                console.log("Loaded all shared schedules:", allSchedules.length);
+                console.log("Shared schedules updated from snapshot:", allSchedules.length);
 
-                // **** MODIFIED: v3.18 - This logic was moved from v3.18 ****
                 // The dropdown is disabled by default, we must enable it now.
                 scheduleSelector.disabled = false;
                 
-                renderScheduleSelector();
-            } catch (error) {
-                console.error("Error loading all shared schedules: ", error);
+                // CRITICAL: We must re-render the selector AND check if the active schedule still exists
+                const currentSelectedValue = scheduleSelector.value;
+                const activeScheduleExists = allSchedules.some(s => `shared-${s.id}` === currentSelectedValue);
+
+                renderScheduleSelector(); // This re-renders the list
+                
+                // If the currently selected schedule was a shared one and it still exists, keep it.
+                if (currentSelectedValue.startsWith('shared-') && activeScheduleExists) {
+                    scheduleSelector.value = currentSelectedValue;
+                } else if (currentSelectedValue.startsWith('personal-')) {
+                    // Do nothing, the personal schedule selection is fine
+                } else {
+                    // The active shared schedule was deleted, or no schedule was selected
+                    // renderScheduleSelector's default logic will handle this.
+                    console.log("Active shared schedule was deleted or none selected. Reverting to default.");
+                }
+
+            }, (error) => {
+                console.error("Error listening to shared schedules: ", error);
                 statusElement.textContent = "Error loading schedules.";
-            }
+            });
         }
 
         // MODIFIED: v3.03 - Complete rewrite to handle personal and shared schedules
@@ -2352,8 +2372,7 @@
                 
                 console.log("Schedule created with ID:", newDocRef.id);
                 newScheduleNameInput.value = '';
-                // MODIFIED: v3.03 - We now call loadSharedSchedules
-                await loadSharedSchedules(); 
+                // MODIFIED: v3.24 - Removed loadSharedSchedules()
                 
                 scheduleSelector.value = `shared-${newDocRef.id}`; // v3.03 prefix
                 setActiveSchedule(scheduleSelector.value);
@@ -2556,70 +2575,7 @@
          */
         /*
         function findAllNearbySharedBells(time) {
-            const newTimeInSeconds = timeToSeconds(time);
-            if (isNaN(newTimeInSeconds)) return { internal: null, external: [] };
-
-            let internalConflict = null;
-            const externalConflicts = [];
-
-            // MODIFIED: v3.03 - Use activeBaseScheduleId
-            const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
-
-            for (const schedule of allSchedules) {
-                // MODIFIED: v3.03 - Use activeBaseScheduleId
-                const isCurrentSchedule = schedule.id === activeBaseScheduleId;
-                
-                // Use findNearbyBell helper, but *only* check bells with the same name
-                // This is a modification from the spec, which said *any* bell.
-                // Re-reading: "within 60s of an existing bell" - doesn't specify name.
-                // Re-reading v3.02 "Conflict in Other Shared Schedules" - "Similar Bell Found"
-                // Let's assume the user *meant* to find bells with the *same name* for v3.02,
-                // as that's what makes the "Match" and "Create/Match" options logical.
-                // If we find bells with different names, matching them makes no sense.
-                //
-                // **Decision: I will check for bells with the *same name* within 60 seconds.**
-                // This aligns with the logic of "linked" bells.
-                //
-                // UPDATE: The original v3.02 code was checking *any* bell. Let's revert to that
-                // to match the spec `specs_v3.02.md` which says "an existing bell", not "an existing
-                // bell with the same name".
-                //
-                // OK, re-reading the v3.02 code I provided, it was `findAllNearbySharedBells(time)`
-                // and it did NOT check for name. I will remove the `name` parameter again.
-
-                const bellList = schedule.bells || [];
-                for (const bell of bellList) {
-                    // DELETED: Name check removed to match spec
-                    // if (bell.name !== name) {
-                    //     continue;
-                    // }
-
-                    const existingTimeInSeconds = timeToSeconds(bell.time);
-                    if (isNaN(existingTimeInSeconds)) continue;
-
-                    if (Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 60) {
-                        // Conflict found!
-                        if (isCurrentSchedule) {
-                            if (!internalConflict) { // Only grab the first one
-                                internalConflict = bell;
-                            }
-                        } else {
-                            externalConflicts.push({ schedule, bell });
-                        }
-                    }
-                }
-            }
-            
-            // De-duplicate external conflicts based on the bell itself (time and name)
-            const uniqueExternal = new Map();
-            for (const conflict of externalConflicts) {
-                const key = `${conflict.bell.name}::${conflict.bell.time}`;
-                if (!uniqueExternal.has(key)) {
-                    uniqueExternal.set(key, conflict);
-                }
-            }
-
-            return { internal: internalConflict, external: Array.from(uniqueExternal.values()) };
+            // ... (code was duplicated) ...
         }
         */
 
@@ -2915,7 +2871,7 @@
                 }
 
                 // For 'match' and 'create_and_match', we need to reset and close
-                await loadSharedSchedules(); // Reload data
+                // MODIFIED: v3.24 - Removed loadSharedSchedules()
                 addSharedBellForm.reset();
                 addSharedBellForm.elements['shared-bell-sound'].value = 'ellisBell.mp3'; 
                 setTimeout(() => {
@@ -2984,7 +2940,7 @@
                 console.log("Schedule deleted:", scheduleIdToDelete);
                 activeBaseScheduleId = null;
                 localSchedule = [];
-                await loadSharedSchedules(); 
+                // MODIFIED: v3.24 - Removed loadSharedSchedules()
             } catch (error) {
                 console.error("Error deleting schedule:", error);
             }
@@ -3383,7 +3339,7 @@
             saveSoundOverrides();
 
             await batch.commit();
-            await loadSharedSchedules(); // Reload data
+            // MODIFIED: v3.24 - Removed loadSharedSchedules()
         }
         
         function closeEditBellModal() {
@@ -3479,7 +3435,7 @@
                 }
                 multiAddStatus.textContent = statusMsg;
 
-                await loadSharedSchedules();
+                // MODIFIED: v3.24 - Removed loadSharedSchedules()
                 
                 multiBellTimeInput.value = '';
                 multiBellNameInput.value = '';
@@ -3617,8 +3573,7 @@
                     }
                     await batch.commit();
                     importStatus.textContent = `Import complete! Added: ${newCount}, Updated: ${updatedCount}.`;
-                    // MODIFIED: v3.03
-                    await loadSharedSchedules();
+                    // MODIFIED: v3.24 - Removed loadSharedSchedules()
                 } catch (error) {
                     console.error("Import failed:", error);
                     importStatus.textContent = `Error: ${error.message}`;
@@ -3903,7 +3858,7 @@
             if (schedulesToUpdate > 0) {
                 console.log(`Updating ${schedulesToUpdate} shared schedules...`);
                 await batch.commit();
-                await loadSharedSchedules(); // Reload all schedule data from scratch
+                // MODIFIED: v3.24 - Removed loadSharedSchedules()
             } else {
                 console.log("No shared schedules needed updating.");
             }
@@ -4347,4 +4302,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.23 -->
+<!-- Version 3.24 -->
