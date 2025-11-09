@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.20</title>
+    <title>Ellis Web Bell 3.21</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -492,7 +492,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.20</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.21</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -520,6 +520,10 @@
                 <!-- Line 3: "until XXBELLXX" -->
                 <div id="next-bell-sentence" class="text-2xl font-medium text-gray-600">
                     until the next bell.
+                </div>
+                <!-- MODIFIED: v3.21 - Added new line for next bell info -->
+                <div id="next-bell-info" class="text-lg text-gray-500 mt-2">
+                    <!-- JS will populate this -->
                 </div>
             </div>
 
@@ -863,6 +867,9 @@
         const scheduleSelector = document.getElementById('schedule-selector');
         const scheduleTitle = document.getElementById('schedule-title');
         const adminToggleBtn = document.getElementById('admin-toggle');
+
+        // MODIFIED: v3.21 - Added new info element
+        const nextBellInfoElement = document.getElementById('next-bell-info');
 
         // NEW: Quick Bell Elements
         const quickBellControls = document.getElementById('quickBellControls');
@@ -1375,6 +1382,7 @@
             return nextBell;
         }
 
+        // MODIFIED: v3.21 - Updated clock logic
         function updateClock() {
             const now = new Date();
             const nowTimestamp = now.getTime(); // Get current time in ms
@@ -1383,12 +1391,15 @@
             const seconds = String(now.getSeconds()).padStart(2, '0');
             const currentTimeHHMMSS = `${hours}:${minutes}:${seconds}`;
 
-            clockElement.textContent = `The time is ${currentTimeHHMMSS}. There are`;
+            // REQ 1: Format time for display and add period
+            const formattedTime = formatTime12Hour(currentTimeHHMMSS);
+            clockElement.textContent = `The time is ${formattedTime}. There are.`;
             
             const nextBell = findNextBell(currentTimeHHMMSS);
             
-            // --- NEW: Quick Bell + Schedule Bell Countdown Logic ---
+            // --- Quick Bell + Schedule Bell Countdown Logic ---
             let millisToScheduleBell = Infinity;
+            let scheduleBellObject = null; // Store the bell
             if (nextBell) {
                 const [h, m, s] = nextBell.time.split(':').map(Number);
                 const nextBellDate = new Date();
@@ -1398,6 +1409,7 @@
                     nextBellDate.setDate(nextBellDate.getDate() + 1);
                     millisToScheduleBell = nextBellDate.getTime() - nowTimestamp;
                 }
+                scheduleBellObject = nextBell; // Store it
             }
 
             const millisToQuickBell = quickBellEndTime ? quickBellEndTime.getTime() - nowTimestamp : Infinity;
@@ -1405,18 +1417,30 @@
             let activeTimerLabel = null;
             let activeTimerMillis = Infinity;
             let isMuting = false;
+            let nextBellInfoString = "No upcoming bell scheduled."; // REQ 2: Default for new line
 
-            if (millisToScheduleBell < millisToQuickBell && nextBell) {
-                activeTimerLabel = nextBell.name;
+            if (millisToScheduleBell < millisToQuickBell && scheduleBellObject) {
+                activeTimerLabel = scheduleBellObject.name;
                 activeTimerMillis = millisToScheduleBell;
-                const nextBellId = getBellId(nextBell);
+                const nextBellId = getBellId(scheduleBellObject);
                 isMuting = mutedBellIds.has(nextBellId);
+                // REQ 2: Set info string for schedule bell
+                nextBellInfoString = `Next: ${formatTime12Hour(scheduleBellObject.time)} (${scheduleBellObject.name})`;
+                if (isMuting) nextBellInfoString += " (MUTED)";
+
             } else if (millisToQuickBell < millisToScheduleBell) {
                 activeTimerLabel = "Quick Bell";
                 activeTimerMillis = millisToQuickBell;
-                isMuting = false;
+                isMuting = false; // Quick bells can't be muted
+                // REQ 2: Set info string for quick bell
+                const quickBellTimeStr = quickBellEndTime.toTimeString().split(' ')[0];
+                nextBellInfoString = `Next: ${formatTime12Hour(quickBellTimeStr)} (Quick Bell)`;
             }
 
+            // REQ 2: Update the new line
+            nextBellInfoElement.textContent = nextBellInfoString;
+
+            // Now, handle the countdown display
             if (activeTimerLabel) {
                 let totalSeconds = Math.max(0, Math.floor(activeTimerMillis / 1000));
                 let cdHours = Math.floor(totalSeconds / 3600);
@@ -1443,7 +1467,7 @@
                 countdownElement.textContent = "--:--";
                 nextBellElement.textContent = "until the next bell.";
             }
-            // --- END NEW Countdown Logic ---
+            // --- END v3.21 MODIFICATION ---
 
 
             // --- Ring Logic (Scheduled Bells) ---
@@ -2456,7 +2480,7 @@
                 console.log("Schedule restored.");
                 
                 // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
-                // The onSnapshot listener will handle the update.
+                // The listener will handle the update.
                 scheduleSelector.value = `personal-${activePersonalScheduleId}`;
                 setActiveSchedule(scheduleSelector.value);
 
@@ -4268,4 +4292,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.20 -->
+<!-- Version 3.21 -->
