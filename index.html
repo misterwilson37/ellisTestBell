@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.25</title>
+    <title>Ellis Web Bell 3.26</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -72,6 +72,8 @@
         #create-personal-schedule-modal { z-index: 50; }
         #confirm-delete-personal-modal { z-index: 50; }
         #confirm-restore-modal { z-index: 50; }
+        /* NEW: v3.26 - Add rename modal to z-50 */
+        #rename-personal-schedule-modal { z-index: 50; }
         
         /* Modals that appear ON TOP of other modals are z-60 */
         #confirm-linked-edit-modal { z-index: 60; }
@@ -489,6 +491,29 @@
             </div>
         </div>
     </div>
+    
+    <!-- NEW: v3.26 - Rename Personal Schedule Modal -->
+    <div id="rename-personal-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <form id="rename-personal-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-2xl font-medium mb-6">Rename Personal Schedule</h3>
+            
+            <p class="text-gray-700 mb-4">
+                Current Name: <strong id="rename-old-schedule-name">...</strong>
+            </p>
+            
+            <div>
+                <label for="rename-new-schedule-name" class="block text-sm font-medium text-gray-700">New Schedule Name</label>
+                <input type="text" id="rename-new-schedule-name" placeholder="e.g. My A-Day Schedule" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <p id="rename-personal-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="rename-personal-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Name</button>
+            </div>
+        </form>
+    </div>
     <!-- END: Moved Modals (v3.08) -->
 
 
@@ -496,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.25</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.26</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -975,6 +1000,14 @@
         const confirmRestoreText = document.getElementById('confirm-restore-text');
         const restoreConfirmBtn = document.getElementById('restore-confirm');
         const restoreCancelBtn = document.getElementById('restore-cancel');
+
+        // NEW: v3.26 - Rename Personal Schedule Modal
+        const renamePersonalScheduleModal = document.getElementById('rename-personal-schedule-modal');
+        const renamePersonalScheduleForm = document.getElementById('rename-personal-schedule-form');
+        const renameOldScheduleName = document.getElementById('rename-old-schedule-name');
+        const renameNewScheduleNameInput = document.getElementById('rename-new-schedule-name');
+        const renamePersonalScheduleStatus = document.getElementById('rename-personal-schedule-status');
+        const renamePersonalCancelBtn = document.getElementById('rename-personal-cancel');
 
 
         // Delete Bell Modal
@@ -2472,32 +2505,59 @@
 
         // --- NEW: v3.05 Personal Schedule Manager Functions ---
 
-        async function handleRenamePersonalSchedule() {
+        // MODIFIED: v3.26 - Replaced prompt() with custom modal
+        function handleRenamePersonalSchedule() {
             if (!activePersonalScheduleId) return;
             const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
             if (!schedule) return;
 
-            // Use prompt (since custom modals are complex for this)
-            // We'll replace this if the user wants a prettier modal
-            const newName = prompt("Enter new name for:", schedule.name);
+            // Populate modal with current name
+            renameOldScheduleName.textContent = schedule.name;
+            renameNewScheduleNameInput.value = schedule.name;
+            renamePersonalScheduleStatus.classList.add('hidden'); // Clear status
             
-            if (newName && newName.trim() !== "" && newName.trim() !== schedule.name) {
+            // Show the modal
+            renamePersonalScheduleModal.classList.remove('hidden');
+        }
+
+        // NEW: v3.26 - Form submission handler for the rename modal
+        async function handleRenamePersonalScheduleSubmit(e) {
+            e.preventDefault();
+            if (!activePersonalScheduleId) return;
+            const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+            if (!schedule) return;
+
+            const newName = renameNewScheduleNameInput.value.trim();
+            
+            if (newName && newName !== "" && newName !== schedule.name) {
+                renamePersonalScheduleStatus.textContent = "Saving...";
+                renamePersonalScheduleStatus.classList.remove('hidden');
+                
                 const docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 try {
-                    await updateDoc(docRef, { name: newName.trim() });
+                    await updateDoc(docRef, { name: newName });
                     console.log("Personal schedule renamed.");
-                    // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
-                    // The onSnapshot listener will handle the update automatically.
+                    // The onSnapshot listener will handle the UI update.
                     
                     // Reselect the renamed schedule
                     scheduleSelector.value = `personal-${activePersonalScheduleId}`;
                     setActiveSchedule(scheduleSelector.value);
+                    
+                    renamePersonalScheduleModal.classList.add('hidden'); // Close modal on success
                 } catch (error) {
                     console.error("Error renaming schedule:", error);
-                    // We can't use alert(), so log to console
+                    renamePersonalScheduleStatus.textContent = "Error saving name.";
                 }
+            } else if (newName === schedule.name) {
+                // No change, just close the modal
+                renamePersonalScheduleModal.classList.add('hidden');
+            } else {
+                // Invalid name
+                renamePersonalScheduleStatus.textContent = "Please enter a valid name.";
+                renamePersonalScheduleStatus.classList.remove('hidden');
             }
         }
+
 
         function handleBackupPersonalSchedule() {
             if (!activePersonalScheduleId) return;
@@ -3747,6 +3807,39 @@
                 console.error("Error loading shared files:", e); 
                 sharedAudioFiles = []; // Ensure it's an array
             }
+            
+            // NEW: v3.26 - Prune stale entries from synth cache
+            try {
+                // Create a set of all valid URLs from the file lists
+                const validUrls = new Set([...userAudioFiles.map(f => f.url), ...sharedAudioFiles.map(f => f.url)]);
+                
+                // Get all cached URLs, but EXCLUDE the built-in 'ellisBell.mp3'
+                const cachedUrls = Object.keys(synths).filter(url => url.startsWith('http') && url !== 'ellisBell.mp3');
+                
+                let clearedCount = 0;
+                for (const url of cachedUrls) {
+                    if (!validUrls.has(url)) {
+                        // This cached URL is no longer in Firebase Storage
+                        delete synths[url];
+                        clearedCount++;
+                    }
+                }
+                if (clearedCount > 0) {
+                    console.log(`Cleared ${clearedCount} stale audio file(s) from cache.`);
+                }
+
+                // NEW: v3.26 - Check Quick Bell sound against valid URLs
+                // Only check if it's a custom sound URL
+                if (quickBellSound.startsWith('http') && !validUrls.has(quickBellSound)) {
+                    console.log("Resetting Quick Bell sound from stale cache (file no longer exists).");
+                    quickBellSound = 'ellisBell.mp3';
+                    if (quickBellSoundSelect) { // Ensure select exists
+                        quickBellSoundSelect.value = 'ellisBell.mp3';
+                    }
+                }
+            } catch (e) {
+                console.error("Error during cache pruning:", e);
+            }
 
             // 3. Render the lists
             renderAudioFileManager();
@@ -4013,6 +4106,21 @@
                 
                 const fileRef = ref(storage, path);
                 await deleteObject(fileRef);
+
+                // NEW: v3.26 - Immediately clear the cached synth for this URL
+                if (synths[url]) {
+                    delete synths[url];
+                    console.log("Cleared deleted audio from cache:", url);
+                }
+                
+                // NEW: v3.26 - Immediately reset Quick Bell if it was using this sound
+                if (quickBellSound === url) {
+                    quickBellSound = 'ellisBell.mp3';
+                    if (quickBellSoundSelect) { // Check if select is rendered
+                        quickBellSoundSelect.value = 'ellisBell.mp3';
+                    }
+                    console.log("Reset Quick Bell sound from deleted file.");
+                }
                 
                 audioUploadStatus.textContent = "File deleted. Updating schedules...";
                 
@@ -4175,6 +4283,13 @@
             restoreCancelBtn.addEventListener('click', () => {
                 confirmRestoreModal.classList.add('hidden');
                 pendingRestoreData = null;
+            });
+            
+            // NEW: v3.26 - Rename Modal Listeners
+            renamePersonalScheduleForm.addEventListener('submit', handleRenamePersonalScheduleSubmit);
+            renamePersonalCancelBtn.addEventListener('click', () => {
+                renamePersonalScheduleModal.classList.add('hidden');
+                renamePersonalScheduleStatus.classList.add('hidden');
             });
 
 
@@ -4364,4 +4479,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.25 -->
+<!-- Version 3.26 -->
