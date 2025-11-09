@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.26</title>
+    <title>Ellis Web Bell 3.27</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.26</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.27</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1327,13 +1327,15 @@
                     // Create and cache the promise *immediately* to prevent re-fetch
                     const loadPromise = (async () => {
                         try {
-                            // FIX: Tone.Player can load the URL directly.
-                            // We don't need getBytes() or ref(). The download URL
-                            // from Firebase Storage is already public.
-                            const player = new Tone.Player(soundName).toDestination();
+                            // MODIFIED: v3.27 - Correctly load a single player
+                            // 1. Create an empty player
+                            const player = new Tone.Player().toDestination();
                             
-                            // We must wait for it to be loaded
-                            await Tone.loaded();
+                            // 2. Await its load method
+                            // This returns the player instance when loaded.
+                            await player.load(soundName); 
+                            
+                            // DELETED: await Tone.loaded(); // This was the bug
                             
                             console.log(`Successfully loaded: ${soundName}`);
                             return player; // Promise resolves to a loaded player
@@ -3868,7 +3870,8 @@
                                     Make Public
                                  </button>`
                             }
-                            <button class="preview-audio-btn px-2 py-0 text-lg leading-none bg-gray-200 rounded-lg hover:bg-gray-300" data-url="${file.url}" aria-label="Play">&#9654;</button>
+                            <!-- MODIFIED: v3.27 - Adjusted padding and text size -->
+                            <button class="preview-audio-btn px-3 py-1 text-sm bg-gray-200 rounded-lg hover:bg-gray-300" data-url="${file.url}" aria-label="Play">&#9654;</button>
                             <button class="delete-audio-btn text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600" data-path="${file.path}" data-url="${file.url}">Delete</button>
                         </div>
                     </div>
@@ -3887,8 +3890,8 @@
                             <span class="text-xs text-gray-500 ml-2">(by ${file.owner})</span>
                         </div>
                         <div class="flex-shrink-0 flex items-center space-x-2 mt-2 sm:mt-0">
-                            <!-- MODIFIED: Changed button text from "Play" to icon -->
-                            <button class="preview-audio-btn px-2 py-0 text-lg leading-none bg-gray-200 rounded-lg hover:bg-gray-300" data-url="${file.url}" aria-label="Play">&#9654;</button>
+                            <!-- MODIFIED: v3.27 - Adjusted padding and text size -->
+                            <button class="preview-audio-btn px-3 py-1 text-sm bg-gray-200 rounded-lg hover:bg-gray-300" data-url="${file.url}" aria-label="Play">&#9654;</button>
                             <!-- Admins can delete public files -->
                             <button class="delete-audio-btn admin-only text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600" data-path="${file.path}" data-url="${file.url}">Delete</button>
                         </div>
@@ -4479,4 +4482,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.26 -->
+<!-- Version 3.27 -->
