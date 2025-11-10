@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.44</title>
+    <title>Ellis Web Bell 3.45</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.44</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.45</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -4090,7 +4090,7 @@
 
         async function handleAudioListClick(e) {
             const target = e.target;
-
+        
             // Handle Preview
             if (target.classList.contains('preview-audio-btn')) {
                 const url = target.dataset.url;
@@ -4124,7 +4124,15 @@
             
             // MODIFIED: Handle Make Public (Admin) button click
             if (target.classList.contains('make-public-btn')) {
-                if (!document.body.classList.contains('admin-mode')) return;
+                
+                // *** START OF REPLACEMENT BLOCK ***
+                
+                // *** NEW CLIENT-SIDE ADMIN CHECK ***
+                if (!document.body.classList.contains('admin-mode')) {
+                    console.error("Client-side block: Non-admin user attempted to make file public.");
+                    // We rely on the button being hidden, but this is the ultimate safeguard.
+                    return; 
+                }
                 
                 const sourcePath = target.dataset.path;
                 const fileName = target.dataset.name;
@@ -4145,7 +4153,6 @@
                     const bytes = await getBytes(sourceRef);
                     
                     // Create the new metadata for the public file
-                    // MODIFIED: v3.29 - Also copy the contentType
                     const publicMetadata = { 
                         contentType: metadata.contentType, // <-- THE FIX
                         customMetadata: metadata.customMetadata || { 'owner': userId, 'ownerEmail': auth.currentUser.email || 'unknown' } 
@@ -4157,18 +4164,31 @@
                     audioUploadStatus.textContent = `${fileName} is now public.`;
                     await loadAllAudioFiles();
                     setTimeout(() => audioUploadStatus.classList.add('hidden'), 3000);
-
+        
                 } catch(error) {
                     console.error("Failed to make file public:", error);
                     audioUploadStatus.textContent = `Error: ${error.message}`;
                     target.disabled = false;
                 }
+        
+                // *** END OF REPLACEMENT BLOCK ***
+        
             }
         }
 
         // NEW: Function to execute the audio deletion
         async function confirmDeleteAudio() {
             if (!audioToDelete) return;
+
+            // *** NEW CLIENT-SIDE ADMIN CHECK (for shared file deletion) ***
+            // If the path is public AND the user is not in admin mode, block.
+            // Note: Users can still delete their private files, which is fine.
+            if (audioToDelete.path.startsWith('sounds/public') && !document.body.classList.contains('admin-mode')) {
+                console.error("Client-side block: Non-admin user attempted to delete shared file.");
+                // This message will be hidden by the final block, so no need for a visible message here.
+                return; 
+            }
+
             const { path, url } = audioToDelete;
 
             try {
@@ -4550,4 +4570,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.44 -->
+<!-- Version 3.45 -->
