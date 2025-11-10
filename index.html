@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.46</title>
+    <title>Ellis Web Bell 4.00</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.46</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.00</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1092,9 +1092,15 @@
         let db, auth, storage; // NEW: Added storage
         let userId;
         let isUserAnonymous = true; // NEW: Track anonymous state
-        let localSchedule = []; // Bells from the *base* shared schedule
-        // DELETED: customBells = []; // This is GONE
-        let personalBells = []; // NEW: Bells from the *active personal* schedule
+        // Updated for 4.0 all piecemeal like.  We'll see how it goes.
+        let db, auth, storage; // NEW: Added storage
+        let userId;
+        let isUserAnonymous = true; // NEW: Track anonymous state
+        let localSchedulePeriods = []; // NEW: Periods from the *base* shared schedule
+        let personalBellsPeriods = []; // NEW: Periods from the *active personal* schedule
+        let localSchedule = []; // FLAT list of bells from localSchedulePeriods
+        let personalBells = []; // FLAT list of bells from personalBellsPeriods
+        let scheduleRef; // For the *base* shared schedule
         let scheduleRef; // For the *base* shared schedule
         let schedulesCollectionRef; // For *all* shared schedules
         let sharedSchedulesListenerUnsubscribe = null; // NEW: v3.24 - For shared schedules
@@ -1656,121 +1662,167 @@
         }
 
         // --- Render Functions ---
+        // Updated for 4.0 all piecemeal like.  We'll see how it goes.
+        // MODIFIED: v4.0 - Renders bells grouped by periods with collapsible sections.
         function renderCombinedList() {
-            // MODIFIED: v3.03 - Merges base schedule and personal schedule bells
-            const allBells = [...localSchedule, ...personalBells];
-            allBells.sort((a, b) => a.time.localeCompare(b.time));
-
-            if (allBells.length === 0) {
+            // Combine both period structures
+            const combinedPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
+            
+            // Step 1: Filter out periods that have no bells, or are disabled (future feature)
+            let renderablePeriods = combinedPeriods.filter(p => p.bells && p.bells.length > 0 && p.isEnabled !== false);
+            
+            if (renderablePeriods.length === 0) {
                 combinedBellListElement.innerHTML = `<div class="p-8 text-center text-gray-500">No bells scheduled for this day.</div>`;
                 return;
             }
 
-            combinedBellListElement.innerHTML = allBells.map((bell, index) => {
-                const isCustom = bell.type === 'custom';
-                const isFirst = index === 0;
-                const safeName = bell.name.replace(/"/g, '&quot;');
-                const bellId = getBellId(bell);
-                const isMuted = mutedBellIds.has(bellId);
-                const originalSound = bell.originalSound || bell.sound; // NEW: Get original sound
-                const isOverridden = bell.sound !== originalSound; // NEW: Check if overridden
+            // Step 2: Sort periods chronologically by the time of the first bell in that period
+            renderablePeriods = sortPeriodsByFirstBell(renderablePeriods);
 
-                // Truncate long sound URLs for display
-                let soundDisplay = bell.sound;
-                if (soundDisplay && soundDisplay.startsWith('http')) {
-                    try {
-                        const url = new URL(soundDisplay);
-                        // MODIFICATION: Decode path, THEN split by '/' and get filename
-                        let path = decodeURIComponent(url.pathname.split('/').pop());
-                        soundDisplay = path.split('/').pop(); // Get just the filename
-                    } catch (e) {
-                        soundDisplay = "Custom Sound";
-                    }
-                } else if (soundDisplay === 'ellisBell.mp3') {
-                    soundDisplay = "Ellis Bell";
-                } else if (!soundDisplay) {
-                    soundDisplay = "No Sound";
-                }
+            // Step 3: Render as collapsible sections
+            combinedBellListElement.innerHTML = renderablePeriods.map(period => {
                 
-                // NEW: Add prefix if overridden
-                if (isOverridden) {
-                    soundDisplay = `Custom: ${soundDisplay}`;
-                }
+                // Get all bells for this period, sorted by time
+                const sortedBells = [...period.bells].sort((a, b) => a.time.localeCompare(b.time));
 
+                // Determine if this is a PERSONAL period (based on whether it was added to the personalBellsPeriods)
+                const isPersonalPeriod = personalBellsPeriods.some(p => p.name === period.name);
+                
+                // Get a list of all bells in this period with their final type (shared or custom)
+                const bellsToRender = sortedBells.map(bell => {
+                    // Check if this bell is a custom bell (i.e., exists in the personalBells flat list)
+                    const isCustom = personalBells.some(b => b.time === bell.time && b.name === bell.name);
+                    const bellType = isCustom ? 'custom' : 'shared';
+                    
+                    // Look up the bell in the flat list to get sound overrides
+                    const flatBellData = localSchedule.find(b => b.time === bell.time && b.name === bell.name) || 
+                                         personalBells.find(b => b.time === bell.time && b.name === bell.name) ||
+                                         bell; // Fallback to original bell data
 
-                // MODIFIED: v3.19 - Reordered controls
-                return `
-                    <div class="bell-item flex items-center justify-between p-4 ${!isFirst ? 'border-t border-gray-200' : ''} hover:bg-gray-50 transition-colors"
-                         data-time="${bell.time}" data-name="${safeName}" 
-                         data-sound="${bell.sound}" data-type="${bell.type}"
-                         data-original-sound="${originalSound}"> <!-- NEW: Store original sound -->
-                        
-                        <!-- Bell Info (Time, Name, Sound) (left) -->
-                        <div class="flex items-center space-x-4 min-w-0 flex-grow">
-                            <!-- MODIFIED: v3.22 - Use (false) to always show seconds in list -->
-                            <span class="text-xl font-medium text-blue-600 tabular-nums">${formatTime12Hour(bell.time, false)}</span>
-                            <div class="min-w-0">
-                                <span class="font-medium text-gray-800 truncate block" title="${safeName}">${safeName}</span>
-                                <!-- MODIFIED: Updated sound display logic -->
-                                <span class="text-sm ${isOverridden ? 'text-blue-600' : 'text-gray-500'} truncate block" title="${bell.sound}">(${soundDisplay})</span>
-                                ${isCustom ? '<span class="ml-2 text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">PERSONAL</span>' : ''}
+                    return { ...flatBellData, ...bell, type: bellType };
+                });
+
+                const firstBellTime = formatTime12Hour(bellsToRender[0].time, true);
+                const lastBellTime = formatTime12Hour(bellsToRender[bellsToRender.length - 1].time, true);
+
+                // Start Period Header (Collapsible <details> tag)
+                let periodHtml = `
+                    <details class="group border-b border-gray-200">
+                        <summary class="flex items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-xl font-bold text-gray-800">${period.name}</span>
+                                ${isPersonalPeriod ? '<span class="ml-2 text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">PERSONAL</span>' : ''}
                             </div>
-                        </div>
-                        
-                        <!-- Right side controls (Audio + Admin) -->
-                        <div class="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-2 sm:gap-0">
-                        
-                            <!-- Group 1: Audio Controls (Sound, Play, Mute) -->
-                            <div class="flex items-center space-x-2">
-                                
-                                <!-- 1. "Sound" Button (Shared Bells only) -->
-                                <button class="sound-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                                        style="${isCustom ? 'display: none;' : ''}"
-                                        aria-label="Change sound for ${safeName}"
-                                        title="Change sound">Sound</button>
-                                
-                                <!-- 2. "Play" Button (NEW for all bells) -->
-                                <!-- **** MODIFIED: v3.20 - Changed classes for alignment **** -->
-                                <button class="preview-bell-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300" 
-                                        aria-label="Play sound for ${safeName}"
-                                        title="Play Sound">&#9654;</button>
-
-                                <!-- 3. "Mute" Control (Label + Checkbox) -->
-                                <label class="flex items-center space-x-2 cursor-pointer p-1"> <!-- Added p-1 for better touch target -->
-                                    <span class="text-sm font-medium text-gray-700">Mute</span>
-                                    <input type="checkbox" class="bell-mute-toggle h-5 w-5 text-blue-600 rounded focus:ring-blue-500" 
-                                           data-bell-id="${bellId}" ${isMuted ? 'checked' : ''} 
-                                           aria-label="Mute this bell">
-                                </label>
-                            </div>
-
-                            <!-- Group 2: Admin/Edit Controls -->
-                            <div class="flex-shrink-0 space-x-2">
-                                <!-- Admin-only Edit (Time/Name) button -->
-                                <button class="edit-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                                        aria-label="Edit shared bell ${safeName}"
-                                        title="Edit shared bell">Edit</button>
-                                
-                                <!-- Admin-only Delete button -->
-                                <button class="delete-btn px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
-                                        aria-label="Delete shared bell ${safeName}"
-                                        title="Delete shared bell">Delete</button>
-                                
-                                <!-- Custom Bell Edit (Time/Name/Sound) button -->
-                                <button class="edit-custom-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                                        style="${!isCustom ? 'display: none;' : ''}"
-                                        aria-label="Edit custom bell ${safeName}"
-                                        title="Edit custom bell">Edit</button>
-                                
-                                <!-- Custom Bell Delete button -->
-                                <button class="delete-custom-btn px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
-                                        style="${!isCustom ? 'display: none;' : ''}"
-                                        aria-label="Delete custom bell ${safeName}"
-                                        title="Delete custom bell">Delete</button>
-                            </div>
-                        </div>
-                    </div>
+                            <span class="text-gray-600 text-sm">
+                                ${firstBellTime} - ${lastBellTime}
+                                <span class="group-open:hidden ml-2">&#9660;</span>
+                                <span class="group-open:inline-block hidden ml-2">&#9650;</span>
+                            </span>
+                        </summary>
+                        <div class="p-0">
                 `;
+
+                // Render Bells inside the Period
+                periodHtml += bellsToRender.map((bell, index) => {
+                    const isCustom = bell.type === 'custom';
+                    const safeName = bell.name.replace(/"/g, '&quot;');
+                    const bellId = getBellId(bell);
+                    const isMuted = mutedBellIds.has(bellId);
+                    const originalSound = bell.originalSound || bell.sound;
+                    const isOverridden = bell.sound !== originalSound; 
+
+                    let soundDisplay = bell.sound;
+                    if (soundDisplay && soundDisplay.startsWith('http')) {
+                        try {
+                            const url = new URL(soundDisplay);
+                            let path = decodeURIComponent(url.pathname.split('/').pop());
+                            soundDisplay = path.split('/').pop();
+                        } catch (e) {
+                            soundDisplay = "Custom Sound";
+                        }
+                    } else if (soundDisplay === 'ellisBell.mp3') {
+                        soundDisplay = "Ellis Bell";
+                    } else if (!soundDisplay) {
+                        soundDisplay = "No Sound";
+                    }
+                    
+                    if (isOverridden) {
+                        soundDisplay = `Custom: ${soundDisplay}`;
+                    }
+
+                    return `
+                        <div class="bell-item flex items-center justify-between p-4 border-t border-gray-100 hover:bg-gray-50 transition-colors"
+                            data-time="${bell.time}" data-name="${safeName}" 
+                            data-sound="${bell.sound}" data-type="${bell.type}"
+                            data-original-sound="${originalSound}" data-period-name="${period.name}">
+                            
+                            <!-- Bell Info (Time, Name, Sound) (left) -->
+                            <div class="flex items-center space-x-4 min-w-0 flex-grow">
+                                <span class="text-xl font-medium text-blue-600 tabular-nums">${formatTime12Hour(bell.time, false)}</span>
+                                <div class="min-w-0">
+                                    <span class="font-medium text-gray-800 truncate block" title="${safeName}">${safeName}</span>
+                                    <span class="text-sm ${isOverridden ? 'text-blue-600' : 'text-gray-500'} truncate block" title="${bell.sound}">(${soundDisplay})</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Right side controls (Audio + Admin) -->
+                            <div class="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-2 sm:gap-0">
+                            
+                                <!-- Group 1: Audio Controls (Sound, Play, Mute) -->
+                                <div class="flex items-center space-x-2">
+                                    <button class="sound-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                                            style="${isCustom ? 'display: none;' : ''}"
+                                            aria-label="Change sound for ${safeName}"
+                                            title="Change sound">Sound</button>
+                                    
+                                    <button class="preview-bell-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300" 
+                                            aria-label="Play sound for ${safeName}"
+                                            title="Play Sound">&#9654;</button>
+
+                                    <label class="flex items-center space-x-2 cursor-pointer p-1"> 
+                                        <span class="text-sm font-medium text-gray-700">Mute</span>
+                                        <input type="checkbox" class="bell-mute-toggle h-5 w-5 text-blue-600 rounded focus:ring-blue-500" 
+                                               data-bell-id="${bellId}" ${isMuted ? 'checked' : ''} 
+                                               aria-label="Mute this bell">
+                                    </label>
+                                </div>
+
+                                <!-- Group 2: Admin/Edit Controls -->
+                                <div class="flex-shrink-0 space-x-2">
+                                    <!-- Admin-only Edit/Delete for SHARED bells -->
+                                    <button class="edit-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                                            style="${isCustom ? 'display: none;' : ''}"
+                                            aria-label="Edit shared bell ${safeName}"
+                                            title="Edit shared bell">Edit</button>
+                                    
+                                    <button class="delete-btn px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                            style="${isCustom ? 'display: none;' : ''}"
+                                            aria-label="Delete shared bell ${safeName}"
+                                            title="Delete shared bell">Delete</button>
+                                    
+                                    <!-- Custom Bell Edit/Delete -->
+                                    <button class="edit-custom-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                                            style="${!isCustom ? 'display: none;' : ''}"
+                                            aria-label="Edit custom bell ${safeName}"
+                                            title="Edit custom bell">Edit</button>
+                                    
+                                    <button class="delete-custom-btn px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                            style="${!isCustom ? 'display: none;' : ''}"
+                                            aria-label="Delete custom bell ${safeName}"
+                                            title="Delete custom bell">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                // End Period Footer
+                periodHtml += `
+                        </div>
+                    </details>
+                `;
+
+                return periodHtml;
             }).join('');
         }
 
@@ -1838,7 +1890,40 @@
                 return NaN;
             }
         }
+        // Updated for 4.0 all piecemeal like.  We'll see how it goes.
+        /**
+         * NEW: v4.0 - Converts the period structure into a flat, time-sorted list of bells.
+         * @param {Array} periodList - Array of { name, bells: [...] } objects.
+         * @returns {Array} Flat array of bell objects.
+         */
+        function flattenPeriodsToBells(periodList) {
+            if (!periodList || periodList.length === 0) return [];
+            let flatBells = [];
+            periodList.forEach(period => {
+                if (period.bells && period.isEnabled) {
+                    period.bells.forEach(bell => {
+                        // Inherit period context into the bell object
+                        flatBells.push({ ...bell, periodName: period.name }); 
+                    });
+                }
+            });
+            // Final sort by time to ensure chronological order for the clock
+            flatBells.sort((a, b) => a.time.localeCompare(b.time));
+            return flatBells;
+        }
 
+        /**
+         * NEW: v4.0 - Sorts periods chronologically based on the time of their first bell.
+         * @param {Array} periods - Array of period objects.
+         * @returns {Array} Sorted array of period objects.
+         */
+        function sortPeriodsByFirstBell(periods) {
+            return [...periods].sort((a, b) => {
+                const timeA = a.bells && a.bells.length > 0 ? a.bells[0].time : '23:59:59';
+                const timeB = b.bells && b.bells.length > 0 ? b.bells[0].time : '23:59:59';
+                return timeA.localeCompare(timeB);
+            });
+        }
         /**
          * Finds a bell within 60 seconds of the given time.
          * @param {string} time - The time to check (HH:MM:SS)
@@ -2296,7 +2381,8 @@
             });
         }
 
-        // MODIFIED: v3.03 - Complete rewrite to handle personal and shared schedules
+        // Updated for 4.0 all piecemeal like.  We'll see how it goes.
+        // MODIFIED: v4.0 - Complete rewrite to handle period structures
         function setActiveSchedule(prefixedId) {
             // Unsubscribe from *both* listeners
             if (activeScheduleListenerUnsubscribe) {
@@ -2308,9 +2394,11 @@
                 activePersonalScheduleListenerUnsubscribe = null;
             }
 
-            // Reset bell arrays
-            localSchedule = [];
-            personalBells = [];
+            // Reset bell arrays (now period structures)
+            localSchedulePeriods = [];
+            personalBellsPeriods = [];
+            localSchedule = []; // Reset flat list
+            personalBells = []; // Reset flat list
             
             // v3.05: Disable manager buttons
             renamePersonalScheduleBtn.disabled = true;
@@ -2361,11 +2449,15 @@
                 activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const scheduleData = docSnap.data();
-                        if (activePersonalScheduleId === null) { // Only update title if a personal schedule isn't active
+                        if (activePersonalScheduleId === null) { 
                             scheduleTitle.textContent = scheduleData.name;
                         }
-                        // Apply sound overrides to base schedule bells
-                        localSchedule = (scheduleData.bells || []).map(bell => {
+                        
+                        // NEW v4.0: Get periods array
+                        localSchedulePeriods = scheduleData.periods || [];
+                        
+                        // Apply sound overrides to base schedule bells (requires flattening first)
+                        const bellsWithOverrides = flattenPeriodsToBells(localSchedulePeriods).map(bell => {
                             const overrideKey = getBellOverrideKey(scheduleId, {...bell, type: 'shared'});
                             const overrideSound = bellSoundOverrides[overrideKey];
                             return { 
@@ -2375,9 +2467,13 @@
                                 originalSound: bell.sound
                             };
                         });
+                        // Set the FLAT list used by the clock
+                        localSchedule = bellsWithOverrides; 
+                        
                         console.log("Active shared schedule updated.");
                     } else {
                         console.warn("Selected shared schedule does not exist.");
+                        localSchedulePeriods = [];
                         localSchedule = [];
                         scheduleTitle.textContent = "Schedule Not Found";
                     }
@@ -2409,11 +2505,9 @@
                 deletePersonalScheduleBtn.disabled = false;
                 deletePersonalScheduleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 
-                // v3.05: Enable "Duplicate" button
+                // v3.05: Enable "Duplicate" button and manager buttons
                 createPersonalScheduleBtn.disabled = false;
                 createPersonalScheduleBtn.textContent = 'Duplicate as Another Personal Schedule';
-                
-                // v3.05: Enable manager buttons
                 renamePersonalScheduleBtn.disabled = false;
                 backupPersonalScheduleBtn.disabled = false;
                 restorePersonalScheduleBtn.disabled = false;
@@ -2422,8 +2516,11 @@
                 scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
                 activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
                     if (docSnap.exists()) {
+                        // NEW v4.0: Get periods array
+                        localSchedulePeriods = docSnap.data().periods || [];
+                        
                         // Apply sound overrides to base schedule bells
-                        localSchedule = (docSnap.data().bells || []).map(bell => {
+                        const bellsWithOverrides = flattenPeriodsToBells(localSchedulePeriods).map(bell => {
                             const overrideKey = getBellOverrideKey(activeBaseScheduleId, {...bell, type: 'shared'});
                             const overrideSound = bellSoundOverrides[overrideKey];
                             return { 
@@ -2433,9 +2530,13 @@
                                 originalSound: bell.sound
                             };
                         });
+                        // Set the FLAT list used by the clock
+                        localSchedule = bellsWithOverrides; 
+                        
                         console.log("Base schedule for personal schedule updated.");
                     } else {
                         console.warn("Base schedule does not exist.");
+                        localSchedulePeriods = [];
                         localSchedule = [];
                     }
                     renderCombinedList();
@@ -2445,16 +2546,20 @@
                 const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
                     if (docSnap.exists()) {
+                        // NEW v4.0: Get periods array
+                        personalBellsPeriods = docSnap.data().periods || [];
+                        
                         // Personal bells do not get overrides (they are edited directly)
-                        personalBells = (docSnap.data().bells || []).map(bell => ({
+                        personalBells = flattenPeriodsToBells(personalBellsPeriods).map(bell => ({
                             ...bell,
                             type: 'custom' // This flags them as personal bells for editing
                         }));
+                        
                         console.log("Personal schedule bells updated.");
                     } else {
                         console.warn("Personal schedule removed.");
+                        personalBellsPeriods = [];
                         personalBells = [];
-                        // TODO: Handle if the personal schedule is deleted out from under us
                     }
                     renderCombinedList();
                 });
@@ -4583,4 +4688,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.46 -->
+<!-- Version 4.00 -->
