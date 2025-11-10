@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.32</title>
+    <title>Ellis Web Bell 3.34</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.32</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.34</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1305,119 +1305,29 @@
         }
 
         async function playBell(soundName) {
-            // --- NEW: v3.28 - Developer Note on 403 Errors ---
-            // If you are getting a 403 (Forbidden) error when playing 
-            // custom audio files from Firebase Storage, this is almost
-            // always a CORS (Cross-Origin Resource Sharing) issue.
-            //
-            // Your Firebase Storage bucket needs to be configured to
-            // allow browsers (like from this web app's domain) to 
-            // fetch files. This is not a code bug, but a server
-            // configuration.
-            //
-            // See the chat for instructions on how to fix this using
-            // `gsutil` or the Google Cloud web portal.
-            // --- End v3.28 Note ---
+        // --- NEW: v3.34 - The Big Fix ---
+        // This function now handles:
+        // 1. Default sounds ("Bell", "Chime", etc.)
+        // 2. 'ellisBell.mp3' (pre-loaded)
+        // 3. File paths (e.g., "sounds/users/...") - The new, correct way.
+        // 4. Old, expiring URLs (e.g., "https://firebasestorage...") - The legacy, broken way.
 
-            if (!isAudioReady) {
-                console.warn("Audio not ready. Cannot play bell.");
-                try {
-                    await startAudio();
-                } catch (e) {
-                    console.error("Audio start failed during playback attempt:", e);
-                }
-                return;
-            }
-
-            const now = Tone.now();
-
-            // --- Handle HTTP URLs (Firebase Storage) ---
-            if (soundName.startsWith('http')) {
-                try {
-                    // Case 1: Player is already cached (as a promise)
-                    if (synths[soundName]) {
-                        // console.log(`Waiting for cached player: ${soundName}`);
-                        const player = await synths[soundName]; // Wait for the promise
-                        if (player && player.loaded) {
-                            player.start(now);
-                        } else if (player) {
-                            console.warn(`Cached player for ${soundName} was not loaded.`);
-                        }
-                        return;
-                    }
-
-                    // Case 2: Player is not in cache. Create, load, and cache it.
-                    console.log(`Fetching and caching new sound: ${soundName}`);
-                    
-                    // Create and cache the promise *immediately* to prevent re-fetch
-                    const loadPromise = (async () => {
-                        try {
-                            // MODIFIED: v3.27 - Correctly load a single player
-                            // 1. Create an empty player
-                            const player = new Tone.Player().toDestination();
-                            
-                            // 2. Await its load method
-                            // This returns the player instance when loaded.
-                            await player.load(soundName); 
-                            
-                            // DELETED: await Tone.loaded(); // This was the bug
-                            
-                            console.log(`Successfully loaded: ${soundName}`);
-                            return player; // Promise resolves to a loaded player
-                        
-                        } catch (err) {
-                            console.error(`Failed to load custom audio: ${soundName}`, err);
-                            // If it fails, remove the promise from cache so we can retry
-                            delete synths[soundName]; 
-                            return null;
-                        }
-                    })();
-                    
-                    // Store the promise in the cache
-                    synths[soundName] = loadPromise;
-
-                    // Wait for this first load to complete
-                    const newPlayer = await loadPromise;
-                    
-                    if (newPlayer) {
-                        newPlayer.start(now); // Play it
-                    }
-
-                } catch (e) {
-                    console.error(`Error playing custom sound ${soundName}:`, e);
-                    delete synths[soundName]; // Clear cache on error
-                }
-                return; // Handled http, now exit
-            }
-
-            // --- MODIFIED: v3.30 - Handle 'ellisBell.mp3' (which is now a promise) ---
-            if (soundName === 'ellisBell.mp3') {
-                try {
-                    // synths['ellisBell.mp3'] is the promise from setupSynths()
-                    const player = await synths['ellisBell.mp3'];
-                    if (player && player.loaded) {
-                        player.start(now);
-                    } else {
-                        console.error("Ellis Bell player was not ready.");
-                    }
-                } catch (e) {
-                    console.error(`Error playing ${soundName}:`, e);
-                }
-                return; // Handled ellisBell.mp3, now exit
-            }
-
-            // --- Handle built-in synths (Bell, Chime, Beep, Alarm) ---
-            if (!synths[soundName]) {
-                console.warn(`Sound '${soundName}' not found.`);
-                return;
-            }
-
-            const synth = synths[soundName]; // This is now *only* the synths
-
+        if (!isAudioReady) {
+            console.warn("Audio not ready. Cannot play bell.");
             try {
-                // DELETED: v3.30 - The 'if (synth instanceof Tone.Player)' block
-                
-                // Handle built-in synths
+                await startAudio();
+            } catch (e) {
+                console.error("Audio start failed during playback attempt:", e);
+            }
+            return;
+        }
+
+        const now = Tone.now();
+
+        // --- Case 1: Handle built-in synths ---
+        if (soundName === 'Bell' || soundName === 'Chime' || soundName === 'Beep' || soundName === 'Alarm') {
+            const synth = synths[soundName];
+            try {
                 if (soundName === 'Bell') {
                     synth.triggerAttackRelease('C4', '0.5', now);
                     synth.triggerAttackRelease('G4', '0.5', now + 0.3);
@@ -1432,9 +1342,157 @@
                     synth.triggerAttackRelease("C5", "0.1", now + 0.3);
                 }
             } catch (error) {
-                console.error("Error playing sound:", error);
+                console.error("Error playing built-in synth:", error);
             }
+            return; // Handled
         }
+        
+        // --- Case 2: Handle 'ellisBell.mp3' (pre-loaded promise) ---
+        if (soundName === 'ellisBell.mp3') {
+            try {
+                const player = await synths['ellisBell.mp3']; // Await the promise
+                if (player && player.loaded) {
+                    player.start(now);
+                } else {
+                    console.error("Ellis Bell player was not ready.");
+                }
+            } catch (e) {
+                console.error(`Error playing ${soundName}:`, e);
+            }
+            return; // Handled
+        }
+
+        // --- Case 3 & 4: Handle custom sounds (Paths or URLs) ---
+        let soundPath = null;
+        let soundUrl = null;
+
+        if (!soundName) {
+            console.warn("playBell called with empty soundName.");
+            return;
+        }
+
+        if (soundName.startsWith('sounds/')) {
+            // --- Case 3: This is a file path (The new, correct way) ---
+            // We must get a fresh download URL.
+            // console.log(`Handling sound path: ${soundName}`);
+            soundPath = soundName;
+            // We will fetch the URL below.
+            
+        } else if (soundName.startsWith('http')) {
+            // --- Case 4: This is an old download URL (The legacy, broken way) ---
+            // It might be expired. We need to extract the path and get a fresh URL.
+            // console.log(`Handling legacy URL: ${soundName}`);
+            soundUrl = soundName; // Use this as the cache key
+            try {
+                // Extract the path from the URL
+                // e.g., https.../o/sounds%2Fusers%2F...%2Ffile.mp3?alt=media&token=...
+                const decodedUrl = decodeURIComponent(soundName);
+                const pathRegex = /\/o\/(sounds\/.*?)\?alt=media/;
+                const match = decodedUrl.match(pathRegex);
+                
+                if (match && match[1]) {
+                    soundPath = match[1]; // e.g., "sounds/users/.../file.mp3"
+                    // console.log(`Extracted path: ${soundPath}`);
+                } else {
+                    console.warn("Could not extract path from legacy URL. Will try to play URL directly.");
+                    // soundPath remains null
+                }
+            } catch (e) {
+                console.error("Error parsing legacy URL:", e);
+                // soundPath remains null
+            }
+        } else {
+            console.warn(`Unknown sound format: ${soundName}`);
+            return; // Can't handle this
+        }
+        
+        // --- Caching and Playing Logic ---
+
+        // We use the sound *path* as the *true* cache key, if we have it.
+        // If we only have a URL (Case 4 failed path extraction), we use the URL as the key.
+        const cacheKey = soundPath || soundUrl;
+        if (!cacheKey) {
+            console.error("No valid path or URL to play.");
+            return;
+        }
+
+        try {
+            // Check if a player (as a promise) is already in the cache
+            if (synths[cacheKey]) {
+                // console.log(`Waiting for cached player: ${cacheKey}`);
+                const player = await synths[cacheKey]; // Wait for the promise
+                if (player && player.loaded) {
+                    player.start(now);
+                } else {
+                    console.warn(`Cached player for ${cacheKey} failed to load or was invalid.`);
+                    // It failed. Delete the bad cache entry so we can retry.
+                    delete synths[cacheKey]; 
+                    // We will now fall through to the "Not in cache" logic.
+                }
+
+                // Only return if we successfully played from cache.
+                if (synths[cacheKey]) {
+                   return; // Played from cache 
+                }
+            }
+
+            // --- Not in cache (or cache failed). We must create and cache a new player promise. ---
+            
+            // We need a URL to load the player.
+            let urlToLoad = null;
+            
+            if (soundPath) {
+                // Case 3 or 4a (Path exists): Get a fresh URL.
+                try {
+                    const storageRef = ref(storage, soundPath);
+                    urlToLoad = await getDownloadURL(storageRef);
+                } catch (urlError) {
+                    console.error(`Could not get download URL for path ${soundPath}:`, urlError);
+                    if (urlError.code === 'storage/object-not-found') {
+                        // The file was deleted.
+                    }
+                    return; // Can't play
+                }
+            } else {
+                // Case 4b (Path extraction failed): Use the (possibly expired) URL directly.
+                urlToLoad = soundUrl;
+            }
+
+            if (!urlToLoad) {
+                console.error("No URL to load for player.");
+                return;
+            }
+
+            // Create and cache the load promise *immediately*
+            console.log(`Fetching and caching new sound: ${cacheKey}`);
+            const loadPromise = (async () => {
+                try {
+                    const player = new Tone.Player().toDestination();
+                    await player.load(urlToLoad); 
+                    console.log(`Successfully loaded: ${cacheKey}`);
+                    return player; // Promise resolves to a loaded player
+                } catch (err) {
+                    console.error(`Failed to load custom audio: ${urlToLoad}`, err);
+                    // If it fails, remove the promise from cache so we can retry
+                    delete synths[cacheKey]; 
+                    return null;
+                }
+            })();
+            
+            synths[cacheKey] = loadPromise; // Store the promise
+
+            // Wait for this first load to complete
+            const newPlayer = await loadPromise;
+            
+            if (newPlayer) {
+                newPlayer.start(now); // Play it
+            }
+
+        } catch (e) {
+            console.error(`Error playing custom sound ${cacheKey}:`, e);
+            delete synths[cacheKey]; // Clear cache on error
+        }
+    }
 
         // --- Clock and Bell Logic ---
 
@@ -1985,7 +2043,7 @@
                     // The github.io domain caused a 404.
                     // The "missing initial state" error in Firefox must be solved
                     // by disabling Enhanced Tracking Protection (ETP) for the site.
-                    // MODIFIED: v3.32 - removed that array
+                    // MODIFIED: v3.33 - removed that array
                     authDomain: "ellisbell-c185c.firebaseapp.com", 
                     projectId: "ellisbell-c185c",
                     storageBucket: "ellisbell-c185c.firebasestorage.app",
@@ -3944,11 +4002,12 @@
                 { el: changeSoundSelect, myGroup: 'change-my-sounds-optgroup', sharedGroup: 'change-shared-sounds-optgroup' }, // NEW: Add change-sound modal
                 { el: quickBellSoundSelect, myGroup: 'quick-my-sounds-optgroup', sharedGroup: 'quick-shared-sounds-optgroup' } // NEW: Add quick bell select
             ];
-
+    
             // Create options HTML
-            const mySoundsHtml = userAudioFiles.map(file => `<option value="${file.url}">${file.name}</option>`).join('');
-            const sharedSoundsHtml = sharedAudioFiles.map(file => `<option value="${file.url}">${file.name}</option>`).join('');
-
+            // MODIFIED: v3.34 - Use file.path for the value, not the URL
+            const mySoundsHtml = userAudioFiles.map(file => `<option value="${file.path}">${file.name}</option>`).join('');
+            const sharedSoundsHtml = sharedAudioFiles.map(file => `<option value="${file.path}">${file.name}</option>`).join('');
+    
             // Update all dropdowns
             selects.forEach(item => {
                 if (!item.el) return; // Guard clause
@@ -4518,4 +4577,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.32 -->
+<!-- Version 3.34 -->
