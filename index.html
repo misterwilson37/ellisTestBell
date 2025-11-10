@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.39</title>
+    <title>Ellis Web Bell 3.40</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.39</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.40</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1386,17 +1386,45 @@
             try {
                 // Extract the path from the URL
                 // e.g., https.../o/sounds%2Fusers%2F...%2Ffile.mp3?alt=media&token=...
-                const decodedUrl = decodeURIComponent(soundName);
-                const pathRegex = /\/o\/(sounds\/.*?)\?alt=media/;
-                const match = decodedUrl.match(pathRegex);
                 
+                // --- MODIFIED: v3.40 - More robust path extraction ---
+                const pathRegex = /\/o\/(.*?)\?alt=media/;
+                // Try matching the original soundName first
+                let match = soundName.match(pathRegex); 
+
+                if (!match) {
+                    // If that fails, it might be due to special chars in the path.
+                    // Try matching against a decoded version.
+                    try {
+                        const decodedSoundName = decodeURIComponent(soundName);
+                        match = decodedSoundName.match(pathRegex);
+                    } catch (e) {
+                        console.warn("Could not decode soundName for regex match.", e);
+                    }
+                }
+
                 if (match && match[1]) {
-                    soundPath = match[1]; // e.g., "sounds/users/.../file.mp3"
+                    soundPath = match[1]; // e.g., "sounds%Fusers%2F...%2Ffile.mp3"
                     
-                    // --- NEW: v3.39 - THE FIX ---
-                    // The extracted path was *still* URL-encoded (e.g., "sounds%2Fusers%2F...").
-                    // We must decode it one more time to get the *actual* storage path.
-                    soundPath = decodeURIComponent(soundPath);
+                    // --- NEW: v3.40 - Fix broken %F encoding ---
+                    // The database has broken URLs with %F instead of %2F
+                    if (soundPath.includes('%F')) {
+                        console.warn("Detected broken '%F' encoding, attempting to fix...");
+                        soundPath = soundPath.replace(/%F/g, '%2F'); 
+                    }
+                    
+                    // --- NEW: v3.40 - Centralized decoding ---
+                    try {
+                        // Now, decode the (hopefully) fixed path
+                        soundPath = decodeURIComponent(soundPath);
+                    } catch (e) {
+                        console.warn("Error decoding sound path, using as-is:", e);
+                        // This might fail if encoding is really broken, (e.g. lone '%')
+                        // We'll proceed with the partially-fixed path.
+                    }
+                    
+                    // DELETED: v3.39 fix (this logic is now above)
+                    // soundPath = decodeURIComponent(soundPath); 
                     
                     // console.log(`Extracted path: ${soundPath}`);
                 } else {
@@ -4631,4 +4659,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.39 -->
+<!-- Version 3.40 -->
