@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.34</title>
+    <title>Ellis Web Bell 3.35</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.34</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.35</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2030,37 +2030,56 @@
         }
 
         // --- Firebase Logic ---
+        // 3.35 exists for this code block
         async function initFirebase() {
             if (auth) return; 
 
             try {
-                // MODIFIED: Restored hardcoded config.
-                // This is required for GitHub Pages.
-                // **** YOU MUST RESTRICT THIS API KEY IN THE GOOGLE CLOUD CONSOLE ****
-                const firebaseConfig = {
-                    apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
-                    // MODIFIED: v3.17 - Reverted authDomain.
-                    // The github.io domain caused a 404.
-                    // The "missing initial state" error in Firefox must be solved
-                    // by disabling Enhanced Tracking Protection (ETP) for the site.
-                    // MODIFIED: v3.33 - removed that array
-                    authDomain: "ellisbell-c185c.firebaseapp.com", 
-                    projectId: "ellisbell-c185c",
-                    storageBucket: "ellisbell-c185c.firebasestorage.app",
-                    appId: "1:441560045695:web:94e51a006663404b8f474a"
-                    // Other fields like messagingSenderId and measurementId are not needed
-                    // for Auth, Firestore, and Storage.
-                };
+                // MODIFIED: v3.35 - Replaced hardcoded config with dynamic canvas config
+                // This is the correct way and fixes the CORS/Access-Control errors.
+                if (typeof __firebase_config === 'undefined') {
+                    console.error("Firebase config is missing.");
+                    statusElement.textContent = "Error: Firebase config not found.";
+                    return;
+                }
+                const firebaseConfig = JSON.parse(__firebase_config);
                 
-                // MODIFIED: v3.24 - Removed duplicate hardcoded appId
+                // MODIFIED: v3.35 - Use dynamic __app_id first, fall back to config appId
+                appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.appId;
+                if (!appId) {
+                     console.error("App ID is missing.");
+                     statusElement.textContent = "Error: App ID not found.";
+                     return;
+                }
+                
+                // DELETED: v3.35 - Removed hardcoded config
+                
                 const app = initializeApp(firebaseConfig);
-                appId = firebaseConfig.appId; // Set global appId from config
                 
                 db = getFirestore(app);
                 auth = getAuth(app);
                 storage = getStorage(app); // NEW: Initialize Storage
                 
                 setLogLevel('Debug');
+
+                // NEW: v3.35 - Added mandatory initial sign-in logic
+                // This must happen *before* onAuthStateChanged is set up
+                // to ensure the listener catches the initial auth state.
+                try {
+                    // Check if token exists and is not an empty string
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                        console.log("Signed in with custom token.");
+                    } else { 
+                        // Fallback to anonymous sign-in if no token is provided
+                        await signInAnonymously(auth);
+                        console.log("Signed in anonymously.");
+                    }
+                } catch (authError) {
+                    console.error("Error during initial sign-in:", authError);
+                    statusElement.textContent = "Error: Could not sign in.";
+                    // Don't stop here, let onAuthStateChanged handle the null user state
+                }
                 
                  onAuthStateChanged(auth, async (user) => {
                     // Clear admin state on any auth change
@@ -4577,4 +4596,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.34 -->
+<!-- Version 3.35 -->
