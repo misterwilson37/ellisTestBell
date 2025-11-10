@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.42</title>
+    <title>Ellis Web Bell 3.43</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.42</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.43</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1305,11 +1305,13 @@
         }
 
         async function playBell(soundName) {
-            // --- NEW: v3.41 - Reverted to robust (getBytes) logic ---
-            // This logic is simpler and more reliable. It fetches the raw audio
-            // bytes directly from storage using either the path OR the full URL
-            // as the reference. This bypasses all the URL parsing and 404 errors.
-
+            // --- MODIFIED: v3.43 ---
+            // This is the complete, working logic from v2.24, adapted for v3.42.
+            // It uses the `getBytes` and `decodeAudioData` method, which is more robust
+            // than the URL-parsing logic that was failing.
+            // It also correctly handles the pre-loaded promise for 'ellisBell.mp3'
+            // and the built-in synths.
+        
             if (!isAudioReady) {
                 console.warn("Audio not ready. Cannot play bell.");
                 try {
@@ -1319,9 +1321,9 @@
                 }
                 return;
             }
-
+        
             const now = Tone.now();
-
+        
             // --- Case 1: Handle built-in synths ---
             if (soundName === 'Bell' || soundName === 'Chime' || soundName === 'Beep' || soundName === 'Alarm') {
                 const synth = synths[soundName];
@@ -1348,7 +1350,7 @@
             // --- Case 2: Handle 'ellisBell.mp3' (pre-loaded promise) ---
             if (soundName === 'ellisBell.mp3') {
                 try {
-                    // This is still a promise for a Player, not an AudioBuffer
+                    // This is a promise for a Player
                     const player = await synths['ellisBell.mp3']; 
                     if (player && player.loaded) {
                         player.start(now);
@@ -1360,7 +1362,7 @@
                 }
                 return; // Handled
             }
-
+        
             // --- Case 3: Handle all other sounds (Custom HTTP URLs or Paths) ---
             
             if (!soundName) {
@@ -1368,12 +1370,12 @@
                 await playBell('ellisBell.mp3'); // Play default as a fallback
                 return;
             }
-
+        
             // Determine Cache Key
             // The soundName is the cacheKey, whether it's a full URL (legacy) or a path (new).
             // We create a new cache key prefix for Buffers to avoid conflicts with old cached Player promises.
             const bufferCacheKey = `buffer-${soundName}`;
-
+        
             try {
                 // Check cache for a pre-decoded AudioBuffer
                 if (synths[bufferCacheKey] instanceof AudioBuffer) {
@@ -1382,7 +1384,7 @@
                     player.start(now);
                     return; // Played from cache
                 }
-
+        
                 // Check if a promise for this buffer is already in flight
                 if (synths[bufferCacheKey] && typeof synths[bufferCacheKey].then === 'function') {
                     // console.log("Waiting on in-flight buffer promise:", bufferCacheKey);
@@ -1397,33 +1399,33 @@
                     }
                     return;
                 }
-
+        
                 // --- Not in buffer cache. Fetch bytes. ---
                 // console.log("Fetching bytes for buffer:", soundName);
                 
                 // Store the promise immediately to prevent race conditions
                 const bufferPromise = (async () => {
                     try {
-                        // This is the key insight:
+                        // This is the key insight from v2.24:
                         // `ref(storage, soundName)` works for *both* full URLs and paths.
                         const storageRef = ref(storage, soundName); 
-                        const bytes = await getBytes(storageRef);
+                        const bytes = await getBytes(storageRef); // This is an ArrayBuffer
+                        
                         // Decode the ArrayBuffer into an AudioBuffer
-                        // --- MODIFIED: v3.42 - THE FIX ---
-                        // getBytes() *returns* an ArrayBuffer, not an object containing one.
-                        // The `.buffer` was causing it to try to decode `undefined`.
                         const audioBuffer = await Tone.context.decodeAudioData(bytes);
+                        return audioBuffer; // Promise resolves to the buffer
+                    
                     } catch (err) {
                         console.error(`Failed to getBytes or decode audio: ${soundName}`, err);
                         delete synths[bufferCacheKey]; // Clear bad promise
                         return null;
                     }
                 })();
-
+        
                 synths[bufferCacheKey] = bufferPromise; // Cache the promise
-
+        
                 const newBuffer = await bufferPromise;
-
+        
                 if (newBuffer) {
                     synths[bufferCacheKey] = newBuffer; // Overwrite promise with resolved buffer
                     const player = new Tone.Player(newBuffer).toDestination();
@@ -3955,21 +3957,27 @@
         }
         
         function updateSoundDropdowns() {
+            // --- MODIFIED: v3.43 ---
+            // This function combines the v3.42 list of all dropdowns
+            // with the v2.24 (working) logic of using `file.url` as the
+            // value for the options. This is the other half of the fix.
+            
             const selects = [
-                // MODIFIED: v3.03 - Renamed customSoundInput
+                // This is the full list of selects from v3.42
                 { el: personalSoundInput, myGroup: 'personal-my-sounds-optgroup', sharedGroup: 'personal-shared-sounds-optgroup' },
                 { el: sharedSoundInput, myGroup: 'shared-my-sounds-optgroup', sharedGroup: 'shared-shared-sounds-optgroup' },
                 { el: multiBellSoundInput, myGroup: 'multi-my-sounds-optgroup', sharedGroup: 'multi-shared-sounds-optgroup' },
                 { el: editBellSoundInput, myGroup: 'edit-my-sounds-optgroup', sharedGroup: 'edit-shared-sounds-optgroup' },
-                { el: changeSoundSelect, myGroup: 'change-my-sounds-optgroup', sharedGroup: 'change-shared-sounds-optgroup' }, // NEW: Add change-sound modal
-                { el: quickBellSoundSelect, myGroup: 'quick-my-sounds-optgroup', sharedGroup: 'quick-shared-sounds-optgroup' } // NEW: Add quick bell select
+                { el: changeSoundSelect, myGroup: 'change-my-sounds-optgroup', sharedGroup: 'change-shared-sounds-optgroup' }, 
+                { el: quickBellSoundSelect, myGroup: 'quick-my-sounds-optgroup', sharedGroup: 'quick-shared-sounds-optgroup' } 
             ];
-    
+        
             // Create options HTML
-            // MODIFIED: v3.34 - Use file.path for the value, not the URL
-            const mySoundsHtml = userAudioFiles.map(file => `<option value="${file.path}">${file.name}</option>`).join('');
-            const sharedSoundsHtml = sharedAudioFiles.map(file => `<option value="${file.path}">${file.name}</option>`).join('');
-    
+            // --- THIS IS THE FIX from v2.24 ---
+            // The value *must* be the full file.url, not the file.path.
+            const mySoundsHtml = userAudioFiles.map(file => `<option value="${file.url}">${file.name}</option>`).join('');
+            const sharedSoundsHtml = sharedAudioFiles.map(file => `<option value="${file.url}">${file.name}</option>`).join('');
+        
             // Update all dropdowns
             selects.forEach(item => {
                 if (!item.el) return; // Guard clause
@@ -4539,4 +4547,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.42 -->
+<!-- Version 3.43 -->
