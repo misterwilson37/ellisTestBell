@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.36</title>
+    <title>Ellis Web Bell 3.37</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.36</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.37</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1441,11 +1441,42 @@
             // We need a URL to load the player.
             let urlToLoad = null;
             
+            // MODIFIED: v3.37 - Find the pre-fetched URL instead of calling getDownloadURL() again.
+            // This avoids the path encoding bug and is much more efficient.
+            if (soundPath) {
+                // We have a path (e.g., "sounds/users/..."), find its URL in our loaded lists.
+                const audioFile = [...userAudioFiles, ...sharedAudioFiles].find(f => f.path === soundPath);
+                
+                if (audioFile) {
+                    urlToLoad = audioFile.url;
+                    // console.log(`Found pre-fetched URL for path ${soundPath}`);
+                } else {
+                    // This shouldn't happen if loadAllAudioFiles() worked, but as a fallback,
+                    // we can *try* the legacy URL-based logic if soundUrl exists (from http parsing).
+                    if (soundUrl) {
+                        console.warn(`Could not find path ${soundPath} in lists. Falling back to legacy soundUrl.`);
+                        urlToLoad = soundUrl;
+                    } else {
+                        console.error(`Could not find a URL for path: ${soundPath}. File may be deleted or lists are stale.`);
+                        // Try to play it anyway, maybe it's ellisBell.mp3 or default
+                        // No, we already checked for those. This is a hard failure.
+                        return; // Can't play
+                    }
+                }
+            } else if (soundUrl) {
+                // Case 4b (Path extraction failed): Use the (possibly expired) URL directly.
+                console.warn("Using legacy URL directly. Sound may fail to play if expired.");
+                urlToLoad = soundUrl;
+            }
+            
+            // DELETED: v3.37 - Removed the entire block that called getDownloadURL(ref(storage, soundPath))
+            // This was the source of the URL encoding bug.
+            /*
             if (soundPath) {
                 // Case 3 or 4a (Path exists): Get a fresh URL.
                 try {
                     const storageRef = ref(storage, soundPath);
-                    urlToLoad = await getDownloadURL(storageRef);
+                    urlToLoad = await getDownloadURL(storageRef); 
                 } catch (urlError) {
                     console.error(`Could not get download URL for path ${soundPath}:`, urlError);
                     if (urlError.code === 'storage/object-not-found') {
@@ -1457,6 +1488,7 @@
                 // Case 4b (Path extraction failed): Use the (possibly expired) URL directly.
                 urlToLoad = soundUrl;
             }
+            */
 
             if (!urlToLoad) {
                 console.error("No URL to load for player.");
@@ -2030,7 +2062,7 @@
         }
 
         // --- Firebase Logic ---
-        // 3.35 was a bust, so 3.36 exists for this code block
+        // 3.35 was a bust, so 3.37 exists for this code block
         async function initFirebase() {
             if (auth) return; 
 
@@ -4592,4 +4624,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.36 -->
+<!-- Version 3.37 -->
