@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.00</title>
+    <title>Ellis Web Bell 4.01</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.00</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.01</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1088,24 +1088,24 @@
         // DELETED: v3.24 - Removed hardcoded admin list
         // const ADMIN_EMAIL_LIST = [ ... ];
 
-        // --- App State ---
-        let db, auth, storage; // NEW: Added storage
+        // --- App State (Correct v4.0 Definition) ---
+        let db, auth, storage; // Firebase services
         let userId;
-        let isUserAnonymous = true; // NEW: Track anonymous state
-        // Updated for 4.0 all piecemeal like.  We'll see how it goes.
-        let db, auth, storage; // NEW: Added storage
-        let userId;
-        let isUserAnonymous = true; // NEW: Track anonymous state
-        let localSchedulePeriods = []; // NEW: Periods from the *base* shared schedule
-        let personalBellsPeriods = []; // NEW: Periods from the *active personal* schedule
-        let localSchedule = []; // FLAT list of bells from localSchedulePeriods
-        let personalBells = []; // FLAT list of bells from personalBellsPeriods
-        let scheduleRef; // For the *base* shared schedule
-        let scheduleRef; // For the *base* shared schedule
-        let schedulesCollectionRef; // For *all* shared schedules
-        let sharedSchedulesListenerUnsubscribe = null; // NEW: v3.24 - For shared schedules
+        let isUserAnonymous = true; // Track anonymous state
+        
+        // NEW V4.01 Period-Based State:
+        let localSchedulePeriods = []; // Periods from the *base* shared schedule
+        let personalBellsPeriods = []; // Periods from the *active personal* schedule
+        let localSchedule = []; // FLAT list of bells from localSchedulePeriods (derived from periods)
+        let personalBells = []; // FLAT list of bells from personalBellsPeriods (derived from periods)
+        
+        // Listener/Reference State:
+        let scheduleRef; // For the *base* shared schedule reference
+        let schedulesCollectionRef; // For *all* shared schedules collection
+        let sharedSchedulesListenerUnsubscribe = null; // v3.24 - For shared schedules
         let allSchedules = []; // Array of *all* shared schedules
-        let allPersonalSchedules = []; // NEW: Array of *user's* personal schedules
+        let allPersonalSchedules = []; // Array of *user's* personal schedules
+            
         let activeBaseScheduleId = null; // MODIFIED: Renamed from activeScheduleId
         let activePersonalScheduleId = null; // NEW: ID of active personal schedule
         let activeScheduleListenerUnsubscribe = null; // For base schedule
@@ -4688,4 +4688,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.00 -->
+<!-- Version 4.01 -->
