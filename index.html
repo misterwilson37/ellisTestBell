@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 3.43</title>
+    <title>Ellis Web Bell 3.44</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.43</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 3.44</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1979,10 +1979,10 @@
         }
 
         // --- Firebase Logic ---
-        // 3.35 was a bust, so 3.36 exists for this code block
+        // 3.44?  That's going to be it, I tell you.
         async function initFirebase() {
             if (auth) return; 
-
+        
             try {
                 // MODIFIED: v3.36 - Restored hardcoded config from v3.34.
                 // The dynamic config check was for the canvas environment and
@@ -2005,11 +2005,13 @@
                 storage = getStorage(app); // NEW: Initialize Storage
                 
                 setLogLevel('Debug');
-
-                // MODIFIED: v3.36 - Kept initial sign-in logic.
-                // This is more robust. In the GitHub Pages environment,
-                // __initial_auth_token will be undefined, so this will
-                // correctly fall back to signInAnonymously().
+        
+                // MODIFIED: v3.44 - REMOVED the automatic signInAnonymously() block.
+                // The onAuthStateChanged listener will now correctly
+                // see a null user on initial load, prompting the welcome overlay.
+                
+                /*
+                DELETED in v3.44:
                 try {
                     // Check if token exists and is not an empty string
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
@@ -2025,12 +2027,13 @@
                     statusElement.textContent = "Error: Could not sign in.";
                     // Don't stop here, let onAuthStateChanged handle the null user state
                 }
+                */
                 
                  onAuthStateChanged(auth, async (user) => {
                     // Clear admin state on any auth change
                     document.body.classList.remove('admin-mode');
                     adminToggleBtn.textContent = 'Toggle Admin';
-
+        
                     if (user) {
                         console.log("User is signed in:", user.uid);
                         userId = user.uid;
@@ -2064,7 +2067,7 @@
                             updateClock();
                             clockIntervalId = setInterval(updateClock, 1000);
                         }
-
+        
                         document.body.classList.add('authenticated');
                         signOutBtn.classList.remove('hidden');
                         if (user.isAnonymous) {
@@ -2078,7 +2081,7 @@
                            const displayName = user.displayName || user.email;
                            userDisplayNameElement.textContent = `Signed in as: ${displayName}`;
                         }
- 
+        
                         // MODIFIED: v3.24 - Admin Check now ONLY checks Firestore
                         let isAdmin = false; // Local admin flag
                         if (!user.isAnonymous && user.uid) { // Check for non-anonymous user
@@ -2098,7 +2101,7 @@
                         } else {
                              console.log("Anonymous user, skipping admin check.");
                         }
-
+        
                         // NEW: Enable admin toggle *only* if server-side check passed
                         if (isAdmin) {
                             adminToggleBtn.disabled = false;
@@ -2138,8 +2141,8 @@
                         } else {
                             statusElement.textContent = "Connected. Waiting for audio.";
                         }
-
-
+        
+        
                      } else {
                         console.log("User is signed out.");
                         userId = null;
@@ -2149,7 +2152,7 @@
                             clearInterval(clockIntervalId);
                             clockIntervalId = null;
                         }
-
+        
                         // NEW: v3.09 - Unsubscribe from personal schedules
                         if (personalSchedulesListenerUnsubscribe) {
                             personalSchedulesListenerUnsubscribe();
@@ -2185,7 +2188,7 @@
                         audioOverlay.classList.add('hidden');
                      }
                  });
-
+        
             } catch (error) {
                 console.error("Firebase Init Error:", error);
                 statusElement.textContent = "Error connecting to Firebase.";
@@ -4547,4 +4550,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 3.43 -->
+<!-- Version 3.44 -->
