@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.01</title>
+    <title>Ellis Web Bell 4.02</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.01</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.02</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -660,7 +660,16 @@
             <!-- NEW: Add Bell to THIS Schedule Form -->
             <form id="add-shared-bell-form" class="border-t pt-6">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Add Bell to This Schedule</label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <!-- NEW V4.02: Period Selector added to Admin Form -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label for="shared-bell-period" class="block text-sm font-medium text-gray-700 mb-1">Period</label>
+                        <!-- NEW V4.02: Period selector -->
+                        <select id="shared-bell-period" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <!-- Options populated by JS -->
+                            <option value="">Select Period...</option>
+                        </select>
+                    </div>
                     <div>
                         <label for="shared-bell-time" class="block text-sm font-medium text-gray-700 mb-1">Time (HH:MM:SS)</label>
                         <input type="time" id="shared-bell-time" step="1" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -669,6 +678,7 @@
                         <label for="shared-bell-name" class="block text-sm font-medium text-gray-700 mb-1">Bell Name</label>
                         <input type="text" id="shared-bell-name" placeholder="e.g. 1st Period Start" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
+                </div>
                 </div>
                 <div class="flex flex-col sm:flex-row sm:items-end gap-4">
                     <div class="flex-grow" style="min-width: 120px;">
@@ -747,7 +757,16 @@
             <!-- Add Custom Bell Form -->
             <form id="add-personal-bell-form" class="bg-white p-6 rounded-xl shadow-md mb-8">
                 <p id="personal-bell-status" class="text-sm text-gray-600 mb-4">Select a Personal Schedule from the dropdown above to add bells to it.</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <!-- NEW V4.02: Period Selector added to Personal Form -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label for="personal-bell-period" class="block text-sm font-medium text-gray-700 mb-1">Period</label>
+                        <!-- NEW: Period selector -->
+                        <select id="personal-bell-period" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                            <!-- Options populated by JS -->
+                            <option value="">Select Period...</option>
+                        </select>
+                    </div>
                     <div>
                         <label for="personal-bell-time" class="block text-sm font-medium text-gray-700 mb-1">Time (HH:MM:SS)</label>
                         <input type="time" id="personal-bell-time" step="1" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
@@ -1662,8 +1681,7 @@
         }
 
         // --- Render Functions ---
-        // Updated for 4.0 all piecemeal like.  We'll see how it goes.
-        // MODIFIED: v4.0 - Renders bells grouped by periods with collapsible sections.
+        // MODIFIED: v4.02 - Renders bells grouped by periods with collapsible sections.
         function renderCombinedList() {
             // Combine both period structures
             const combinedPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
@@ -1691,6 +1709,7 @@
                 // Get a list of all bells in this period with their final type (shared or custom)
                 const bellsToRender = sortedBells.map(bell => {
                     // Check if this bell is a custom bell (i.e., exists in the personalBells flat list)
+                    // We must check the flat list because that's where the FINAL bells (including overrides) are stored.
                     const isCustom = personalBells.some(b => b.time === bell.time && b.name === bell.name);
                     const bellType = isCustom ? 'custom' : 'shared';
                     
@@ -1913,6 +1932,53 @@
         }
 
         /**
+         * NEW: v4.02 - Migrates old flat bell structure to the new period structure.
+         * This ensures compatibility with existing Firestore data (Read-Only).
+         * NOTE: This function's bell grouping relies on names containing "1st Period", "Lunch A", etc.
+         * @param {Array} flatBells - The old flat array of bells.
+         * @returns {Array} New array of period objects.
+         */
+        function migrateLegacyBellsToPeriods(flatBells) {
+            if (!flatBells || flatBells.length === 0) return [];
+            
+            const periodMap = new Map();
+            
+            flatBells.forEach(bell => {
+                // Find the period name using the bell name (e.g., "1st Period Start Bell" -> "1st Period")
+                // Uses a regex to capture "1st Period", "Planning (1)", "Lunch A", etc.
+                const match = bell.name.match(/(\d+(?:st|nd|rd|th)?\s+(?:Period|Planning|Lunch|FLEX|Recess)|Lunch\s+[A-Z]|\w+\s*\(\d+\))\b/i);
+
+                let periodName = 'General Bells'; // Default if no period is matched
+                if (match) {
+                    periodName = match[1].trim();
+                } else if (bell.name.toLowerCase().includes('lunch')) {
+                    periodName = 'Lunch';
+                }
+                
+                let key = periodName;
+
+                if (!periodMap.has(key)) {
+                    periodMap.set(key, {
+                        name: periodName,
+                        isEnabled: true,
+                        bells: []
+                    });
+                }
+                
+                // Add the bell to the corresponding period
+                periodMap.get(key).bells.push(bell);
+            });
+            
+            // Convert Map back to array and ensure bells within each period are sorted by time
+            const periodsArray = Array.from(periodMap.values()).map(period => {
+                period.bells.sort((a, b) => a.time.localeCompare(b.time));
+                return period;
+            });
+            
+            // Finally, sort the periods themselves by the start time of the first bell
+            return sortPeriodsByFirstBell(periodsArray);
+        }
+        /**
          * NEW: v4.0 - Sorts periods chronologically based on the time of their first bell.
          * @param {Array} periods - Array of period objects.
          * @returns {Array} Sorted array of period objects.
@@ -2001,8 +2067,7 @@
 
         // --- End of NEW Helper Functions ---
         
-        // MODIFIED: v3.03 - handleAddCustomBell -> handleAddPersonalBell
-        // MODIFIED: v3.25 - Use nearby bell modal state
+        // MODIFIED: v4.02 - handleAddPersonalBell now uses period structure
         async function handleAddPersonalBell(e) {
             e.preventDefault();
             if (!activePersonalScheduleId) {
@@ -2010,33 +2075,37 @@
                 return;
             }
 
+            // NEW V4.02: Get period name
+            const periodName = document.getElementById('personal-bell-period').value;
             const time = personalTimeInput.value;
             const name = personalNameInput.value;
             const sound = personalSoundInput.value;
             
-            if (!time || !name) {
-                console.warn("Please provide a time and name for the personal bell.");
+            if (!periodName || !time || !name) {
+                console.warn("Please provide a period, time, and name for the personal bell.");
                 return;
             }
             
-            // REQ 1 CHECK
+            const newBell = { time, name, sound };
+
+            // REQ 1 CHECK (Still checks flat list of ALL bells)
             const allBells = [...localSchedule, ...personalBells];
             const nearbyBell = findNearbyBell(time, allBells);
             
             if (nearbyBell) {
                 // Store pending bell
-                pendingPersonalBell = { time, name, sound, type: 'custom' };
+                pendingPersonalBell = { time, name, sound, type: 'custom', periodName }; // Store period name
                 // v3.25: Set action type
                 pendingPersonalBellAction = 'add';
                 pendingPersonalBellOriginal = null;
                 
                 // Show modal
                 nearbyBellName.textContent = nearbyBell.name;
-                nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time, true); // v3.22
+                nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time, true); 
                 nearbyBellCustomControls.style.display = 'flex';
                 nearbyBellModal.classList.remove('hidden');
             } else {
-                // No conflict, add directly
+                // No conflict, add directly to Firestore using V4.0 logic
                 const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 try {
                     const docSnap = await getDoc(personalScheduleRef);
@@ -2044,19 +2113,27 @@
                         console.error("Personal schedule doc not found.");
                         return;
                     }
-                    const existingBells = docSnap.data().bells || [];
                     
-                    if (existingBells.find(b => b.time === time && b.name === name)) {
-                        console.warn("This personal bell already exists.");
-                        return;
-                    }
+                    // V4.0 LOGIC: Get existing periods (or empty array)
+                    const existingPeriods = docSnap.data().periods || [];
                     
-                    const newBell = { time, name, sound }; // Don't save 'type'
-                    const updatedBells = [...existingBells, newBell];
-                    await updateDoc(personalScheduleRef, { bells: updatedBells });
+                    // Use helper to insert the new bell into the correct period
+                    const updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, newBell);
+
+                    // Save the entire updated periods array
+                    // NOTE: This will now write the 'periods' field if it didn't exist before,
+                    // moving this personal schedule to the V4.0 format.
+                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
 
                     addPersonalBellForm.reset();
                     personalSoundInput.value = 'ellisBell.mp3';
+                    // Re-enable and reset inputs
+                    personalTimeInput.disabled = false;
+                    personalNameInput.disabled = false;
+                    personalSoundInput.disabled = false;
+                    previewPersonalSoundBtn.disabled = false;
+                    addPersonalBellForm.querySelector('button[type="submit"]').disabled = false;
+                    
                 } catch (error) {
                     console.error("Error adding personal bell:", error);
                 }
@@ -2381,8 +2458,39 @@
             });
         }
 
-        // Updated for 4.0 all piecemeal like.  We'll see how it goes.
-        // MODIFIED: v4.0 - Complete rewrite to handle period structures
+        // NEW: v4.02 - Form rendering and logic handlers
+        
+        /**
+         * NEW: v4.02 - Populates the Period selector dropdowns based on the active schedule.
+         */
+        function populatePeriodSelectors() {
+            // Get all unique period names from the active schedule
+            let periodNames = [];
+            const combinedPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
+            
+            combinedPeriods.forEach(p => {
+                if (!periodNames.includes(p.name)) {
+                    periodNames.push(p.name);
+                }
+            });
+            
+            periodNames.sort(); // Sort alphabetically
+
+            const optionsHtml = periodNames.map(name => `<option value="${name}">${name}</option>`).join('');
+
+            // Update selectors
+            const sharedPeriodSelect = document.getElementById('shared-bell-period');
+            const personalPeriodSelect = document.getElementById('personal-bell-period');
+
+            if (sharedPeriodSelect) {
+                sharedPeriodSelect.innerHTML = `<option value="" disabled selected>Select Period...</option>` + optionsHtml;
+            }
+            if (personalPeriodSelect) {
+                personalPeriodSelect.innerHTML = `<option value="" disabled selected>Select Period...</option>` + optionsHtml;
+            }
+        }
+            
+        // MODIFIED: v4.02 - Complete rewrite to handle period structures and legacy data
         function setActiveSchedule(prefixedId) {
             // Unsubscribe from *both* listeners
             if (activeScheduleListenerUnsubscribe) {
@@ -2420,6 +2528,7 @@
                 activeBaseScheduleId = null;
                 activePersonalScheduleId = null;
                 scheduleTitle.textContent = "No Schedule Selected";
+                populatePeriodSelectors(); // NEW V4.02
                 renderCombinedList();
                 return;
             }
@@ -2453,8 +2562,16 @@
                             scheduleTitle.textContent = scheduleData.name;
                         }
                         
-                        // NEW v4.0: Get periods array
-                        localSchedulePeriods = scheduleData.periods || [];
+                        // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
+                        if (scheduleData.periods && scheduleData.periods.length > 0) {
+                            localSchedulePeriods = scheduleData.periods;
+                        } else if (scheduleData.bells && scheduleData.bells.length > 0) {
+                            // If only old 'bells' exist, migrate it in memory.
+                            localSchedulePeriods = migrateLegacyBellsToPeriods(scheduleData.bells);
+                            console.log("Reading shared schedule using LEGACY structure (read-only for time edits).");
+                        } else {
+                            localSchedulePeriods = [];
+                        }
                         
                         // Apply sound overrides to base schedule bells (requires flattening first)
                         const bellsWithOverrides = flattenPeriodsToBells(localSchedulePeriods).map(bell => {
@@ -2477,6 +2594,7 @@
                         localSchedule = [];
                         scheduleTitle.textContent = "Schedule Not Found";
                     }
+                    populatePeriodSelectors(); // NEW V4.02
                     renderCombinedList();
                 }, (error) => {
                     console.error("Error on shared schedule snapshot:", error);
@@ -2516,8 +2634,17 @@
                 scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
                 activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
                     if (docSnap.exists()) {
-                        // NEW v4.0: Get periods array
-                        localSchedulePeriods = docSnap.data().periods || [];
+                        const scheduleData = docSnap.data();
+                        // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
+                        if (scheduleData.periods && scheduleData.periods.length > 0) {
+                            localSchedulePeriods = scheduleData.periods;
+                        } else if (scheduleData.bells && scheduleData.bells.length > 0) {
+                            // If only old 'bells' exist, migrate it in memory.
+                            localSchedulePeriods = migrateLegacyBellsToPeriods(scheduleData.bells);
+                            console.log("Reading base shared schedule using LEGACY structure.");
+                        } else {
+                            localSchedulePeriods = [];
+                        }
                         
                         // Apply sound overrides to base schedule bells
                         const bellsWithOverrides = flattenPeriodsToBells(localSchedulePeriods).map(bell => {
@@ -2539,6 +2666,7 @@
                         localSchedulePeriods = [];
                         localSchedule = [];
                     }
+                    populatePeriodSelectors(); // NEW V4.02
                     renderCombinedList();
                 });
                 
@@ -2546,8 +2674,17 @@
                 const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
                     if (docSnap.exists()) {
-                        // NEW v4.0: Get periods array
-                        personalBellsPeriods = docSnap.data().periods || [];
+                        const personalData = docSnap.data();
+                         // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
+                        if (personalData.periods && personalData.periods.length > 0) {
+                            personalBellsPeriods = personalData.periods;
+                        } else if (personalData.bells && personalData.bells.length > 0) {
+                            // Migrate the user's legacy flat bells for in-memory use.
+                            personalBellsPeriods = migrateLegacyBellsToPeriods(personalData.bells);
+                            console.log("Reading personal schedule using LEGACY structure.");
+                        } else {
+                            personalBellsPeriods = [];
+                        }
                         
                         // Personal bells do not get overrides (they are edited directly)
                         personalBells = flattenPeriodsToBells(personalBellsPeriods).map(bell => ({
@@ -2561,11 +2698,11 @@
                         personalBellsPeriods = [];
                         personalBells = [];
                     }
+                    populatePeriodSelectors(); // NEW V4.02
                     renderCombinedList();
                 });
             }
         }
-
 
         async function handleCreateSchedule(e) {
             e.preventDefault();
@@ -2573,9 +2710,10 @@
             if (!name) return;
             
             try {
+                // MODIFIED V4.02 FINAL: All new schedules are created with the period structure.
                 const newDocRef = await addDoc(schedulesCollectionRef, {
                     name: name,
-                    bells: [] 
+                    periods: [] // Use the new structure
                 });
                 
                 console.log("Schedule created with ID:", newDocRef.id);
@@ -2804,16 +2942,7 @@
         // --- End v3.05 Functions ---
 
         
-        // DELETED: Removed entire duplicate function block
-        /*
-         * NEW: v3.02 - Finds all shared bells within 60s of the new time.
-         */
-        /*
-        function findAllNearbySharedBells(time) {
-            // ... (code was duplicated) ...
-        }
-        */
-
+        // New V4.02
         async function handleAddSharedBell(e) {
             e.preventDefault();
             // MODIFIED: v3.03 - Check activeBaseScheduleId and scheduleRef
@@ -2824,12 +2953,14 @@
                 return;
             }
             
+            // NEW V4.0: Get period name
+            const periodName = document.getElementById('shared-bell-period').value;
             const time = sharedTimeInput.value;
             const name = sharedNameInput.value;
             const sound = sharedSoundInput.value;
             
-            if (!time || !name) {
-                addSharedStatus.textContent = "Please provide a time and name.";
+            if (!periodName || !time || !name) {
+                addSharedStatus.textContent = "Please provide a period, time, and name.";
                 addSharedStatus.classList.remove('hidden');
                 setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
                 return;
@@ -2843,27 +2974,28 @@
                 return;
             }
             
-            const existingBells = currentSchedule.bells || [];
+            // V4.0: Get the periods array. This will be the new structure.
+            const existingPeriods = currentSchedule.periods || [];
 
-            // --- v3.02 LOGIC START ---
-
-            // Check for *exact* duplicate first
-            if (existingBells.find(b => b.time === time && b.name === name)) {
-                console.warn("This bell (time and name) already exists in this schedule.");
-                addSharedStatus.textContent = "This exact bell already exists.";
+            // --- v3.02 LOGIC START (Still needs to check nearby bells in all schedules) ---
+            
+            // Check for *exact* duplicate first in the TARGET period
+            const targetPeriod = existingPeriods.find(p => p.name === periodName);
+            if (targetPeriod && targetPeriod.bells.find(b => b.time === time && b.name === name)) {
+                console.warn("This bell (time and name) already exists in this period.");
+                addSharedStatus.textContent = "This exact bell already exists in this period.";
                 addSharedStatus.classList.remove('hidden');
                 setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
                 return;
             }
 
             // Find all conflicts (internal and external)
-            // MODIFIED: v3.02 logic restored - checking *any* bell time
             const conflicts = findAllNearbySharedBells(time);
 
             // Store pending bell for modals
             pendingSharedBell = newBell;
 
-            // --- Scenario 1: Internal Conflict ---
+            // --- Scenario 1: Internal Conflict (in this schedule) ---
             if (conflicts.internal) {
                 console.log("Scenario 1: Internal Conflict Found", conflicts.internal);
                 currentInternalConflict = conflicts.internal; // Store conflict
@@ -2909,10 +3041,12 @@
 
             // --- Case A: No Conflict ---
             console.log("Case A: No conflict found. Adding bell directly.");
-            const updatedBells = [...existingBells, newBell];
+            
+            // V4.0 LOGIC: Update the periods array
+            const updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, newBell);
 
             try {
-                await updateDoc(scheduleRef, { bells: updatedBells });
+                await updateDoc(scheduleRef, { periods: updatedPeriods });
                 
                 console.log("Shared bell added.");
                 addSharedBellForm.reset();
@@ -2929,7 +3063,43 @@
                 // Clear any pending state just in case
                 closeAllConflictModals();
             }
-            // --- v3.02 LOGIC END ---
+        }
+
+        /**
+         * NEW: v4.0 - Helper to find or create a period and insert a new bell.
+         * NOTE: This should ONLY be used for v4.0 (period-based) documents.
+         * @param {Array} periods - The existing periods array.
+         * @param {string} targetPeriodName - Name of the period to update.
+         * @param {object} newBell - The new bell object to insert.
+         * @returns {Array} The new, updated periods array.
+         */
+        function updatePeriodsWithNewBell(periods, targetPeriodName, newBell) {
+            let periodFound = false;
+            
+            // 1. Iterate and update existing period
+            const updatedPeriods = periods.map(p => {
+                if (p.name === targetPeriodName) {
+                    periodFound = true;
+                    // Return a new period object with the new bell added
+                    return {
+                        ...p,
+                        bells: [...(p.bells || []), newBell]
+                    };
+                }
+                return p;
+            });
+
+            // 2. If period was not found, create it and add the bell
+            if (!periodFound) {
+                updatedPeriods.push({
+                    name: targetPeriodName,
+                    isEnabled: true,
+                    bells: [newBell]
+                });
+            }
+            
+            // Return the updated array (now sorted by the first bell time)
+            return sortPeriodsByFirstBell(updatedPeriods);
         }
         
         /**
@@ -4688,4 +4858,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.01 -->
+<!-- Version 4.02 -->
