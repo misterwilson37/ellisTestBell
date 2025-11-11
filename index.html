@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.06</title>
+    <title>Ellis Web Bell 4.07</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.06</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.07</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2116,9 +2116,8 @@
             }
     
             /**
-             * NEW: v4.02 - Migrates old flat bell structure to the new period structure.
-             * This ensures compatibility with existing Firestore data (Read-Only).
-             * NOTE: This function's bell grouping relies on names containing "1st Period", "Lunch A", etc.
+             * MODIFIED: v4.07 - Final robust logic for migrating old flat bell structure to the new period structure.
+             * Guarantees that ALL bells are grouped into a period, handling complex names and converting time/sound objects.
              * @param {Array} flatBells - The old flat array of bells.
              * @returns {Array} New array of period objects.
              */
@@ -2128,14 +2127,45 @@
                 const periodMap = new Map();
                 
                 flatBells.forEach(bell => {
-                    // Find the period name using the bell name (e.g., "1st Period Start Bell" -> "1st Period")
-                    // Uses a regex to capture "1st Period", "Planning (1)", "Lunch A", etc.
-                    const match = bell.name.match(/(\d+(?:st|nd|rd|th)?\s+(?:Period|Planning|Lunch|FLEX|Recess)|Lunch\s+[A-Z]|\w+\s*\(\d+\))\b/i);
+                    let convertedBell = { ...bell };
     
-                    let periodName = 'General Bells'; // Default if no period is matched
-                    if (match) {
-                        periodName = match[1].trim();
-                    } else if (bell.name.toLowerCase().includes('lunch')) {
+                    // --- 1. CONVERT TIME and SOUND ---
+                    // Time: Unix Timestamp (seconds) to HH:MM:SS string
+                    if (typeof convertedBell.time === 'number') {
+                        const date = new Date(convertedBell.time * 1000);
+                        const totalSecondsInDay = date.getUTCHours() * 3600 + 
+                                                  date.getUTCMinutes() * 60 + 
+                                                  date.getUTCSeconds();
+                                                  
+                        const h = String(Math.floor(totalSecondsInDay / 3600)).padStart(2, '0');
+                        const m = String(Math.floor((totalSecondsInDay % 3600) / 60)).padStart(2, '0');
+                        const s = String(totalSecondsInDay % 60).padStart(2, '0');
+                        
+                        convertedBell.time = `${h}:${m}:${s}`;
+                    }
+                    
+                    // Sound: Nested Object to String Name
+                    if (typeof convertedBell.sound === 'object' && convertedBell.sound !== null && convertedBell.sound.soundName) {
+                        convertedBell.sound = convertedBell.sound.soundName;
+                    } else if (convertedBell.sound === 'Bell' || convertedBell.sound === 'Chime' || convertedBell.sound === 'Beep' || convertedBell.sound === 'Alarm') {
+                        convertedBell.sound = 'ellisBell.mp3';
+                    }
+                    
+                    // --- 2. FIND PERIOD: Robust Grouping Logic (Final Pass) ---
+                    let periodName = 'General Bells'; // Fallback for unmatched bells
+    
+                    // Regex to find specific complex names: (Word) (Number) or (Word) (Parenthesis)
+                    // Examples: "Period 1", "Planning (1)", "Lunch A", "FLEX"
+                    const complexMatch = convertedBell.name.match(/(Period\s+\d+|Planning\s*\(\d+\)|Lunch\s+[A-Z]|FLEX)/i);
+                    
+                    if (complexMatch && complexMatch[1]) {
+                        periodName = complexMatch[1].trim();
+                    } else if (convertedBell.name.match(/(\d+(?:st|nd|rd|th)?\s+Period)/i)) {
+                        // Catch "1st Period Start Bell" -> "1st Period"
+                        periodName = convertedBell.name.match(/(\d+(?:st|nd|rd|th)?\s+Period)/i)[1].trim();
+                    } else if (convertedBell.name.toLowerCase().includes('planning')) {
+                        periodName = 'Planning';
+                    } else if (convertedBell.name.toLowerCase().includes('lunch')) {
                         periodName = 'Lunch';
                     }
                     
@@ -2149,8 +2179,7 @@
                         });
                     }
                     
-                    // Add the bell to the corresponding period
-                    periodMap.get(key).bells.push(bell);
+                    periodMap.get(key).bells.push(convertedBell);
                 });
                 
                 // Convert Map back to array and ensure bells within each period are sorted by time
@@ -2162,6 +2191,7 @@
                 // Finally, sort the periods themselves by the start time of the first bell
                 return sortPeriodsByFirstBell(periodsArray);
             }
+            
             /**
              * NEW: v4.0 - Sorts periods chronologically based on the time of their first bell.
              * @param {Array} periods - Array of period objects.
@@ -5103,4 +5133,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.06 -->
+<!-- Version 4.07 -->
