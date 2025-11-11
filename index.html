@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.03</title>
+    <title>Ellis Web Bell 4.04</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.03</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.04</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -830,6 +830,67 @@
                 </div>
             </div>
         </div>
+        
+        <!-- NEW: v4.04 - Relative Bell Modal -->
+        <div id="relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <form id="relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl">
+                <h3 class="text-2xl font-medium mb-4">Add Relative Bell</h3>
+                <p class="text-gray-700 mb-6">Create a bell relative to the start or end of the period <strong id="relative-period-name">...</strong>.</p>
+                
+                <!-- Anchor Bell Selector (Time Basis) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="relative-anchor" class="block text-sm font-medium text-gray-700 mb-1">Anchor Bell</label>
+                        <select id="relative-anchor" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="start">Period Start (<span id="anchor-start-time">--:--</span>)</option>
+                            <option value="end">Period End (<span id="anchor-end-time">--:--</span>)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="relative-direction" class="block text-sm font-medium text-gray-700 mb-1">Time Direction</label>
+                        <select id="relative-direction" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="after">After Anchor</option>
+                            <option value="before">Before Anchor</option>
+                        </select>
+                    </div>
+                </div>
+    
+                <!-- Offset Time Input -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="relative-minutes" class="block text-sm font-medium text-gray-700 mb-1">Offset (Minutes)</label>
+                        <input type="number" id="relative-minutes" value="0" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="relative-seconds" class="block text-sm font-medium text-gray-700 mb-1">Offset (Seconds)</label>
+                        <input type="number" id="relative-seconds" value="0" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+    
+                <!-- Bell Name and Sound -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="relative-bell-name" class="block text-sm font-medium text-gray-700 mb-1">Bell Name</label>
+                        <input type="text" id="relative-bell-name" placeholder="e.g. Hamburger Time" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="relative-bell-sound" class="block text-sm font-medium text-gray-700 mb-1">Sound</label>
+                        <select id="relative-bell-sound" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <!-- Options will be populated by JS -->
+                        </select>
+                    </div>
+                </div>
+    
+                <p id="relative-time-preview" class="text-lg font-medium text-blue-600 mt-4">Calculated Time: <span id="calculated-time">--:--:--</span></p>
+                <p id="relative-bell-status" class="text-red-600 text-sm mt-2 hidden"></p>
+    
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="relative-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Bell</button>
+                </div>
+            </form>
+        </div>
+        
         <!-- NEW: v4.03 - Rename Period Modal -->
         <div id="rename-period-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <form id="rename-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
@@ -1047,7 +1108,7 @@
         const renameNewScheduleNameInput = document.getElementById('rename-new-schedule-name');
         const renamePersonalScheduleStatus = document.getElementById('rename-personal-schedule-status');
         const renamePersonalCancelBtn = document.getElementById('rename-personal-cancel');
-
+            
         // NEW: v4.03 - Rename Period Modal Elements
         const renamePeriodModal = document.getElementById('rename-period-modal');
         const renamePeriodForm = document.getElementById('rename-period-form');
@@ -1056,6 +1117,26 @@
         const renamePeriodStatus = document.getElementById('rename-period-status');
         const renamePeriodCancelBtn = document.getElementById('rename-period-cancel');
 
+        // NEW: v4.04 - Relative Bell Modal Elements
+        const relativeBellModal = document.getElementById('relative-bell-modal');
+        const relativeBellForm = document.getElementById('relative-bell-form');
+        const relativePeriodName = document.getElementById('relative-period-name');
+        const relativeAnchor = document.getElementById('relative-anchor');
+        const relativeDirection = document.getElementById('relative-direction');
+        const relativeMinutesInput = document.getElementById('relative-minutes');
+        const relativeSecondsInput = document.getElementById('relative-seconds');
+        const relativeBellNameInput = document.getElementById('relative-bell-name');
+        const relativeBellSoundSelect = document.getElementById('relative-bell-sound');
+        const anchorStartTimeDisplay = document.getElementById('anchor-start-time');
+        const anchorEndTimeDisplay = document.getElementById('anchor-end-time');
+        const relativeTimePreview = document.getElementById('relative-time-preview');
+        const calculatedTimeDisplay = document.getElementById('calculated-time');
+        const relativeBellStatus = document.getElementById('relative-bell-status');
+        const relativeBellCancelBtn = document.getElementById('relative-bell-cancel');
+
+        // NEW: v4.04 - State for Relative Bell Creation
+        let currentRelativePeriod = null; // Stores { name, startSeconds, endSeconds }
+            
         // NEW: v4.03 - State for Period Renaming
         let currentRenamingPeriod = null; // { name, type: 'shared' | 'personal' }
             
@@ -1294,7 +1375,58 @@
             }
         }
 
+        /**
+         * NEW: v4.04 - Calculates the absolute time (HH:MM:SS) based on an anchor and offset.
+         * @param {number} anchorSeconds - Anchor time in seconds from midnight.
+         * @param {string} direction - 'before' or 'after'.
+         * @param {number} minutes - Offset minutes.
+         * @param {number} seconds - Offset seconds.
+         * @returns {string} Calculated time in HH:MM:SS format.
+         */
+        function calculateRelativeTime(anchorSeconds, direction, minutes, seconds) {
+            const offsetSeconds = (minutes * 60) + seconds;
+            let targetSeconds;
 
+            if (direction === 'after') {
+                targetSeconds = anchorSeconds + offsetSeconds;
+            } else {
+                targetSeconds = anchorSeconds - offsetSeconds;
+            }
+
+            // Ensure time wraps around 24 hours if necessary (mostly for 'before' midnight)
+            targetSeconds = (targetSeconds % 86400 + 86400) % 86400;
+
+            const h = String(Math.floor(targetSeconds / 3600)).padStart(2, '0');
+            const m = String(Math.floor((targetSeconds % 3600) / 60)).padStart(2, '0');
+            const s = String(targetSeconds % 60).padStart(2, '0');
+
+            return `${h}:${m}:${s}`;
+        }
+        
+        /**
+         * NEW: v4.04 - Handles the time calculation and updates the Relative Bell Modal display.
+         * This function is now defined in the global scope for immediate access by init().
+         */
+        function updateCalculatedTime() {
+            if (!currentRelativePeriod) return;
+
+            const anchor = relativeAnchor.value;
+            const direction = relativeDirection.value;
+            // Use || 0 to safely handle non-numeric input without crashing
+            const minutes = parseInt(relativeMinutesInput.value) || 0; 
+            const seconds = parseInt(relativeSecondsInput.value) || 0;
+            
+            const anchorSeconds = anchor === 'start' 
+                ? currentRelativePeriod.startSeconds 
+                : currentRelativePeriod.endSeconds;
+
+            const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, minutes, seconds);
+            
+            calculatedTimeDisplay.textContent = formatTime12Hour(calculatedTimeHHMMSS, false);
+            
+            // This function is purely for updating the UI preview
+        }
+            
         // --- Audio Setup (Tone.js) ---
         async function startAudio() {
             if (isAudioReady) return;
@@ -1836,7 +1968,14 @@
                             <div class="flex items-center space-x-4 min-w-0 flex-grow">
                                 <span class="text-xl font-medium text-blue-600 tabular-nums">${formatTime12Hour(bell.time, false)}</span>
                                 <div class="min-w-0">
-                                    <span class="font-medium text-gray-800 truncate block" title="${safeName}">${safeName}</span>
+                                    <!-- NEW v4.04: Anchor Icon Logic -->
+                                    <span class="font-medium text-gray-800 truncate block flex items-center" title="${safeName}">
+                                        ${safeName}
+                                        ${(bell.name === anchorStart.name && bell.time === anchorStart.time) || (bell.name === anchorEnd.name && bell.time === anchorEnd.time) ?
+                                            `<span class="ml-2 text-blue-500" title="Period Anchor Bell">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11 15h2v6h-2v-6zM11 3h2v10h-2V3zM3 3h2v18H3V3zm16 0h2v18h-2V3z"/></svg>
+                                            </span>` : ''}
+                                    </span>
                                     <span class="text-sm ${isOverridden ? 'text-blue-600' : 'text-gray-500'} truncate block" title="${bell.sound}">(${soundDisplay})</span>
                                 </div>
                             </div>
@@ -1966,6 +2105,7 @@
                 return NaN;
             }
         }
+
         // Updated for 4.0 all piecemeal like.  We'll see how it goes.
         /**
          * NEW: v4.0 - Converts the period structure into a flat, time-sorted list of bells.
@@ -3585,30 +3725,143 @@
         }
 
         /**
-         * NEW: v4.03 - Temporarily redirects to the form below the schedule list.
-         * @param {string} periodName - The period to select in the forms.
+         * MODIFIED: v4.04 - Opens the Relative Bell Modal instead of scrolling to the form.
+         * @param {string} periodName - The period that was clicked.
          */
         function handleShowAddBellForm(periodName) {
-            if (!activePersonalScheduleId && !document.body.classList.contains('admin-mode')) {
-                showUserMessage("You must select a personal schedule to add bells.");
+            if (!activePersonalScheduleId) {
+                showUserMessage("You must select a personal schedule to add custom bells.");
                 return;
             }
             
-            // 1. Determine which form to open
-            if (document.body.classList.contains('admin-mode') && activeBaseScheduleId) {
-                // Admin Mode: Use shared bell form
-                document.getElementById('shared-bell-period').value = periodName;
-                document.getElementById('add-shared-bell-form').scrollIntoView({ behavior: 'smooth' });
-                document.getElementById('shared-bell-time').focus();
-            } else if (activePersonalScheduleId) {
-                // User Mode: Use personal bell form
-                document.getElementById('personal-bell-period').value = periodName;
-                document.getElementById('add-personal-bell-form').scrollIntoView({ behavior: 'smooth' });
-                document.getElementById('personal-bell-time').focus();
+            // 1. Get the target period's bells
+            // Look for the period in the personal structure first, then the shared base schedule.
+            const targetPeriod = personalBellsPeriods.find(p => p.name === periodName) || 
+                                 localSchedulePeriods.find(p => p.name === periodName);
+                                 
+            if (!targetPeriod || !targetPeriod.bells || targetPeriod.bells.length < 2) {
+                showUserMessage(`Cannot add relative bells to ${periodName}. A period must have at least two existing bells (Start/End) defined.`);
+                return;
             }
-            // Fallback: This is okay for now, we will add a dedicated modal soon.
+            
+            // 2. Determine Anchor Bells (Start/End)
+            const sortedBells = [...targetPeriod.bells].sort((a, b) => a.time.localeCompare(b.time));
+            const anchorStart = sortedBells[0];
+            const anchorEnd = sortedBells[sortedBells.length - 1];
+            
+            if (!anchorStart || !anchorEnd || anchorStart.time === anchorEnd.time) {
+                 showUserMessage(`Cannot add relative bells to ${periodName}. A period must have distinct Start and End bells.`);
+                 return;
+            }
+
+            // 3. Store Anchor Data in State
+            currentRelativePeriod = {
+                name: periodName,
+                anchorStart: anchorStart,
+                anchorEnd: anchorEnd,
+                startSeconds: timeToSeconds(anchorStart.time),
+                endSeconds: timeToSeconds(anchorEnd.time)
+            };
+
+            // 4. Populate Modal UI
+            relativePeriodName.textContent = periodName;
+            anchorStartTimeDisplay.textContent = formatTime12Hour(anchorStart.time, true);
+            anchorEndTimeDisplay.textContent = formatTime12Hour(anchorEnd.time, true);
+
+            // Populate sound dropdowns (need to fetch latest files)
+            updateSoundDropdowns();
+            relativeBellSoundSelect.value = 'ellisBell.mp3'; // Default sound
+
+            // Initial calculation
+            updateCalculatedTime(); 
+
+            // 5. Show Modal
+            relativeBellModal.classList.remove('hidden');
         }
 
+        /**
+         * NEW: v4.1 - Handles the time calculation and submission for the Relative Bell Modal.
+         */
+        async function handleRelativeTimeChange() {
+            if (!currentRelativePeriod) return;
+
+            const anchor = relativeAnchor.value;
+            const direction = relativeDirection.value;
+            const minutes = parseInt(relativeMinutesInput.value) || 0;
+            const seconds = parseInt(relativeSecondsInput.value) || 0;
+            
+            const anchorSeconds = anchor === 'start' 
+                ? currentRelativePeriod.startSeconds 
+                : currentRelativePeriod.endSeconds;
+
+            const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, minutes, seconds);
+            
+            calculatedTimeDisplay.textContent = formatTime12Hour(calculatedTimeHHMMSS, false);
+            
+            return calculatedTimeHHMMSS;
+        }
+
+        /**
+         * NEW: v4.04 - Submits the calculated relative bell to Firestore (Personal Schedule).
+         */
+        async function handleRelativeBellSubmit(e) {
+            e.preventDefault();
+            relativeBellStatus.classList.add('hidden');
+            if (!currentRelativePeriod || !activePersonalScheduleId) return;
+
+            const calculatedTime = handleRelativeTimeChange();
+            const bellName = relativeBellNameInput.value.trim();
+            const bellSound = relativeBellSoundSelect.value;
+            
+            if (!bellName) {
+                relativeBellStatus.textContent = "Bell Name is required.";
+                relativeBellStatus.classList.remove('hidden');
+                return;
+            }
+
+            const newBell = { time: calculatedTime, name: bellName, sound: bellSound };
+            const periodName = currentRelativePeriod.name;
+
+            // 1. Conflict Check (using the absolute calculated time)
+            const allBells = [...localSchedule, ...personalBells];
+            const nearbyBell = findNearbyBell(calculatedTime, allBells);
+            
+            if (nearbyBell) {
+                // If conflict, show the nearby bell modal (we re-use the personal bell flow)
+                pendingPersonalBell = { time: calculatedTime, name: bellName, sound: bellSound, type: 'custom', periodName };
+                pendingPersonalBellAction = 'add';
+                nearbyBellName.textContent = nearbyBell.name;
+                nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time, true); 
+                nearbyBellCustomControls.style.display = 'flex';
+                
+                // Close relative modal and open conflict modal
+                relativeBellModal.classList.add('hidden');
+                nearbyBellModal.classList.remove('hidden');
+                return;
+            }
+
+            // 2. No conflict, save directly to Firestore
+            const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+            try {
+                const docSnap = await getDoc(personalScheduleRef);
+                const existingPeriods = docSnap.data().periods || [];
+                
+                const updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, newBell);
+
+                await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+
+                showUserMessage(`Bell "${bellName}" added successfully to ${periodName}!`);
+                relativeBellForm.reset();
+                relativeBellModal.classList.add('hidden');
+                currentRelativePeriod = null;
+                
+            } catch (error) {
+                console.error("Error adding relative bell:", error);
+                relativeBellStatus.textContent = "Error saving bell.";
+                relativeBellStatus.classList.remove('hidden');
+            }
+        }
+            
         /**
          * NEW: v4.03 - Opens the Rename Period Modal.
          * @param {string} periodName - The name of the period to rename.
@@ -4669,6 +4922,20 @@
                 currentRenamingPeriod = null;
             });
 
+            // NEW: v4.04 - Relative Bell Listeners
+            relativeBellForm.addEventListener('submit', handleRelativeBellSubmit);
+            relativeBellCancelBtn.addEventListener('click', () => {
+                relativeBellModal.classList.add('hidden');
+                relativeBellForm.reset();
+                currentRelativePeriod = null;
+            });
+
+            // Update calculated time whenever an input changes
+            relativeAnchor.addEventListener('change', updateCalculatedTime);
+            relativeDirection.addEventListener('change', updateCalculatedTime);
+            relativeMinutesInput.addEventListener('input', updateCalculatedTime);
+            relativeSecondsInput.addEventListener('input', updateCalculatedTime);
+            
             // MODIFIED: v4.03 - Handles clicks for bells AND period management buttons
             function handleBellListClick(e) {
                 const target = e.target;
@@ -4823,4 +5090,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.03 -->
+<!-- Version 4.04 -->
