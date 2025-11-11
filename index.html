@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.07</title>
+    <title>Ellis Web Bell 4.08</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.07</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.08</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1830,94 +1830,101 @@
             }
     
             // --- Render Functions ---
-            // MODIFIED: v4.03 - Renders bells grouped by periods with management controls
-            function renderCombinedList() {
-                // Combine both period structures
-                const combinedPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
+
+            // MODIFIED: v4.08 - Final Fix for anchorStart/End Scope Error
+        function renderCombinedList() {
+            // Combine both period structures
+            const combinedPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
+            
+            // Step 1: Filter out periods that have no bells, or are disabled (future feature)
+            let renderablePeriods = combinedPeriods.filter(p => p.bells && p.bells.length > 0 && p.isEnabled !== false);
+            
+            if (renderablePeriods.length === 0) {
+                combinedBellListElement.innerHTML = `<div class="p-8 text-center text-gray-500">No bells scheduled for this day.</div>`;
+                return;
+            }
+
+            // Step 2: Sort periods chronologically by the time of the first bell in that period
+            renderablePeriods = sortPeriodsByFirstBell(renderablePeriods);
+
+            // Step 3: Render as collapsible sections
+            combinedBellListElement.innerHTML = renderablePeriods.map(period => {
                 
-                // Step 1: Filter out periods that have no bells, or are disabled (future feature)
-                let renderablePeriods = combinedPeriods.filter(p => p.bells && p.bells.length > 0 && p.isEnabled !== false);
+                // Get all bells for this period, sorted by time
+                const sortedBells = [...period.bells].sort((a, b) => a.time.localeCompare(b.time));
+
+                const isSharedPeriod = localSchedulePeriods.some(p => p.name === period.name);
+                const isPersonalPeriod = personalBellsPeriods.some(p => p.name === period.name);
+                const isOnlyPersonal = isPersonalPeriod && !isSharedPeriod; // True if this period was custom-added by the user
+
+                // *** CRITICAL FIX: DEFINE ANCHOR VARIABLES HERE ***
+                const sortedBellsForAnchor = [...period.bells].sort((a, b) => a.time.localeCompare(b.time));
+                const anchorStart = sortedBellsForAnchor[0] || {};
+                const anchorEnd = sortedBellsForAnchor[sortedBellsForAnchor.length - 1] || {};
+                // *** END CRITICAL FIX ***
                 
-                if (renderablePeriods.length === 0) {
-                    combinedBellListElement.innerHTML = `<div class="p-8 text-center text-gray-500">No bells scheduled for this day.</div>`;
-                    return;
-                }
-    
-                // Step 2: Sort periods chronologically by the time of the first bell in that period
-                renderablePeriods = sortPeriodsByFirstBell(renderablePeriods);
-    
-                // Step 3: Render as collapsible sections
-                combinedBellListElement.innerHTML = renderablePeriods.map(period => {
+                // --- Determine Management Permissions ---
+                const isAdmin = document.body.classList.contains('admin-mode');
+                const canRename = (isAdmin && isSharedPeriod) || isOnlyPersonal; // Admins can rename shared, Users can rename their custom periods.
+                // The 'Add Bell' button is controlled by activePersonalScheduleId in the HTML template.
+
+                // Get a list of all bells in this period with their final type (shared or custom)
+                const bellsToRender = sortedBells.map(bell => {
+                    // Check if this bell is a custom bell (i.e., exists in the personalBells flat list)
+                    const isCustom = personalBells.some(b => b.time === bell.time && b.name === bell.name);
+                    const bellType = isCustom ? 'custom' : 'shared';
                     
-                    // Get all bells for this period, sorted by time
-                    const sortedBells = [...period.bells].sort((a, b) => a.time.localeCompare(b.time));
-    
-                    const isSharedPeriod = localSchedulePeriods.some(p => p.name === period.name);
-                    const isPersonalPeriod = personalBellsPeriods.some(p => p.name === period.name);
-                    const isOnlyPersonal = isPersonalPeriod && !isSharedPeriod; // True if this period was custom-added by the user
-    
-                    // --- Determine Management Permissions ---
-                    const isAdmin = document.body.classList.contains('admin-mode');
-                    const canRename = (isAdmin && isSharedPeriod) || isOnlyPersonal; // Admins can rename shared, Users can rename their custom periods.
-                    const canAddBell = true; // Any user can add a bell to any period they see (if it's their personal schedule)
-    
-                    // Get a list of all bells in this period with their final type (shared or custom)
-                    const bellsToRender = sortedBells.map(bell => {
-                        // Check if this bell is a custom bell (i.e., exists in the personalBells flat list)
-                        const isCustom = personalBells.some(b => b.time === bell.time && b.name === bell.name);
-                        const bellType = isCustom ? 'custom' : 'shared';
-                        
-                        // Look up the bell in the flat list to get sound overrides
-                        const flatBellData = localSchedule.find(b => b.time === bell.time && b.name === bell.name) || 
-                                             personalBells.find(b => b.time === bell.time && b.name === bell.name) ||
-                                             bell; // Fallback to original bell data
-    
-                        return { ...flatBellData, ...bell, type: bellType };
-                    });
-    
-                    const firstBellTime = formatTime12Hour(bellsToRender[0].time, true);
-                    const lastBellTime = formatTime12Hour(bellsToRender[bellsToRender.length - 1].time, true);
-                    const safePeriodName = period.name.replace(/"/g, '&quot;');
-    
-    
-                    // Start Period Header (Collapsible <details> tag)
-                    let periodHtml = `
-                        <details class="group border-b border-gray-200" open>
-                            <summary class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
-                                <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2 sm:mb-0">
-                                    <span class="text-xl font-bold text-gray-800">${period.name}</span>
-                                    ${isOnlyPersonal ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">CUSTOM PERIOD</span>' : (isPersonalPeriod ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">PERSONAL</span>' : '')}
-                                    <span class="text-gray-600 text-sm mt-1 sm:mt-0">${firstBellTime} - ${lastBellTime}</span>
-                                </div>
+                    // Look up the bell in the flat list to get sound overrides
+                    const flatBellData = localSchedule.find(b => b.time === bell.time && b.name === bell.name) || 
+                                         personalBells.find(b => b.time === bell.time && b.name === bell.name) ||
+                                         bell; // Fallback to original bell data
+
+                    return { ...flatBellData, ...bell, type: bellType };
+                });
+
+                const firstBellTime = formatTime12Hour(bellsToRender[0].time, true);
+                const lastBellTime = formatTime12Hour(bellsToRender[bellsToRender.length - 1].time, true);
+                const safePeriodName = period.name.replace(/"/g, '&quot;');
+
+
+                // Start Period Header (Collapsible <details> tag)
+                let periodHtml = `
+                    <details class="group border-b border-gray-200" open>
+                        <summary class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2 sm:mb-0">
+                                <span class="text-xl font-bold text-gray-800">${period.name}</span>
+                                ${isOnlyPersonal ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">CUSTOM PERIOD</span>' : (isPersonalPeriod ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">PERSONAL</span>' : '')}
+                                <span class="text-gray-600 text-sm mt-1 sm:mt-0">${firstBellTime} - ${lastBellTime}</span>
+                            </div>
+                            
+                            <!-- Management Controls (Right Side) -->
+                            <div class="flex-shrink-0 flex items-center space-x-2">
+                                <!-- NEW: Add Bell to Period Button -->
+                                <button data-period-name="${safePeriodName}" 
+                                        class="add-bell-to-period-btn px-3 py-1 text-xs bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+                                        title="Add a new bell to the ${safePeriodName} period"
+                                        ${!activePersonalScheduleId ? 'disabled' : ''}>
+                                    + Bell
+                                </button>
                                 
-                                <!-- Management Controls (Right Side) -->
-                                <div class="flex-shrink-0 flex items-center space-x-2">
-                                    <!-- NEW: Add Bell to Period Button -->
-                                    <button data-period-name="${safePeriodName}" 
-                                            class="add-bell-to-period-btn px-3 py-1 text-xs bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
-                                            title="Add a new bell to the ${safePeriodName} period"
-                                            ${!activePersonalScheduleId ? 'disabled' : ''}>
-                                        + Bell
-                                    </button>
-                                    
-                                    <!-- NEW: Rename Period Button -->
-                                    <button data-period-name="${safePeriodName}" 
-                                            class="rename-period-btn px-3 py-1 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
-                                            title="Rename the ${safePeriodName} period"
-                                            ${!canRename ? 'disabled' : ''}>
-                                        Rename
-                                    </button>
+                                <!-- NEW: Rename Period Button -->
+                                <button data-period-name="${safePeriodName}" 
+                                        class="rename-period-btn px-3 py-1 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
+                                        title="Rename the ${safePeriodName} period"
+                                        ${!canRename ? 'disabled' : ''}>
+                                    Rename
+                                </button>
     
-                                    <span class="hidden sm:inline-block ml-2 text-gray-600">
-                                        <span class="group-open:hidden">&#9660;</span>
-                                        <span class="group-open:inline-block hidden">&#9650;</span>
-                                    </span>
-                                </div>
-                            </summary>
-                            <div class="p-0">
+                                <span class="hidden sm:inline-block ml-2 text-gray-600">
+                                    <span class="group-open:hidden">&#9660;</span>
+                                    <span class="group-open:inline-block hidden">&#9650;</span>
+                                </span>
+                            </div>
+                        </summary>
+                        <div class="p-0">
                     `;
     
-                    // ... (Render Bells inside the Period - remains the same) ...
+                    // ... (Render Bells inside the Period) ...
                     periodHtml += bellsToRender.map((bell, index) => {
                         const isCustom = bell.type === 'custom';
                         const safeName = bell.name.replace(/"/g, '&quot;');
@@ -5133,4 +5140,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.07 -->
+<!-- Version 4.08 -->
