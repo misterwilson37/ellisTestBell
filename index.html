@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.08</title>
+    <title>Ellis Web Bell 4.09</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.08</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.09</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -4952,7 +4952,21 @@
                 linkedEditCancel.addEventListener('click', closeLinkedEditModal);
                 linkedEditThisOnly.addEventListener('click', () => handleLinkedEdit(false));
                 linkedEditApply.addEventListener('click', () => handleLinkedEdit(true));
-    
+
+                // NEW: v4.04 (4.09?) - Relative Bell Listeners (Moved to End of Init)
+                relativeBellForm.addEventListener('submit', handleRelativeBellSubmit);
+                relativeBellCancelBtn.addEventListener('click', () => {
+                    relativeBellModal.classList.add('hidden');
+                    relativeBellForm.reset();
+                    currentRelativePeriod = null;
+                });
+
+                // Update calculated time whenever an input changes
+                relativeAnchor.addEventListener('change', updateCalculatedTime);
+                relativeDirection.addEventListener('change', updateCalculatedTime);
+                relativeMinutesInput.addEventListener('input', updateCalculatedTime);
+                relativeSecondsInput.addEventListener('input', updateCalculatedTime);
+                
                 signOutBtn.addEventListener('click', signOutUser);
     
                 // Sound previews
@@ -4966,20 +4980,6 @@
                     renamePeriodForm.reset();
                     currentRenamingPeriod = null;
                 });
-    
-                // NEW: v4.04 - Relative Bell Listeners
-                relativeBellForm.addEventListener('submit', handleRelativeBellSubmit);
-                relativeBellCancelBtn.addEventListener('click', () => {
-                    relativeBellModal.classList.add('hidden');
-                    relativeBellForm.reset();
-                    currentRelativePeriod = null;
-                });
-    
-                // Update calculated time whenever an input changes
-                relativeAnchor.addEventListener('change', updateCalculatedTime);
-                relativeDirection.addEventListener('change', updateCalculatedTime);
-                relativeMinutesInput.addEventListener('input', updateCalculatedTime);
-                relativeSecondsInput.addEventListener('input', updateCalculatedTime);
                 
                 // MODIFIED: v4.03 - Handles clicks for bells AND period management buttons
                 function handleBellListClick(e) {
@@ -5140,4 +5140,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.08 -->
+<!-- Version 4.09 -->
