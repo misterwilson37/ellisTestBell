@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.05</title>
+    <title>Ellis Web Bell 4.06</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.05</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.06</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1116,23 +1116,6 @@
         const renameNewPeriodNameInput = document.getElementById('rename-new-period-name');
         const renamePeriodStatus = document.getElementById('rename-period-status');
         const renamePeriodCancelBtn = document.getElementById('rename-period-cancel');
-
-        // NEW: v4.04 - Relative Bell Modal Elements
-        const relativeBellModal = document.getElementById('relative-bell-modal');
-        const relativeBellForm = document.getElementById('relative-bell-form');
-        const relativePeriodName = document.getElementById('relative-period-name');
-        const relativeAnchor = document.getElementById('relative-anchor');
-        const relativeDirection = document.getElementById('relative-direction');
-        const relativeMinutesInput = document.getElementById('relative-minutes');
-        const relativeSecondsInput = document.getElementById('relative-seconds');
-        const relativeBellNameInput = document.getElementById('relative-bell-name');
-        const relativeBellSoundSelect = document.getElementById('relative-bell-sound');
-        const anchorStartTimeDisplay = document.getElementById('anchor-start-time');
-        const anchorEndTimeDisplay = document.getElementById('anchor-end-time');
-        const relativeTimePreview = document.getElementById('relative-time-preview');
-        const calculatedTimeDisplay = document.getElementById('calculated-time');
-        const relativeBellStatus = document.getElementById('relative-bell-status');
-        const relativeBellCancelBtn = document.getElementById('relative-bell-cancel');
 
         // NEW: v4.04 - State for Relative Bell Creation
         let currentRelativePeriod = null; // Stores { name, startSeconds, endSeconds }
@@ -4655,7 +4638,28 @@
                 initFirebase(); 
                 loadMutedBells(); 
                 loadSoundOverrides(); // NEW: Load sound overrides
-    
+
+                // NEW V4.06: Initialize Relative Bell DOM elements inside init() 
+                // This prevents the ReferenceError on startup.
+                const relativeBellModal = document.getElementById('relative-bell-modal');
+                const relativeBellForm = document.getElementById('relative-bell-form');
+                const relativePeriodName = document.getElementById('relative-period-name');
+                const relativeAnchor = document.getElementById('relative-anchor');
+                const relativeDirection = document.getElementById('relative-direction');
+                const relativeMinutesInput = document.getElementById('relative-minutes');
+                const relativeSecondsInput = document.getElementById('relative-seconds');
+                const relativeBellNameInput = document.getElementById('relative-bell-name');
+                const relativeBellSoundSelect = document.getElementById('relative-bell-sound');
+                const anchorStartTimeDisplay = document.getElementById('anchor-start-time');
+                const anchorEndTimeDisplay = document.getElementById('anchor-end-time');
+                const relativeTimePreview = document.getElementById('relative-time-preview');
+                const calculatedTimeDisplay = document.getElementById('calculated-time');
+                const relativeBellStatus = document.getElementById('relative-bell-status');
+                const relativeBellCancelBtn = document.getElementById('relative-bell-cancel');
+                
+                // Re-declare currentRelativePeriod as it's used globally in init()
+                let currentRelativePeriod = null;
+                
                 // Auth buttons
                 googleStartBtn.addEventListener('click', signInWithGoogle);
                 anonymousStartBtn.addEventListener('click', signInAnon);
@@ -5099,4 +5103,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.05 -->
+<!-- Version 4.06 -->
