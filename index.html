@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.19</title>
+    <title>Ellis Web Bell 4.21</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -240,6 +240,14 @@
                     <optgroup label="My Sounds" id="edit-my-sounds-optgroup"></optgroup>
                     <optgroup label="Shared Sounds" id="edit-shared-sounds-optgroup"></optgroup>
                 </select>
+            </div>
+
+            <!-- NEW in 4.21: Override sound checkbox for shared bells -->
+            <div id="edit-bell-override-container" class="mt-4 hidden">
+                <label class="flex items-center space-x-2 cursor-pointer p-1">
+                    <input type="checkbox" id="edit-bell-override-sound" class="h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+                    <span class="text-sm font-medium text-gray-700">Override shared sound for all users</span>
+                </label>
             </div>
             
             <p id="edit-bell-status" class="text-blue-600 text-sm mt-4 hidden"></p>
@@ -521,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.19</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.21</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -923,18 +931,22 @@
                 <h3 class="text-2xl font-medium mb-6">Rename Period</h3>
                 
                 <p class="text-gray-700 mb-4">
-                    You are renaming the period: <strong id="rename-old-period-name">...</strong>
+                    You are renaming the period: <strong id="rename-period-old-name">...</strong>
                 </p>
                 
                 <div>
-                    <label for="rename-new-period-name" class="block text-sm font-medium text-gray-700">New Period Name</label>
-                    <input type="text" id="rename-new-period-name" placeholder="e.g. My Science Block" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <!-- MODIFIED in 4.20: Unique ID for label 'for' -->
+                    <label for="rename-period-new-name" class="block text-sm font-medium text-gray-700">New Period Name</label>
+                    <!-- MODIFIED in 4.20: Unique ID -->
+                    <input type="text" id="rename-period-new-name" placeholder="e.g. My Science Block" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 
-                <p id="rename-period-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+                <!-- MODIFIED in 4.20: Unique ID -->
+                <p id="rename-period-status-msg" class="text-blue-600 text-sm mt-4 hidden"></p>
     
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="rename-period-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <!-- MODIFIED in 4.20: Unique ID -->
+                    <button type="button" id="rename-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Name</button>
                 </div>
             </form>
@@ -1115,6 +1127,9 @@
         const editBellCancelBtn = document.getElementById('edit-bell-cancel');
         const editBellSubmitBtn = document.getElementById('edit-bell-submit');
         const editBellStatus = document.getElementById('edit-bell-status');
+        // NEW in 4.21: Override checkbox for Edit Bell modal
+        const editBellOverrideContainer = document.getElementById('edit-bell-override-container');
+        const editBellOverrideCheckbox = document.getElementById('edit-bell-override-sound');
         
         // Change Sound Modal
         const changeSoundModal = document.getElementById('change-sound-modal');
@@ -1134,10 +1149,11 @@
         // Rename Period Modal
         const renamePeriodModal = document.getElementById('rename-period-modal');
         const renamePeriodForm = document.getElementById('rename-period-form');
-        const renameOldPeriodName = document.getElementById('rename-old-period-name');
-        const renameNewPeriodNameInput = document.getElementById('rename-new-period-name');
-        const renamePeriodStatus = document.getElementById('rename-period-status');
-        const renamePeriodCancelBtn = document.getElementById('rename-period-cancel');
+        // MODIFIED in 4.20: Use unique IDs to avoid conflict with Rename Schedule Modal
+        const renamePeriodOldName = document.getElementById('rename-period-old-name');
+        const renamePeriodNewNameInput = document.getElementById('rename-period-new-name');
+        const renamePeriodStatusMsg = document.getElementById('rename-period-status-msg');
+        const renamePeriodCancelBtn = document.getElementById('rename-period-cancel-btn');
 
         // Orphan Modal (v4.12.2)
         const orphanHandlingModal = document.getElementById('orphan-handling-modal');
@@ -3524,24 +3540,36 @@
              * NEW: v3.02 (4.03?) - Opens the modal to edit a bell.
              * @param {string} time - Original time.
              * @param {string} name - Original name.
-             * @param {string} sound - Original sound URL/Name.
              * @param {string} type - 'shared' or 'custom'.
              */
             // MODIFIED: v4.11 - Added 'periodName' to the function signature and state
-            function handleEditBellClick(time, name, sound, type, periodName) {
-                currentEditingBell = { time, name, sound, type, periodName }; // Store state
+            // MODIFIED: v4.20 - Added 'originalSound' to fix override bug
+            function handleEditBellClick(time, name, sound, type, periodName, originalSound) {
+                // MODIFIED in 4.20: Store the original sound in the state
+                currentEditingBell = { time, name, sound: originalSound, type, periodName }; // Store state
                 
                 // Set fields
                 editBellTimeInput.value = time;
                 editBellNameInput.value = name;
-                editBellSoundInput.value = sound;
+                // MODIFIED in 4.20: Use originalSound to populate the modal
+                editBellSoundInput.value = originalSound;
                 editBellStatus.classList.add('hidden'); // Clear status
                 
                 // Populate sound dropdowns again to ensure custom files are available
                 updateSoundDropdowns();
                 
                 // Select the current sound
-                editBellSoundInput.value = sound; 
+                // MODIFIED in 4.20: Use originalSound to select the correct dropdown value
+                editBellSoundInput.value = originalSound; 
+
+                // NEW in 4.21: Show/hide the override checkbox
+                if (type === 'shared') {
+                    editBellOverrideContainer.classList.remove('hidden');
+                    editBellOverrideCheckbox.checked = false; // Default to not overriding
+                } else {
+                    editBellOverrideContainer.classList.add('hidden');
+                    editBellOverrideCheckbox.checked = false;
+                }
     
                 // Show modal
                 editBellModal.classList.remove('hidden');
@@ -3582,11 +3610,23 @@
                 
                 const oldBell = currentEditingBell;
                 
+                // MODIFIED in 4.21: Build the newBell object
                 const newBell = {
                     time: editBellTimeInput.value,
                     name: editBellNameInput.value.trim(),
-                    sound: editBellSoundInput.value
+                    sound: oldBell.sound // Start by assuming the sound does NOT change
                 };
+
+                // NEW in 4.21: Check if we should override the sound
+                if (oldBell.type === 'shared' && editBellOverrideCheckbox.checked) {
+                    // The override box is checked, so take the new sound
+                    newBell.sound = editBellSoundInput.value;
+                } else if (oldBell.type === 'custom') {
+                    // It's a custom bell, so always take the new sound
+                    newBell.sound = editBellSoundInput.value;
+                }
+                // If it's a shared bell and the box is NOT checked,
+                // newBell.sound remains set to oldBell.sound, protecting it.
                 
                 if (!newBell.time || !newBell.name) {
                     editBellStatus.textContent = "Time and Name are required.";
@@ -4521,9 +4561,10 @@
                 };
     
                 // Populate modal
-                renameOldPeriodName.textContent = periodName;
-                renameNewPeriodNameInput.value = periodName;
-                renamePeriodStatus.classList.add('hidden');
+                // MODIFIED in 4.20: Use new unique variable names
+                renamePeriodOldName.textContent = periodName;
+                renamePeriodNewNameInput.value = periodName;
+                renamePeriodStatusMsg.classList.add('hidden');
                 
                 renamePeriodModal.classList.remove('hidden');
             }
@@ -4536,15 +4577,17 @@
                 if (!currentRenamingPeriod) return;
     
                 const { name: oldName, type } = currentRenamingPeriod;
-                const newName = renameNewPeriodNameInput.value.trim();
+                // MODIFIED in 4.20: Use new unique variable name
+                const newName = renamePeriodNewNameInput.value.trim();
     
                 if (!newName || newName === oldName) {
                     renamePeriodModal.classList.add('hidden');
                     return;
                 }
     
-                renamePeriodStatus.textContent = "Renaming...";
-                renamePeriodStatus.classList.remove('hidden');
+                // MODIFIED in 4.20: Use new unique variable name
+                renamePeriodStatusMsg.textContent = "Renaming...";
+                renamePeriodStatusMsg.classList.remove('hidden');
                 
                 let targetPeriods = [];
                 let docRef;
@@ -4583,7 +4626,8 @@
                     // We always write to the 'periods' field for V4.0 schedules
                     await updateDoc(docRef, { periods: updatedPeriods, bells: legacyBells });
                     
-                    renamePeriodStatus.textContent = "Rename successful. Updating view...";
+                    // MODIFIED in 4.20: Use new unique variable name
+                    renamePeriodStatusMsg.textContent = "Rename successful. Updating view...";
                     
                     // The onSnapshot listener will handle the UI refresh.
                     setTimeout(() => {
@@ -4593,7 +4637,8 @@
     
                 } catch (error) {
                     console.error("Error renaming period:", error);
-                    renamePeriodStatus.textContent = `Error saving name: ${error.message}`;
+                    // MODIFIED in 4.20: Use new unique variable name
+                    renamePeriodStatusMsg.textContent = `Error saving name: ${error.message}`;
                 }
             }
     
@@ -5578,6 +5623,8 @@
     
                 // NEW: v4.03 - Period Rename Listeners
                 renamePeriodForm.addEventListener('submit', handleRenamePeriodSubmit);
+                // MODIFIED in 4.20: The variable 'renamePeriodCancelBtn' now correctly
+                // points to the button with the new ID 'rename-period-cancel-btn'
                 renamePeriodCancelBtn.addEventListener('click', () => {
                     renamePeriodModal.classList.add('hidden');
                     renamePeriodForm.reset();
@@ -5650,10 +5697,10 @@
                         handleDeleteBellClick(bell);
                         return; // Action handled
                     } else if (target.classList.contains('edit-btn') || target.classList.contains('edit-custom-btn')) {
-                        // MODIFIED: Pass periodName to edit function
-                        handleEditBellClick(bell.time, bell.name, bell.sound, bell.type, bell.periodName);
+                        // MODIFIED in 4.20: Pass periodName AND originalSound to edit function
+                        handleEditBellClick(bell.time, bell.name, bell.sound, bell.type, bell.periodName, bell.originalSound);
                         return; // Action handled
-                    } else if (target.classList.contains('sound-btn')) { 
+                    } else if (target.classList.contains('sound-btn')) {
                         openChangeSoundModal(bell);
                         return; // Action handled
                     } else if (target.classList.contains('preview-bell-btn')) { // NEW in 4.16: Handle Play button
@@ -5862,4 +5909,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.19 -->
+<!-- Version 4.21 -->
