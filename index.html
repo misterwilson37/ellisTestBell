@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.12</title>
+    <title>Ellis Web Bell 4.13</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.12</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.13</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1798,12 +1798,18 @@
                     }
                     countdownElement.textContent = countdownString;
                     
+                    // NEW: v4.13 - Add Period context to the label
+                    let bellLabel = activeTimerLabel;
+                    if (scheduleBellObject && scheduleBellObject.periodName && activeTimerLabel !== "Quick Bell") {
+                        bellLabel = `${scheduleBellObject.periodName}: ${activeTimerLabel}`;
+                    }
+
                     if (isMuting) {
                         // MODIFICATION: Added period
-                        nextBellElement.textContent = `until ${activeTimerLabel} (MUTED).`;
+                        nextBellElement.textContent = `until ${bellLabel} (MUTED).`;
                     } else {
                         // MODIFICATION: Added period
-                        nextBellElement.textContent = `until ${activeTimerLabel}.`;
+                        nextBellElement.textContent = `until ${bellLabel}.`;
                     }
                 } else {
                     // --- C. No active timer ---
@@ -1877,10 +1883,10 @@
     
             // --- Render Functions ---
 
-            // MODIFIED: v4.08 - Final Fix for anchorStart/End Scope Error
-        function renderCombinedList() {
-            // Combine both period structures
-            const combinedPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
+            // MODIFIED: v4.13 - Now accepts calculatedPeriods as an argument
+        function renderCombinedList(calculatedPeriods) {
+            // Use the calculated, merged, and time-resolved periods passed from the engine
+            const combinedPeriods = calculatedPeriods || [];
             
             // Step 1: Filter out periods that have no bells, or are disabled (future feature)
             let renderablePeriods = combinedPeriods.filter(p => p.bells && p.bells.length > 0 && p.isEnabled !== false);
@@ -2014,7 +2020,7 @@
                                             ${safeName}
                                             ${(bell.name === anchorStart.name && bell.time === anchorStart.time) || (bell.name === anchorEnd.name && bell.time === anchorEnd.time) ?
                                                 `<span class="ml-2 text-blue-500" title="Period Anchor Bell">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11 15h2v6h-2v-6zM11 3h2v10h-2V3zM3 3h2v18H3V3zm16 0h2v18h-2V3z"/></svg>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 12H9v5.24c-1.72-.4-3-1.89-3-3.74h-2c0 2.8 2.2 5 5 5v2h2v-2c2.8 0 5-2.2 5-5h-2c0 1.85-1.28 3.34-3 3.74V12h-1zM12 2a4 4 0 0 0-4 4c0 2.21 1.79 4 4 4s4-1.79 4-4a4 4 0 0 0-4-4zm0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
                                                 </span>` : ''}
                                             
                                             <!-- NEW: v4.10.3 - Relative Bell Icon -->
@@ -2348,11 +2354,18 @@
                 const bellMap = new Map();
                 allPeriods.forEach(period => {
                     period.bells.forEach(bell => {
-                        if (bell.bellId) {
-                            bellMap.set(bell.bellId, bell);
-                        } else {
-                            console.warn("Found a bell with no bellId:", bell.name);
+                        // MODIFIED: v4.13 - Fix for legacy bells
+                        if (!bell.bellId) {
+                            bell.bellId = generateBellId(); // Assign one on the fly
+                            console.warn(`Assigned new bellId to legacy bell: ${bell.name}`);
                         }
+                        bellMap.set(bell.bellId, bell);
+                        // DELETED: Old logic
+                        // if (bell.bellId) {
+                        //     bellMap.set(bell.bellId, bell);
+                        // } else {
+                        //     console.warn("Found a bell with no bellId:", bell.name);
+                        // }
                     });
                 });
 
@@ -2367,7 +2380,9 @@
                             ...bell,
                             time: calculatedTime, // This will be null if calculation failed
                             // Add 'type' for rendering
-                            type: personalBellsPeriods.includes(period) ? 'custom' : 'shared'
+                            // MODIFIED: v4.13 - This logic is more robust and survives the race condition.
+                            // We check if the *source* array contains a period with this name.
+                            type: personalBellsPeriods.some(p => p.name === period.name) ? 'custom' : 'shared'
                         };
                     }).filter(bell => bell.time !== null); // Filter out any bells that failed (orphans, circular)
 
@@ -3383,7 +3398,8 @@
                 if (!bellToDelete) return;
                 
                 // bellToDelete is now the full bell object from handleBellListClick
-                const { bellId, name, periodName, type } = bellToDelete; 
+                // MODIFIED: v4.13b - Destructure the 'children' array
+                const { bellId, name, periodName, type, children } = bellToDelete; 
                 
                 try {
                     // Determine if we are deleting a SHARED or PERSONAL bell
@@ -3424,11 +3440,26 @@
                         // Delete from the personal schedule (V4.0 logic)
                         const existingPeriods = docSnap.data().periods || docSnap.data().bells && migrateLegacyBellsToPeriods(docSnap.data().bells) || [];
                         
+                        // NEW: v4.13b - Create a Set of all bell IDs to delete
+                        const childIds = (children || []).map(c => c.bellId);
+                        const idsToDelete = new Set([bellId, ...childIds]);
+                        
+                        console.log(`Deleting ${idsToDelete.size} bell(s): ${name} and ${childIds.length} children.`);
+
                         const updatedPeriods = existingPeriods.map(p => {
-                            // Find the correct period by name
-                            if (p.name === periodName) {
-                                // Filter out the bell by its unique ID
-                                const newBells = p.bells.filter(b => b.bellId !== bellId);
+                            // We must check *all* periods, as children might be in different periods (future-proofing)
+                            let bellsChanged = false;
+                            
+                            // Filter out all bells that are in the deletion Set
+                            const newBells = p.bells.filter(b => {
+                                if (idsToDelete.has(b.bellId)) {
+                                    bellsChanged = true;
+                                    return false; // Don't keep this bell
+                                }
+                                return true; // Keep this bell
+                            });
+
+                            if (bellsChanged) {
                                 return { ...p, bells: newBells };
                             }
                             return p;
@@ -4418,24 +4449,23 @@
              * NEW: v4.10.3 - Master function to recalculate all bells and update the UI.
              * This is called by both shared and personal schedule listeners.
              */
+            // MODIFIED: v4.13 - This function no longer overwrites its source arrays.
             function recalculateAndRenderAll() {
                 // 1. Run the calculation engine
+                // It reads from the global localSchedulePeriods and personalBellsPeriods
                 const { calculatedPeriods, flatBellList } = resolveAllBellTimes();
 
-                // 2. Update the flat 'localSchedule' and 'personalBells' lists for the clock
+                // 2. Update the flat 'localSchedule' and 'personalBells' lists (for the clock)
                 localSchedule = flatBellList.filter(b => b.type === 'shared');
                 personalBells = flatBellList.filter(b => b.type === 'custom');
 
-                // 3. Update the 'localSchedulePeriods' and 'personalBellsPeriods' for the renderer
-                // We use the *output* of the engine, not the source data
-                localSchedulePeriods = calculatedPeriods.filter(p => p.type === 'shared');
-                personalBellsPeriods = calculatedPeriods.filter(p => p.type === 'custom');
-
-                // 4. Re-populate period selectors and render the final list
+                // 3. Re-populate period selectors
                 populatePeriodSelectors();
-                renderCombinedList();
+                
+                // 4. Pass the calculated data *directly* to the render function
+                renderCombinedList(calculatedPeriods);
             }
-
+            
             /**
              * NEW: v4.03 - Opens the Rename Period Modal.
              * @param {string} periodName - The name of the period to rename.
@@ -5799,4 +5829,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.12 -->
+<!-- Version 4.13 -->
