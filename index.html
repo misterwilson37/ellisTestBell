@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.13</title>
+    <title>Ellis Web Bell 4.14</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.13</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.14</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1026,6 +1026,198 @@
         // MODIFIED: v3.21 -> v3.22 - Renamed from v3.21
         const nextBellInfoElement = document.getElementById('next-bell-info');
 
+        // DELETED: v4.14b - Removed illegal 'if' block from global scope.
+        // This block belongs inside the init() function.
+
+        // --- NEW: v4.14c - RESTORING ALL MISSING DOM VARIABLES ---
+
+        // Relative Bell Modal (v4.04 / v4.10)
+        const relativeBellModal = document.getElementById('relative-bell-modal');
+        const relativeBellForm = document.getElementById('relative-bell-form');
+        const relativePeriodName = document.getElementById('relative-period-name');
+        const relativeAnchorBellSelect = document.getElementById('relative-anchor-bell'); 
+        const relativeDirection = document.getElementById('relative-direction');
+        const relativeMinutesInput = document.getElementById('relative-minutes');
+        const relativeSecondsInput = document.getElementById('relative-seconds');
+        const relativeBellNameInput = document.getElementById('relative-bell-name');
+        const relativeBellSoundSelect = document.getElementById('relative-bell-sound');
+        const relativeTimePreview = document.getElementById('relative-time-preview');
+        const calculatedTimeDisplay = document.getElementById('calculated-time');
+        const relativeBellStatus = document.getElementById('relative-bell-status');
+        const relativeBellCancelBtn = document.getElementById('relative-bell-cancel');
+
+        // Create Personal Schedule Modal
+        const createPersonalScheduleModal = document.getElementById('create-personal-schedule-modal');
+        const createPersonalScheduleForm = document.getElementById('create-personal-schedule-form');
+        const personalBaseScheduleName = document.getElementById('personal-base-schedule-name');
+        const newPersonalScheduleNameInput = document.getElementById('new-personal-schedule-name');
+        const createPersonalScheduleStatus = document.getElementById('create-personal-schedule-status');
+        const createPersonalScheduleCancelBtn = document.getElementById('create-personal-schedule-cancel');
+        const createPersonalScheduleBtn = document.getElementById('create-personal-schedule-btn');
+
+        // Delete Personal Schedule Modal
+        const confirmDeletePersonalModal = document.getElementById('confirm-delete-personal-modal');
+        const confirmDeletePersonalText = document.getElementById('confirm-delete-personal-text');
+        const deletePersonalCancelBtn = document.getElementById('delete-personal-cancel');
+        const deletePersonalConfirmBtn = document.getElementById('delete-personal-confirm');
+
+        // Restore Personal Schedule Modal
+        const confirmRestoreModal = document.getElementById('confirm-restore-modal');
+        const confirmRestoreText = document.getElementById('confirm-restore-text');
+        const restoreCancelBtn = document.getElementById('restore-cancel');
+        const restoreConfirmBtn = document.getElementById('restore-confirm');
+        const restoreFileInput = document.getElementById('restore-file-input');
+
+        // Rename Personal Schedule Modal
+        const renamePersonalScheduleModal = document.getElementById('rename-personal-schedule-modal');
+        const renamePersonalScheduleForm = document.getElementById('rename-personal-schedule-form');
+        const renameOldScheduleName = document.getElementById('rename-old-schedule-name');
+        const renameNewScheduleNameInput = document.getElementById('rename-new-schedule-name');
+        const renamePersonalScheduleStatus = document.getElementById('rename-personal-schedule-status');
+        const renamePersonalCancelBtn = document.getElementById('rename-personal-cancel');
+
+        // Personal Schedule Manager Buttons (These were missing!)
+        const renamePersonalScheduleBtn = document.getElementById('rename-personal-schedule-btn');
+        const backupPersonalScheduleBtn = document.getElementById('backup-personal-schedule-btn');
+        const restorePersonalScheduleBtn = document.getElementById('restore-personal-schedule-btn');
+        
+        // Delete SHARED Schedule Modal
+        const deleteScheduleBtn = document.getElementById('delete-schedule-btn');
+        const confirmDeleteModal = document.getElementById('confirm-delete-modal');
+        const confirmDeleteText = document.getElementById('confirm-delete-text');
+        const deleteCancelBtn = document.getElementById('delete-cancel');
+        const deleteConfirmBtn = document.getElementById('delete-confirm');
+
+        // Delete AUDIO Modal
+        const confirmDeleteAudioModal = document.getElementById('confirm-delete-audio-modal');
+        const confirmDeleteAudioText = document.getElementById('confirm-delete-audio-text');
+        const confirmDeleteAudioList = document.getElementById('confirm-delete-audio-list');
+        const deleteAudioCancelBtn = document.getElementById('delete-audio-cancel');
+        const deleteAudioConfirmBtn = document.getElementById('delete-audio-confirm');
+        
+        // Nearby Bell Modal (Custom)
+        const nearbyBellModal = document.getElementById('nearby-bell-modal');
+        const nearbyBellName = document.getElementById('nearby-bell-name');
+        const nearbyBellTime = document.getElementById('nearby-bell-time');
+        const nearbyBellCustomControls = document.getElementById('nearby-bell-custom-controls');
+        const nearbyBellCancelBtn = document.getElementById('nearby-bell-cancel');
+        const nearbyBellConfirmBtn = document.getElementById('nearby-bell-confirm');
+        const nearbyBellStatus = document.getElementById('nearby-bell-status');
+
+        // --- END: v4.14c RESTORE ---
+
+        // Edit Bell Modal
+        const editBellModal = document.getElementById('edit-bell-modal');
+        const editBellForm = document.getElementById('edit-bell-form');
+        const editBellTimeInput = document.getElementById('edit-bell-time');
+        const editBellNameInput = document.getElementById('edit-bell-name');
+        const editBellSoundInput = document.getElementById('edit-bell-sound');
+        const editBellCancelBtn = document.getElementById('edit-bell-cancel');
+        const editBellSubmitBtn = document.getElementById('edit-bell-submit');
+        const editBellStatus = document.getElementById('edit-bell-status');
+        
+        // Change Sound Modal
+        const changeSoundModal = document.getElementById('change-sound-modal');
+        const changeSoundForm = document.getElementById('change-sound-form');
+        const changeSoundBellName = document.getElementById('change-sound-bell-name');
+        const changeSoundBellTime = document.getElementById('change-sound-bell-time');
+        const changeSoundSelect = document.getElementById('change-sound-select');
+        const changeSoundCancelBtn = document.getElementById('change-sound-cancel');
+        const previewChangeSoundBtn = document.getElementById('preview-change-sound');
+        
+        // Delete Bell Modal
+        const confirmDeleteBellModal = document.getElementById('confirm-delete-bell-modal');
+        const confirmDeleteBellText = document.getElementById('confirm-delete-bell-text');
+        const deleteBellConfirmBtn = document.getElementById('delete-bell-confirm');
+        const deleteBellCancelBtn = document.getElementById('delete-bell-cancel');
+        
+        // Rename Period Modal
+        const renamePeriodModal = document.getElementById('rename-period-modal');
+        const renamePeriodForm = document.getElementById('rename-period-form');
+        const renameOldPeriodName = document.getElementById('rename-old-period-name');
+        const renameNewPeriodNameInput = document.getElementById('rename-new-period-name');
+        const renamePeriodStatus = document.getElementById('rename-period-status');
+        const renamePeriodCancelBtn = document.getElementById('rename-period-cancel');
+
+        // Orphan Modal (v4.12.2)
+        const orphanHandlingModal = document.getElementById('orphan-handling-modal');
+        const orphanParentName = document.getElementById('orphan-parent-name');
+        const orphanChildList = document.getElementById('orphan-child-list');
+        const orphanActionIndependent = document.getElementById('orphan-action-independent');
+        const orphanActionDelete = document.getElementById('orphan-action-delete');
+        const orphanActionCancel = document.getElementById('orphan-action-cancel');
+
+        // --- NEW: v4.14d - RESTORING ADMIN & CONFLICT MODAL VARIABLES ---
+        
+        // Create Schedule Form (Admin)
+        const createScheduleForm = document.getElementById('create-schedule-form');
+        const newScheduleNameInput = document.getElementById('new-schedule-name');
+
+        // Add Shared Bell Form (Admin)
+        const addSharedBellForm = document.getElementById('add-shared-bell-form');
+        const sharedTimeInput = document.getElementById('shared-bell-time');
+        const sharedNameInput = document.getElementById('shared-bell-name');
+        const sharedSoundInput = document.getElementById('shared-bell-sound');
+        const previewSharedSoundBtn = document.getElementById('preview-shared-sound');
+        const addSharedStatus = document.getElementById('add-shared-status');
+        
+        // Multi-Add Bell Modal (Admin)
+        const addBellModal = document.getElementById('add-bell-modal');
+        const showAddBellModalBtn = document.getElementById('show-add-bell-modal-btn');
+        const multiAddBellForm = document.getElementById('multi-add-bell-form');
+        const multiBellTimeInput = document.getElementById('multi-bell-time');
+        const multiBellNameInput = document.getElementById('multi-bell-name');
+        const multiBellSoundInput = document.getElementById('multi-bell-sound');
+        const multiScheduleListContainer = document.getElementById('multi-schedule-list-container');
+        const multiAddCancelBtn = document.getElementById('multi-add-cancel');
+        const multiAddSubmitBtn = document.getElementById('multi-add-submit');
+        const multiAddStatus = document.getElementById('multi-add-status');
+        const multiSelectAllBtn = document.getElementById('multi-select-all');
+        const multiSelectNoneBtn = document.getElementById('multi-select-none');
+
+        // Conflict Modals (Admin)
+        const internalConflictWarningModal = document.getElementById('internal-conflict-warning-modal');
+        const internalConflictNewTime = document.getElementById('internal-conflict-new-time');
+        const internalConflictExistingBell = document.getElementById('internal-conflict-existing-bell');
+        const internalConflictCancelBtn = document.getElementById('internal-conflict-cancel');
+        const internalConflictEditBtn = document.getElementById('internal-conflict-edit');
+        const internalConflictConfirmBtn = document.getElementById('internal-conflict-confirm');
+        
+        const internalConflictConfirmModal = document.getElementById('internal-conflict-confirm-modal');
+        const internalConflictFinalNewTime = document.getElementById('internal-conflict-final-new-time');
+        const internalConflictFinalExisting = document.getElementById('internal-conflict-final-existing');
+        const internalConflictFinalDiff = document.getElementById('internal-conflict-final-diff');
+        const internalConflictFinalCancelBtn = document.getElementById('internal-conflict-final-cancel');
+        const internalConflictFinalCreateBtn = document.getElementById('internal-conflict-final-create');
+
+        const externalConflictModal = document.getElementById('external-conflict-modal');
+        const externalConflictNewTime = document.getElementById('external-conflict-new-time');
+        const externalConflictList = document.getElementById('external-conflict-list');
+        const externalConflictStatus = document.getElementById('external-conflict-status');
+        const externalConflictMatchBtn = document.getElementById('external-conflict-match-existing');
+        const externalConflictMatchTime = document.getElementById('external-conflict-match-time');
+        const externalConflictKeepBtn = document.getElementById('external-conflict-keep-new');
+        const externalConflictKeepTime = document.getElementById('external-conflict-keep-time');
+        const externalConflictCreateAndMatchBtn = document.getElementById('external-conflict-create-and-match');
+        const externalConflictCancelBtn = document.getElementById('external-conflict-cancel');
+
+        // Linked Edit Modal (Admin)
+        const confirmLinkedEditModal = document.getElementById('confirm-linked-edit-modal');
+        const linkedScheduleList = document.getElementById('linked-schedule-list');
+        const linkedEditStatus = document.getElementById('linked-edit-status');
+        const linkedEditCancel = document.getElementById('linked-edit-cancel');
+        const linkedEditThisOnly = document.getElementById('linked-edit-this-only');
+        const linkedEditApply = document.getElementById('linked-edit-apply');
+
+        // Import/Export (Admin)
+        const exportSchedulesBtn = document.getElementById('export-schedules-btn');
+        const importSchedulesBtn = document.getElementById('import-schedules-btn');
+        const importFileInput = document.getElementById('import-file-input');
+        const importStatus = document.getElementById('import-status');
+        // --- END: v4.14d RESTORE ---
+
+        // --- END: v4.14 Global Scope Fix ---
+
         // NEW: Quick Bell Elements
         const quickBellControls = document.getElementById('quickBellControls');
         const quickBellSoundSelect = document.getElementById('quickBellSoundSelect');
@@ -1043,176 +1235,8 @@
         const combinedBellListElement = document.getElementById('combined-bell-list');
         // DELETED: previewCustomSoundBtn (renamed)
         
-        // Add Shared Bell Form (in Admin Zone)
-        const addSharedBellForm = document.getElementById('add-shared-bell-form');
-        const sharedTimeInput = document.getElementById('shared-bell-time');
-        const sharedNameInput = document.getElementById('shared-bell-name');
-        const sharedSoundInput = document.getElementById('shared-bell-sound');
-        const previewSharedSoundBtn = document.getElementById('preview-shared-sound');
-        const addSharedStatus = document.getElementById('add-shared-status');
-        
-        // Multi-Add Bell Modal
-        const addBellModal = document.getElementById('add-bell-modal');
-        const showAddBellModalBtn = document.getElementById('show-add-bell-modal-btn');
-        const multiAddBellForm = document.getElementById('multi-add-bell-form');
-        const multiBellTimeInput = document.getElementById('multi-bell-time');
-        const multiBellNameInput = document.getElementById('multi-bell-name');
-        const multiBellSoundInput = document.getElementById('multi-bell-sound');
-        const multiScheduleListContainer = document.getElementById('multi-schedule-list-container');
-        const multiAddCancelBtn = document.getElementById('multi-add-cancel');
-        const multiAddSubmitBtn = document.getElementById('multi-add-submit');
-        const multiAddStatus = document.getElementById('multi-add-status');
-        const multiSelectAllBtn = document.getElementById('multi-select-all');
-        const multiSelectNoneBtn = document.getElementById('multi-select-none');
-
-        // Edit Bell Modal
-        const editBellModal = document.getElementById('edit-bell-modal');
-        const editBellForm = document.getElementById('edit-bell-form');
-        const editBellTimeInput = document.getElementById('edit-bell-time');
-        const editBellNameInput = document.getElementById('edit-bell-name');
-        const editBellSoundInput = document.getElementById('edit-bell-sound');
-        const editBellCancelBtn = document.getElementById('edit-bell-cancel');
-        const editBellSubmitBtn = document.getElementById('edit-bell-submit');
-        const editBellStatus = document.getElementById('edit-bell-status');
-
-        // NEW: Change Sound Modal
-        const changeSoundModal = document.getElementById('change-sound-modal');
-        const changeSoundForm = document.getElementById('change-sound-form');
-        const changeSoundBellName = document.getElementById('change-sound-bell-name');
-        const changeSoundBellTime = document.getElementById('change-sound-bell-time');
-        const changeSoundSelect = document.getElementById('change-sound-select');
-        const changeSoundCancelBtn = document.getElementById('change-sound-cancel');
-        // NEW: v3.19 - Play button for change sound modal
-        const previewChangeSoundBtn = document.getElementById('preview-change-sound');
-
-        // Linked Edit Modal
-        const confirmLinkedEditModal = document.getElementById('confirm-linked-edit-modal');
-        const linkedScheduleList = document.getElementById('linked-schedule-list');
-        const linkedEditStatus = document.getElementById('linked-edit-status');
-        const linkedEditCancel = document.getElementById('linked-edit-cancel');
-        const linkedEditThisOnly = document.getElementById('linked-edit-this-only');
-        const linkedEditApply = document.getElementById('linked-edit-apply');
-
-        // Create/Delete Schedule
-        const createScheduleForm = document.getElementById('create-schedule-form');
-        const newScheduleNameInput = document.getElementById('new-schedule-name');
-        const deleteScheduleBtn = document.getElementById('delete-schedule-btn');
-        const confirmDeleteModal = document.getElementById('confirm-delete-modal');
-        const confirmDeleteText = document.getElementById('confirm-delete-text');
-        const deleteConfirmBtn = document.getElementById('delete-confirm');
-        const deleteCancelBtn = document.getElementById('delete-cancel'); 
-
-        // NEW: v3.03 - Create/Delete Personal Schedule
-        const createPersonalScheduleBtn = document.getElementById('create-personal-schedule-btn');
-        const createPersonalScheduleModal = document.getElementById('create-personal-schedule-modal');
-        const createPersonalScheduleForm = document.getElementById('create-personal-schedule-form');
-        const personalBaseScheduleName = document.getElementById('personal-base-schedule-name');
-        const newPersonalScheduleNameInput = document.getElementById('new-personal-schedule-name');
-        const createPersonalScheduleStatus = document.getElementById('create-personal-schedule-status');
-        const createPersonalScheduleCancelBtn = document.getElementById('create-personal-schedule-cancel');
-        const confirmDeletePersonalModal = document.getElementById('confirm-delete-personal-modal');
-        const confirmDeletePersonalText = document.getElementById('confirm-delete-personal-text');
-        const deletePersonalConfirmBtn = document.getElementById('delete-personal-confirm');
-        const deletePersonalCancelBtn = document.getElementById('delete-personal-cancel');
-
-        // NEW: v3.05 - Personal Schedule Manager Buttons
-        const renamePersonalScheduleBtn = document.getElementById('rename-personal-schedule-btn');
-        const backupPersonalScheduleBtn = document.getElementById('backup-personal-schedule-btn');
-        const restorePersonalScheduleBtn = document.getElementById('restore-personal-schedule-btn');
-        const restoreFileInput = document.getElementById('restore-file-input');
-        
-        // NEW: v3.05 - Restore Modal
-        const confirmRestoreModal = document.getElementById('confirm-restore-modal');
-        const confirmRestoreText = document.getElementById('confirm-restore-text');
-        const restoreConfirmBtn = document.getElementById('restore-confirm');
-        const restoreCancelBtn = document.getElementById('restore-cancel');
-
-        // NEW: v3.26 - Rename Personal Schedule Modal
-        const renamePersonalScheduleModal = document.getElementById('rename-personal-schedule-modal');
-        const renamePersonalScheduleForm = document.getElementById('rename-personal-schedule-form');
-        const renameOldScheduleName = document.getElementById('rename-old-schedule-name');
-        const renameNewScheduleNameInput = document.getElementById('rename-new-schedule-name');
-        const renamePersonalScheduleStatus = document.getElementById('rename-personal-schedule-status');
-        const renamePersonalCancelBtn = document.getElementById('rename-personal-cancel');
-            
-        // NEW: v4.03 - Rename Period Modal Elements
-        const renamePeriodModal = document.getElementById('rename-period-modal');
-        const renamePeriodForm = document.getElementById('rename-period-form');
-        const renameOldPeriodName = document.getElementById('rename-old-period-name');
-        const renameNewPeriodNameInput = document.getElementById('rename-new-period-name');
-        const renamePeriodStatus = document.getElementById('rename-period-status');
-        const renamePeriodCancelBtn = document.getElementById('rename-period-cancel');
-
-        // NEW: v4.04 - State for Relative Bell Creation
-        let currentRelativePeriod = null; // NEW: v4.10 - Stores { name, bells: [...] }
-            
-        // NEW: v4.03 - State for Period Renaming
-        let currentRenamingPeriod = null; // { name, type: 'shared' | 'personal' }
-            
-        // Delete Bell Modal
-        const confirmDeleteBellModal = document.getElementById('confirm-delete-bell-modal');
-        const confirmDeleteBellText = document.getElementById('confirm-delete-bell-text');
-        const deleteBellConfirmBtn = document.getElementById('delete-bell-confirm');
-        const deleteBellCancelBtn = document.getElementById('delete-bell-cancel');
-
-        // NEW: Delete Audio Modal
-        const confirmDeleteAudioModal = document.getElementById('confirm-delete-audio-modal');
-        const confirmDeleteAudioText = document.getElementById('confirm-delete-audio-text');
-        const confirmDeleteAudioList = document.getElementById('confirm-delete-audio-list');
-        const deleteAudioConfirmBtn = document.getElementById('delete-audio-confirm');
-        const deleteAudioCancelBtn = document.getElementById('delete-audio-cancel');
-
-        // **** NEW: Nearby Bell Warning Modal (Req 1 - Custom Bells ONLY) ****
-        const nearbyBellModal = document.getElementById('nearby-bell-modal');
-        const nearbyBellName = document.getElementById('nearby-bell-name');
-        const nearbyBellTime = document.getElementById('nearby-bell-time');
-        const nearbyBellStatus = document.getElementById('nearby-bell-status');
-        const nearbyBellCustomControls = document.getElementById('nearby-bell-custom-controls');
-        // DELETED: Old Admin Controls variable
-        // const nearbyBellAdminControls = document.getElementById('nearby-bell-admin-controls');
-        const nearbyBellCancelBtn = document.getElementById('nearby-bell-cancel');
-        // MODIFIED: v3.25 - Renamed button ID for clarity
-        const nearbyBellConfirmBtn = document.getElementById('nearby-bell-confirm');
-        // DELETED: Old nearby-bell-admin-controls buttons
-        // const nearbyBellMatchBtn = document.getElementById('nearby-bell-match');
-        // const nearbyBellMatchTimeText = document.getElementById('nearby-bell-match-time-text');
-        // const nearbyBellKeepBtn = document.getElementById('nearby-bell-keep');
-        // const nearbyBellKeepTimeText = document.getElementById('nearby-bell-keep-time-text');
-        // const nearbyBellAdminCancelBtn = document.getElementById('nearby-bell-admin-cancel');
-
-        // NEW: Scenario 1 Modal Elements
-        const internalConflictWarningModal = document.getElementById('internal-conflict-warning-modal');
-        const internalConflictNewTime = document.getElementById('internal-conflict-new-time');
-        const internalConflictExistingBell = document.getElementById('internal-conflict-existing-bell');
-        const internalConflictCancelBtn = document.getElementById('internal-conflict-cancel');
-        const internalConflictEditBtn = document.getElementById('internal-conflict-edit');
-        const internalConflictConfirmBtn = document.getElementById('internal-conflict-confirm');
-        
-        const internalConflictConfirmModal = document.getElementById('internal-conflict-confirm-modal');
-        const internalConflictFinalNewTime = document.getElementById('internal-conflict-final-new-time');
-        const internalConflictFinalExisting = document.getElementById('internal-conflict-final-existing');
-        const internalConflictFinalDiff = document.getElementById('internal-conflict-final-diff');
-        const internalConflictFinalCancelBtn = document.getElementById('internal-conflict-final-cancel');
-        const internalConflictFinalCreateBtn = document.getElementById('internal-conflict-final-create');
-
-        // NEW: Scenario 2 Modal Elements
-        const externalConflictModal = document.getElementById('external-conflict-modal');
-        const externalConflictNewTime = document.getElementById('external-conflict-new-time');
-        const externalConflictList = document.getElementById('external-conflict-list');
-        const externalConflictStatus = document.getElementById('external-conflict-status');
-        const externalConflictMatchBtn = document.getElementById('external-conflict-match-existing');
-        const externalConflictMatchTime = document.getElementById('external-conflict-match-time');
-        const externalConflictKeepBtn = document.getElementById('external-conflict-keep-new');
-        const externalConflictKeepTime = document.getElementById('external-conflict-keep-time');
-        const externalConflictCreateAndMatchBtn = document.getElementById('external-conflict-create-and-match');
-        const externalConflictCancelBtn = document.getElementById('external-conflict-cancel');
-
-
-        // Import/Export Elements
-        const exportSchedulesBtn = document.getElementById('export-schedules-btn');
-        const importSchedulesBtn = document.getElementById('import-schedules-btn');
-        const importFileInput = document.getElementById('import-file-input');
-        const importStatus = document.getElementById('import-status');
+        // DELETED: v4.14e - Removed the final block of duplicate variable declarations.
+        // These were all declared earlier (starting at line 964).
 
         // NEW: Audio Manager Elements
         const audioUploadInput = document.getElementById('audio-upload-input');
@@ -5255,31 +5279,17 @@
     
             // --- Init and Event Listeners ---
             function init() {
-                initFirebase(); 
+                initFirebase();
                 loadMutedBells(); 
                 loadSoundOverrides(); // NEW: Load sound overrides
 
                 // NEW V4.06: Initialize Relative Bell DOM elements inside init() 
-                // This prevents the ReferenceError on startup.
-                const relativeBellModal = document.getElementById('relative-bell-modal');
-                const relativeBellForm = document.getElementById('relative-bell-form');
-                const relativePeriodName = document.getElementById('relative-period-name');
-                // MODIFIED: v4.10.2a - Use the new 'relative-anchor-bell' ID
-                const relativeAnchorBellSelect = document.getElementById('relative-anchor-bell'); 
-                const relativeDirection = document.getElementById('relative-direction');
-                const relativeMinutesInput = document.getElementById('relative-minutes');
-                const relativeSecondsInput = document.getElementById('relative-seconds');
-                const relativeBellNameInput = document.getElementById('relative-bell-name');
-                const relativeBellSoundSelect = document.getElementById('relative-bell-sound');
-                // DELETED: v4.10.2a - These elements no longer exist
-                // const anchorStartTimeDisplay = document.getElementById('anchor-start-time');
-                // const anchorEndTimeDisplay = document.getElementById('anchor-end-time');
-                const relativeTimePreview = document.getElementById('relative-time-preview');
-                const calculatedTimeDisplay = document.getElementById('calculated-time');
-                const relativeBellStatus = document.getElementById('relative-bell-status');
-                const relativeBellCancelBtn = document.getElementById('relative-bell-cancel');
-                
-                // Re-declare currentRelativePeriod as it's used globally in init()
+                // MODIFIED: v4.14 - Declarations moved to global scope.
+                // We just do a check here to ensure they loaded.
+                if (!relativeBellModal || !editBellModal || !changeSoundModal || !confirmDeleteBellModal || !renamePeriodModal || !orphanHandlingModal) {
+                    console.error("CRITICAL: Modal DOM elements not found on init. Aborting listener setup.");
+                    return;
+                }
                 let currentRelativePeriod = null;
                 
                 // Auth buttons
@@ -5829,4 +5839,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.13 -->
+<!-- Version 4.14 -->
