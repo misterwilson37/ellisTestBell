@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.09</title>
+    <title>Ellis Web Bell 4.10</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.09</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.10</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -837,22 +837,22 @@
                 <h3 class="text-2xl font-medium mb-4">Add Relative Bell</h3>
                 <p class="text-gray-700 mb-6">Create a bell relative to the start or end of the period <strong id="relative-period-name">...</strong>.</p>
                 
-                <!-- Anchor Bell Selector (Time Basis) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label for="relative-anchor" class="block text-sm font-medium text-gray-700 mb-1">Anchor Bell</label>
-                        <select id="relative-anchor" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="start">Period Start (<span id="anchor-start-time">--:--</span>)</option>
-                            <option value="end">Period End (<span id="anchor-end-time">--:--</span>)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="relative-direction" class="block text-sm font-medium text-gray-700 mb-1">Time Direction</label>
-                        <select id="relative-direction" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="after">After Anchor</option>
-                            <option value="before">Before Anchor</option>
-                        </select>
-                    </div>
+                <!-- NEW: v4.10 - Anchor Bell Selector (All Bells) -->
+                <div class="mb-4">
+                    <label for="relative-anchor-bell" class="block text-sm font-medium text-gray-700 mb-1">Anchor Bell (Parent)</label>
+                    <select id="relative-anchor-bell" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- Options will be populated by JS -->
+                        <option value="">Loading bells...</option>
+                    </select>
+                </div>
+
+                <!-- Time Direction -->
+                <div class="mb-4">
+                    <label for="relative-direction" class="block text-sm font-medium text-gray-700 mb-1">Time Direction</label>
+                    <select id="relative-direction" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="before">Before Anchor</option>
+                        <option value="after">After Anchor</option>
+                    </select>
                 </div>
     
                 <!-- Offset Time Input -->
@@ -1118,7 +1118,7 @@
         const renamePeriodCancelBtn = document.getElementById('rename-period-cancel');
 
         // NEW: v4.04 - State for Relative Bell Creation
-        let currentRelativePeriod = null; // Stores { name, startSeconds, endSeconds }
+        let currentRelativePeriod = null; // NEW: v4.10 - Stores { name, bells: [...] }
             
         // NEW: v4.03 - State for Period Renaming
         let currentRenamingPeriod = null; // { name, type: 'shared' | 'personal' }
@@ -1387,27 +1387,47 @@
         }
         
         /**
-         * NEW: v4.04 - Handles the time calculation and updates the Relative Bell Modal display.
-         * This function is now defined in the global scope for immediate access by init().
+         * NEW: v4.10 - Handles time calculation for the Relative Bell Modal.
+         * Reads from the new anchor bell dropdown.
          */
         function updateCalculatedTime() {
-            if (!currentRelativePeriod) return;
+            if (!currentRelativePeriod || !currentRelativePeriod.bells) {
+                console.warn("updateCalculatedTime: No period bells loaded.");
+                return;
+            }
 
-            const anchor = relativeAnchor.value;
+            const anchorBellSelect = document.getElementById('relative-anchor-bell');
+            const relativeDirection = document.getElementById('relative-direction');
+            const relativeMinutesInput = document.getElementById('relative-minutes');
+            const relativeSecondsInput = document.getElementById('relative-seconds');
+            const calculatedTimeDisplay = document.getElementById('calculated-time');
+            
+            const parentBellId = anchorBellSelect.value;
+            if (!parentBellId) {
+                calculatedTimeDisplay.textContent = "--:--:--";
+                return;
+            }
+
+            // Find the selected parent bell from the state
+            const parentBell = currentRelativePeriod.bells.find(b => b.bellId === parentBellId);
+            if (!parentBell) {
+                console.error("Could not find parent bell with ID:", parentBellId);
+                calculatedTimeDisplay.textContent = "Error";
+                return;
+            }
+
             const direction = relativeDirection.value;
-            // Use || 0 to safely handle non-numeric input without crashing
             const minutes = parseInt(relativeMinutesInput.value) || 0; 
             const seconds = parseInt(relativeSecondsInput.value) || 0;
             
-            const anchorSeconds = anchor === 'start' 
-                ? currentRelativePeriod.startSeconds 
-                : currentRelativePeriod.endSeconds;
+            const anchorSeconds = timeToSeconds(parentBell.time);
 
             const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, minutes, seconds);
             
             calculatedTimeDisplay.textContent = formatTime12Hour(calculatedTimeHHMMSS, false);
             
-            // This function is purely for updating the UI preview
+            // Return the calculated time for the submit handler
+            return calculatedTimeHHMMSS;
         }
 
         // NEW V4.05: Encapsulate all initialization logic inside this function
@@ -1956,6 +1976,7 @@
                             <div class="bell-item flex items-center justify-between p-4 border-t border-gray-100 hover:bg-gray-50 transition-colors"
                                 data-time="${bell.time}" data-name="${safeName}" 
                                 data-sound="${bell.sound}" data-type="${bell.type}"
+                                data-bell-id="${bell.bellId || getBellId(bell)}"
                                 data-original-sound="${originalSound}" data-period-name="${period.name}">
                                 
                                 <!-- Bell Info (Time, Name, Sound) (left) -->
@@ -1968,6 +1989,12 @@
                                             ${(bell.name === anchorStart.name && bell.time === anchorStart.time) || (bell.name === anchorEnd.name && bell.time === anchorEnd.time) ?
                                                 `<span class="ml-2 text-blue-500" title="Period Anchor Bell">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11 15h2v6h-2v-6zM11 3h2v10h-2V3zM3 3h2v18H3V3zm16 0h2v18h-2V3z"/></svg>
+                                                </span>` : ''}
+                                            
+                                            <!-- NEW: v4.10.3 - Relative Bell Icon -->
+                                            ${bell.relative ? 
+                                                `<span class="ml-2 text-purple-600" title="Relative Bell (Time is calculated)">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/></svg>
                                                 </span>` : ''}
                                         </span>
                                         <span class="text-sm ${isOverridden ? 'text-blue-600' : 'text-gray-500'} truncate block" title="${bell.sound}">(${soundDisplay})</span>
@@ -2083,9 +2110,32 @@
     
             // --- Local Storage (Custom Bells) ---
             // DELETED: v3.03 - loadCustomBells() and saveCustomBells() removed
-            
+            /**
+             * NEW: v4.10.3 - Converts total seconds to "HH:MM:SS" format.
+             * @param {number} totalSeconds - Total seconds from midnight.
+             * @returns {string} Time in HH:MM:SS format.
+             */
+            function secondsToTime(totalSeconds) {
+                // Ensure time wraps around 24 hours (86400 seconds)
+                totalSeconds = (totalSeconds % 86400 + 86400) % 86400;
+
+                const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+                const s = String(totalSeconds % 60).padStart(2, '0');
+
+                return `${h}:${m}:${s}`;
+            }
             // --- NEW: Helper Functions for Req 1, 2, 3 ---
-            
+            /**
+             * NEW: v4.10 - Generates a unique, prefixed ID for a bell.
+             * @returns {string} A unique bell ID (e.g., 'bell_abc123')
+             */
+            function generateBellId() {
+                // Creates a short, 8-character random string
+                const randomPart = Math.random().toString(36).substring(2, 10);
+                return `bell_${randomPart}`;
+            }
+
             /**
              * Helper to convert "HH:MM:SS" to total seconds.
              * @param {string} time - The time string (HH:MM:SS)
@@ -2135,7 +2185,11 @@
                 
                 flatBells.forEach(bell => {
                     let convertedBell = { ...bell };
-    
+
+                    // --- NEW: v4.10 - Add bellId if it doesn't exist ---
+                    if (!convertedBell.bellId) {
+                        convertedBell.bellId = generateBellId();
+                    }
                     // --- 1. CONVERT TIME and SOUND ---
                     // Time: Unix Timestamp (seconds) to HH:MM:SS string
                     if (typeof convertedBell.time === 'number') {
@@ -2199,6 +2253,132 @@
                 return sortPeriodsByFirstBell(periodsArray);
             }
             
+            // --- NEW: v4.10.3 - Relative Bell Calculation Engine ---
+
+            /**
+             * Recursively resolves the time for a single bell.
+             * @param {object} bell - The bell object to resolve.
+             * @param {Map} bellMap - A Map of all bells, indexed by bellId.
+             * @param {Set} visited - A Set to detect circular dependencies.
+             * @returns {string|null} The calculated HH:MM:SS time, or null if it fails.
+             */
+            function calculateRelativeBellTime(bell, bellMap, visited = new Set()) {
+                // 1. If the bell already has a static time, it's an anchor.
+                if (bell.time && !bell.relative) {
+                    return bell.time;
+                }
+
+                // 2. If it's a relative bell
+                if (bell.relative && bell.relative.parentBellId) {
+                    // 2a. Check for circular dependencies
+                    if (visited.has(bell.bellId)) {
+                        console.error(`Circular dependency detected for bell "${bell.name}" (ID: ${bell.bellId}).`);
+                        return null; // Stop recursion
+                    }
+                    visited.add(bell.bellId);
+
+                    // 2b. Find the parent bell
+                    const parentBell = bellMap.get(bell.relative.parentBellId);
+                    if (!parentBell) {
+                        console.warn(`Could not find parent bell (ID: ${bell.relative.parentBellId}) for bell "${bell.name}". It may be orphaned.`);
+                        return null; // Orphan bell
+                    }
+
+                    // 2c. Recursively find the parent's time
+                    const parentTime = calculateRelativeBellTime(parentBell, bellMap, new Set(visited));
+                    if (!parentTime) {
+                        console.warn(`Could not calculate time for parent of "${bell.name}".`);
+                        return null; // Parent calculation failed
+                    }
+
+                    // 2d. Calculate this bell's time
+                    const parentSeconds = timeToSeconds(parentTime);
+                    const myTimeSeconds = parentSeconds + bell.relative.offsetSeconds;
+                    const myTime = secondsToTime(myTimeSeconds);
+                    
+                    return myTime;
+                }
+
+                // 3. Bell is invalid (no time and no relative prop)
+                console.warn(`Invalid bell object: "${bell.name}" has no time or relative data.`);
+                return null;
+            }
+
+            /**
+             * Resolves all bell times, handling relative dependencies.
+             * This function flattens all periods and calculates the 'time' for all bells.
+             * @returns {object} { 
+             * calculatedPeriods: Array of all periods with calculated bell times,
+             * flatBellList: Flat list of all calculated bells for the clock
+             * }
+             */
+            function resolveAllBellTimes() {
+                const allPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
+                if (allPeriods.length === 0) {
+                    return { calculatedPeriods: [], flatBellList: [] };
+                }
+
+                // 1. Create a master map of all bells by bellId
+                const bellMap = new Map();
+                allPeriods.forEach(period => {
+                    period.bells.forEach(bell => {
+                        if (bell.bellId) {
+                            bellMap.set(bell.bellId, bell);
+                        } else {
+                            console.warn("Found a bell with no bellId:", bell.name);
+                        }
+                    });
+                });
+
+                // 2. Iterate through all periods and calculate times for their bells
+                const calculatedPeriods = allPeriods.map(period => {
+                    const calculatedBells = period.bells.map(bell => {
+                        // Calculate the time recursively
+                        const calculatedTime = calculateRelativeBellTime(bell, bellMap);
+                        
+                        // Create a new bell object with the calculated time
+                        return {
+                            ...bell,
+                            time: calculatedTime, // This will be null if calculation failed
+                            // Add 'type' for rendering
+                            type: personalBellsPeriods.includes(period) ? 'custom' : 'shared'
+                        };
+                    }).filter(bell => bell.time !== null); // Filter out any bells that failed (orphans, circular)
+
+                    // 3. Re-sort bells within the period by their new calculated time
+                    calculatedBells.sort((a, b) => a.time.localeCompare(b.time));
+
+                    return { ...period, bells: calculatedBells };
+                })
+                .filter(period => period.bells.length > 0); // Filter out periods with no valid bells
+
+                // 4. Create the final flat list for the clock
+                let flatBellList = [];
+                calculatedPeriods.forEach(period => {
+                    period.bells.forEach(bell => {
+                        // Apply sound overrides logic (from old flatten function)
+                        const bellType = bell.type; // 'shared' or 'custom'
+                        let finalBell = { ...bell, periodName: period.name };
+                        
+                        if (bellType === 'shared') {
+                            const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
+                            const overrideSound = bellSoundOverrides[overrideKey];
+                            finalBell.sound = overrideSound || bell.sound;
+                            finalBell.originalSound = bell.sound;
+                        }
+
+                        flatBellList.push(finalBell);
+                    });
+                });
+
+                // 5. Final sort of the flat list
+                flatBellList.sort((a, b) => a.time.localeCompare(b.time));
+
+                return { calculatedPeriods, flatBellList };
+            }
+
+            // --- END: v4.10.3 - Relative Bell Calculation Engine ---
+
             /**
              * NEW: v4.0 - Sorts periods chronologically based on the time of their first bell.
              * @param {Array} periods - Array of period objects.
@@ -2425,7 +2605,8 @@
                     return;
                 }
                 
-                const newBell = { time, name, sound };
+                // updated for v4.10 to add bellID
+                const newBell = { time, name, sound, bellId: generateBellId() };
     
                 // REQ 1 CHECK (Still checks flat list of ALL bells)
                 const allBells = [...localSchedule, ...personalBells];
@@ -2924,7 +3105,8 @@
                                 };
                             });
                             // Set the FLAT list used by the clock
-                            localSchedule = bellsWithOverrides; 
+                            // DELETED: v4.10.3 - Old logic
+                            // localSchedule = bellsWithOverrides; 
                             
                             console.log("Active shared schedule updated.");
                         } else {
@@ -2933,8 +3115,8 @@
                             localSchedule = [];
                             scheduleTitle.textContent = "Schedule Not Found";
                         }
-                        populatePeriodSelectors(); // NEW V4.02
-                        renderCombinedList();
+                        // NEW: v4.10.3 - Run the master calculation engine
+                        recalculateAndRenderAll();
                     }, (error) => {
                         console.error("Error on shared schedule snapshot:", error);
                     });
@@ -2996,8 +3178,8 @@
                                     originalSound: bell.sound
                                 };
                             });
-                            // Set the FLAT list used by the clock
-                            localSchedule = bellsWithOverrides; 
+                            // DELETED: v4.10.3 - Old logic
+                            // localSchedule = bellsWithOverrides; 
                             
                             console.log("Base schedule for personal schedule updated.");
                         } else {
@@ -3005,8 +3187,8 @@
                             localSchedulePeriods = [];
                             localSchedule = [];
                         }
-                        populatePeriodSelectors(); // NEW V4.02
-                        renderCombinedList();
+                        // NEW: v4.10.3 - Run the master calculation engine
+                        recalculateAndRenderAll();
                     });
                     
                     // 2. Listen to the PERSONAL schedule
@@ -3037,8 +3219,8 @@
                             personalBellsPeriods = [];
                             personalBells = [];
                         }
-                        populatePeriodSelectors(); // NEW V4.02
-                        renderCombinedList();
+                        // NEW: v4.10.3 - Run the master calculation engine
+                        recalculateAndRenderAll();
                     });
                 }
             }
@@ -3698,19 +3880,214 @@
     
             // --- End v3.05 Functions ---
             
-            
-            // New V4.02
+            // ... existing code ...
+            // MODIFIED: v4.10 - This is the complete, working v4.0+ implementation
             async function handleAddSharedBell(e) {
                 e.preventDefault();
-                // MODIFIED: v3.03 - Check activeBaseScheduleId and scheduleRef
                 if (!activeBaseScheduleId || !scheduleRef) {
                     addSharedStatus.textContent = "Please select a schedule first.";
                     addSharedStatus.classList.remove('hidden');
                     setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
                     return;
                 }
-            } // 4.03 - I added this bracket!  I did!  Me!
-    
+            
+                // 1. Get New Bell Data
+                const periodName = document.getElementById('shared-bell-period').value;
+                const time = sharedTimeInput.value;
+                const name = sharedNameInput.value;
+                const sound = sharedSoundInput.value;
+            
+                if (!periodName || !time || !name) {
+                    addSharedStatus.textContent = "Period, Time, and Name are required.";
+                    addSharedStatus.classList.remove('hidden');
+                    setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
+                    return;
+                }
+            
+                // NEW: v4.10 - Create newBell object with bellId
+                pendingSharedBell = { time, name, sound, periodName, bellId: generateBellId() };
+            
+                // 2. Check for Conflicts (v3.02 logic)
+                addSharedStatus.textContent = "Checking for conflicts...";
+                addSharedStatus.classList.remove('hidden');
+            
+                const { internal, external } = findAllNearbySharedBells(time);
+            
+                // 3. Handle Conflicts
+                if (internal) {
+                    // --- SCENARIO 1: Internal Conflict ---
+                    currentInternalConflict = internal; // Store conflicting bell
+            
+                    internalConflictNewTime.textContent = formatTime12Hour(pendingSharedBell.time, true);
+                    internalConflictExistingBell.textContent = `${internal.name} at ${formatTime12Hour(internal.time, true)}`;
+                    internalConflictWarningModal.classList.remove('hidden');
+                    
+                } else if (external.length > 0) {
+                    // --- SCENARIO 2: External Conflict ---
+                    currentExternalConflicts = external; // Store conflicting bells
+            
+                    externalConflictNewTime.textContent = formatTime12Hour(pendingSharedBell.time, true);
+                    externalConflictKeepTime.textContent = formatTime12Hour(pendingSharedBell.time, true);
+                    
+                    // Populate list
+                    externalConflictList.innerHTML = external.map(c => `
+                        <div class="flex items-center">
+                            <input type="checkbox" id="conflict-${c.schedule.id}" name="conflict" 
+                                   value="${c.schedule.id}" 
+                                   data-time="${c.bell.time}"
+                                   class="external-conflict-check h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="conflict-${c.schedule.id}" class="ml-2 block text-sm text-gray-900">
+                                <span class="font-medium">${c.schedule.name}:</span>
+                                <span>${c.bell.name} at ${formatTime12Hour(c.bell.time, true)}</span>
+                            </label>
+                        </div>
+                    `).join('');
+            
+                    // Reset button states
+                    handleExternalConflictCheckboxChange();
+                    externalConflictModal.classList.remove('hidden');
+                    
+                } else {
+                    // --- SCENARIO 3: No Conflict ---
+                    addSharedStatus.textContent = "No conflicts. Adding bell...";
+                    addPendingBellToCurrentSchedule();
+                }
+            }
+            
+            /**
+             * NEW: v3.02 (Restored) - Adds the 'pendingSharedBell' to the current schedule.
+             */
+            async function addPendingBellToCurrentSchedule() {
+                if (!pendingSharedBell || !activeBaseScheduleId || !scheduleRef) {
+                    console.error("Missing data to add pending bell.");
+                    closeAllConflictModals();
+                    return;
+                }
+            
+                const { periodName, ...newBell } = pendingSharedBell; // Get periodName, newBell object
+            
+                try {
+                    const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                    if (!currentSchedule) throw new Error("Current schedule data not found.");
+                    
+                    // V4.0 LOGIC: Get existing periods (or empty array if new)
+                    const existingPeriods = currentSchedule.periods || [];
+                    
+                    // Use helper to insert the new bell into the correct period
+                    const updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, newBell);
+            
+                    // Save the entire updated periods array
+                    await updateDoc(scheduleRef, { periods: updatedPeriods });
+            
+                    addSharedStatus.textContent = "Bell added successfully!";
+                    addSharedBellForm.reset();
+                    sharedSoundInput.value = 'ellisBell.mp3';
+            
+                } catch (error) {
+                    console.error("Error adding pending shared bell:", error);
+                    addSharedStatus.textContent = `Error: ${error.message}`;
+                } finally {
+                    closeAllConflictModals();
+                    setTimeout(() => addSharedStatus.classList.add('hidden'), 3000);
+                }
+            }
+            
+            /**
+             * NEW: v3.02 (Restored) - Handles checkbox state in the External Conflict modal.
+             */
+            function handleExternalConflictCheckboxChange() {
+                const checkedBoxes = document.querySelectorAll('.external-conflict-check:checked');
+                
+                if (checkedBoxes.length === 0) {
+                    // No boxes checked
+                    externalConflictMatchBtn.disabled = true;
+                    externalConflictCreateAndMatchBtn.disabled = true;
+                    externalConflictMatchTime.textContent = "--:--";
+                } else if (checkedBoxes.length === 1) {
+                    // Exactly one box checked
+                    externalConflictMatchBtn.disabled = false;
+                    externalConflictCreateAndMatchBtn.disabled = false;
+                    const time = checkedBoxes[0].dataset.time;
+                    externalConflictMatchTime.textContent = formatTime12Hour(time, true);
+                } else {
+                    // Multiple boxes checked
+                    externalConflictMatchBtn.disabled = true; // Can't "Match" multiple
+                    externalConflictCreateAndMatchBtn.disabled = false;
+                    externalConflictMatchTime.textContent = "--:--";
+                }
+            }
+            
+            /**
+             * NEW: v3.02 (Restored) - Handles the resolution from the External Conflict modal.
+             * @param {string} resolution - 'keep', 'match', or 'create_and_match'
+             */
+            async function handleExternalConflictResolution(resolution) {
+                if (!pendingSharedBell) return;
+            
+                externalConflictStatus.textContent = "Processing...";
+                externalConflictStatus.classList.remove('hidden');
+            
+                const { periodName, ...newBell } = pendingSharedBell;
+                const checkedBoxes = document.querySelectorAll('.external-conflict-check:checked');
+                const checkedScheduleIds = Array.from(checkedBoxes).map(cb => cb.value);
+            
+                const batch = writeBatch(db);
+            
+                try {
+                    if (resolution === 'keep') {
+                        // 1. Add the bell to THIS schedule with the NEW time.
+                        const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                        const updatedPeriods = updatePeriodsWithNewBell(currentSchedule.periods || [], periodName, newBell);
+                        batch.update(scheduleRef, { periods: updatedPeriods });
+            
+                    } else if (resolution === 'match') {
+                        // 2. Add the bell to THIS schedule but with the MATCHED time.
+                        const matchedTime = checkedBoxes[0].dataset.time;
+                        const matchedBell = { ...newBell, time: matchedTime };
+            
+                        const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                        const updatedPeriods = updatePeriodsWithNewBell(currentSchedule.periods || [], periodName, matchedBell);
+                        batch.update(scheduleRef, { periods: updatedPeriods });
+            
+                    } else if (resolution === 'create_and_match') {
+                        // 3. Add bell to THIS schedule, AND update all MATCHED schedules.
+            
+                        // 3a. Add to this schedule
+                        const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                        const updatedPeriods = updatePeriodsWithNewBell(currentSchedule.periods || [], periodName, newBell);
+                        batch.update(scheduleRef, { periods: updatedPeriods });
+            
+                        // 3b. Update all selected external schedules
+                        for (const scheduleId of checkedScheduleIds) {
+                            const schedule = allSchedules.find(s => s.id === scheduleId);
+                            const conflictingBell = currentExternalConflicts.find(c => c.schedule.id === scheduleId)?.bell;
+                            if (!schedule || !conflictingBell) continue;
+            
+                            // V4.0 Logic: Find the period and update the bell
+                            const targetPeriods = schedule.periods || [];
+                            const updatedLinkedPeriods = updatePeriodsOnEdit(targetPeriods, conflictingBell, newBell);
+                            
+                            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', scheduleId);
+                            batch.update(docRef, { periods: updatedLinkedPeriods });
+                        }
+                    }
+            
+                    await batch.commit();
+                    externalConflictStatus.textContent = "Actions complete!";
+                    
+                    addSharedBellForm.reset();
+                    sharedSoundInput.value = 'ellisBell.mp3';
+            
+                } catch (error) {
+                    console.error("Error in external conflict resolution:", error);
+                    externalConflictStatus.textContent = `Error: ${error.message}`;
+                } finally {
+                    setTimeout(() => {
+                        closeAllConflictModals();
+                    }, 1500);
+                }
+            }
+            
             /**
              * NEW: v4.03 - Helper to find or create a period and insert a new bell.
              * NOTE: This should ONLY be used for v4.0 (period-based) documents.
@@ -3826,45 +4203,64 @@
             }
     
             /**
-             * NEW: v4.04 - Submits the calculated relative bell to Firestore (Personal Schedule).
+             * MODIFIED: v4.10 - Submits the new "relative" bell object.
+             * This now saves a dependency link, NOT a static time.
              */
             async function handleRelativeBellSubmit(e) {
                 e.preventDefault();
+                const relativeBellStatus = document.getElementById('relative-bell-status');
                 relativeBellStatus.classList.add('hidden');
+                
                 if (!currentRelativePeriod || !activePersonalScheduleId) return;
-    
-                const calculatedTime = handleRelativeTimeChange();
-                const bellName = relativeBellNameInput.value.trim();
-                const bellSound = relativeBellSoundSelect.value;
+
+                // 1. Get all values from the form
+                const bellName = document.getElementById('relative-bell-name').value.trim();
+                const bellSound = document.getElementById('relative-bell-sound').value;
+                const parentBellId = document.getElementById('relative-anchor-bell').value;
+                const direction = document.getElementById('relative-direction').value;
+                const minutes = parseInt(document.getElementById('relative-minutes').value) || 0;
+                const seconds = parseInt(document.getElementById('relative-seconds').value) || 0;
                 
                 if (!bellName) {
                     relativeBellStatus.textContent = "Bell Name is required.";
                     relativeBellStatus.classList.remove('hidden');
                     return;
                 }
-    
-                const newBell = { time: calculatedTime, name: bellName, sound: bellSound };
-                const periodName = currentRelativePeriod.name;
-    
-                // 1. Conflict Check (using the absolute calculated time)
-                const allBells = [...localSchedule, ...personalBells];
-                const nearbyBell = findNearbyBell(calculatedTime, allBells);
-                
-                if (nearbyBell) {
-                    // If conflict, show the nearby bell modal (we re-use the personal bell flow)
-                    pendingPersonalBell = { time: calculatedTime, name: bellName, sound: bellSound, type: 'custom', periodName };
-                    pendingPersonalBellAction = 'add';
-                    nearbyBellName.textContent = nearbyBell.name;
-                    nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time, true); 
-                    nearbyBellCustomControls.style.display = 'flex';
-                    
-                    // Close relative modal and open conflict modal
-                    relativeBellModal.classList.add('hidden');
-                    nearbyBellModal.classList.remove('hidden');
+                if (!parentBellId) {
+                    relativeBellStatus.textContent = "An anchor bell must be selected.";
+                    relativeBellStatus.classList.remove('hidden');
                     return;
                 }
-    
-                // 2. No conflict, save directly to Firestore
+
+                // 2. Calculate the offset in seconds
+                let totalOffsetSeconds = (minutes * 60) + seconds;
+                if (direction === 'before') {
+                    totalOffsetSeconds = -totalOffsetSeconds; // Make it negative
+                }
+
+                // 3. Create the new bell object
+                // *** THIS IS THE NEW STRUCTURE ***
+                const newBell = {
+                    name: bellName,
+                    sound: bellSound,
+                    bellId: generateBellId(),
+                    // We NO LONGER save 'time'
+                    // Instead, we save the 'relative' dependency object
+                    relative: {
+                        parentBellId: parentBellId,
+                        offsetSeconds: totalOffsetSeconds
+                    }
+                };
+                
+                const periodName = currentRelativePeriod.name;
+
+                // 4. CRITICAL: Remove Conflict Check
+                // We can no longer check for conflicts *at save time* because
+                // the bell has no static 'time'. This check must be moved to
+                // the *render* logic in our next patch.
+                // The old "nearbyBell" check is intentionally removed.
+
+                // 5. Save the new bell object to Firestore
                 const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 try {
                     const docSnap = await getDoc(personalScheduleRef);
@@ -3874,7 +4270,10 @@
     
                     await updateDoc(personalScheduleRef, { periods: updatedPeriods });
     
-                    showUserMessage(`Bell "${bellName}" added successfully to ${periodName}!`);
+                    showUserMessage(`Relative bell "${bellName}" saved! It will not be visible until the next patch is applied.`);
+                    
+                    const relativeBellForm = document.getElementById('relative-bell-form');
+                    const relativeBellModal = document.getElementById('relative-bell-modal');
                     relativeBellForm.reset();
                     relativeBellModal.classList.add('hidden');
                     currentRelativePeriod = null;
@@ -3885,7 +4284,29 @@
                     relativeBellStatus.classList.remove('hidden');
                 }
             }
-                
+
+            /**
+             * NEW: v4.10.3 - Master function to recalculate all bells and update the UI.
+             * This is called by both shared and personal schedule listeners.
+             */
+            function recalculateAndRenderAll() {
+                // 1. Run the calculation engine
+                const { calculatedPeriods, flatBellList } = resolveAllBellTimes();
+
+                // 2. Update the flat 'localSchedule' and 'personalBells' lists for the clock
+                localSchedule = flatBellList.filter(b => b.type === 'shared');
+                personalBells = flatBellList.filter(b => b.type === 'custom');
+
+                // 3. Update the 'localSchedulePeriods' and 'personalBellsPeriods' for the renderer
+                // We use the *output* of the engine, not the source data
+                localSchedulePeriods = calculatedPeriods.filter(p => p.type === 'shared');
+                personalBellsPeriods = calculatedPeriods.filter(p => p.type === 'custom');
+
+                // 4. Re-populate period selectors and render the final list
+                populatePeriodSelectors();
+                renderCombinedList();
+            }
+
             /**
              * NEW: v4.03 - Opens the Rename Period Modal.
              * @param {string} periodName - The name of the period to rename.
@@ -4681,14 +5102,16 @@
                 const relativeBellModal = document.getElementById('relative-bell-modal');
                 const relativeBellForm = document.getElementById('relative-bell-form');
                 const relativePeriodName = document.getElementById('relative-period-name');
-                const relativeAnchor = document.getElementById('relative-anchor');
+                // MODIFIED: v4.10.2a - Use the new 'relative-anchor-bell' ID
+                const relativeAnchorBellSelect = document.getElementById('relative-anchor-bell'); 
                 const relativeDirection = document.getElementById('relative-direction');
                 const relativeMinutesInput = document.getElementById('relative-minutes');
                 const relativeSecondsInput = document.getElementById('relative-seconds');
                 const relativeBellNameInput = document.getElementById('relative-bell-name');
                 const relativeBellSoundSelect = document.getElementById('relative-bell-sound');
-                const anchorStartTimeDisplay = document.getElementById('anchor-start-time');
-                const anchorEndTimeDisplay = document.getElementById('anchor-end-time');
+                // DELETED: v4.10.2a - These elements no longer exist
+                // const anchorStartTimeDisplay = document.getElementById('anchor-start-time');
+                // const anchorEndTimeDisplay = document.getElementById('anchor-end-time');
                 const relativeTimePreview = document.getElementById('relative-time-preview');
                 const calculatedTimeDisplay = document.getElementById('calculated-time');
                 const relativeBellStatus = document.getElementById('relative-bell-status');
@@ -4962,7 +5385,8 @@
                 });
 
                 // Update calculated time whenever an input changes
-                relativeAnchor.addEventListener('change', updateCalculatedTime);
+                // MODIFIED: v4.10.2a - Use the new variable name
+                relativeAnchorBellSelect.addEventListener('change', updateCalculatedTime);
                 relativeDirection.addEventListener('change', updateCalculatedTime);
                 relativeMinutesInput.addEventListener('input', updateCalculatedTime);
                 relativeSecondsInput.addEventListener('input', updateCalculatedTime);
@@ -5140,4 +5564,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.09 -->
+<!-- Version 4.10 -->
