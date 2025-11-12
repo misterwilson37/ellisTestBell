@@ -1290,6 +1290,7 @@
         let linkedEditData = null; 
         let bellToDelete = null; 
         let audioToDelete = null; // NEW: State for audio deletion
+        let currentRenamingPeriod = null; // NEW in 4.19: Fix for missing declaration
 
         // NEW: State for Req 1 (Now for Personal Bells)
         let pendingPersonalBell = null; 
@@ -1994,12 +1995,13 @@
 
                 // Get a list of all bells in this period with their final type (shared or custom)
                 const bellsToRender = sortedBells.map(bell => {
-                    // Check if this bell is a custom bell (i.e., exists in the personalBells flat list)
-                    const isCustom = personalBells.some(b => b.time === bell.time && b.name === bell.name);
-                    const bellType = isCustom ? 'custom' : 'shared';
+                    // MODIFIED in v4.19: Use the 'bell.type' property directly, which is
+                    // calculated by resolveAllBellTimes(). This is more reliable.
+                    const bellType = bell.type || 'shared'; // Default to shared
+                    const isCustom = bellType === 'custom';
                     
                     // Look up the bell in the flat list to get sound overrides
-                    const flatBellData = localSchedule.find(b => b.time === bell.time && b.name === bell.name) || 
+                    const flatBellData = localSchedule.find(b => b.time === bell.time && b.name === bell.name) ||
                                          personalBells.find(b => b.time === bell.time && b.name === bell.name) ||
                                          bell; // Fallback to original bell data
 
@@ -4457,7 +4459,7 @@
     
                     await updateDoc(personalScheduleRef, { periods: updatedPeriods });
     
-                    showUserMessage(`Relative bell "${bellName}" saved! It will not be visible until the next patch is applied.`);
+                    showUserMessage(`Relative bell "${bellName}" saved!`); // MODIFIED in 4.19: Simplified message
                     
                     const relativeBellForm = document.getElementById('relative-bell-form');
                     const relativeBellModal = document.getElementById('relative-bell-modal');
@@ -5583,12 +5585,12 @@
                 });
                 
                 // MODIFIED: v4.03 - Handles clicks for bells AND period management buttons
+                // MODIFIED in 4.19: Rewritten to be more robust and fix button non-responsiveness
                 function handleBellListClick(e) {
                     const target = e.target;
-        
+
                     // --- 1. PERIOD MANAGEMENT BUTTONS ---
-                    // NEW in 4.19: Rewritten logic
-                    // Check if the click was on or inside a period management button
+                    // NEW in 4.19: Check for period management buttons first
                     const renameBtn = target.closest('.rename-period-btn');
                     if (renameBtn) {
                         const periodName = renameBtn.dataset.periodName;
@@ -5624,7 +5626,7 @@
                         originalSound: bellElement.dataset.originalSound,
                         periodName: bellElement.dataset.periodName // NEW: Grab period name
                     };
-        
+
                     // Check which specific button *within* the bell item was clicked
                     if (target.classList.contains('bell-mute-toggle')) {
                         const bellId = getBellId(bell);
@@ -5641,8 +5643,9 @@
                         updateClock(); 
                         return; // Action handled
                     }
-        
+
                     // MODIFIED: v4.12.1 - Fixed 'contents' typo to 'contains' and passing full bell object
+                    // MODIFIED in 4.19: Added return statements to prevent fall-through
                     if (target.classList.contains('delete-btn') || target.classList.contains('delete-custom-btn')) {
                         handleDeleteBellClick(bell);
                         return; // Action handled
@@ -5764,14 +5767,24 @@
                         const newBells = period.bells.map(bell => {
                             if (childMap.has(bell.bellId)) {
                                 // This is a child bell. Convert it!
-                                const childBell = childMap.get(bell.bellId);
+                                // const childBell = childMap.get(bell.bellId); // MODIFIED: This is the raw bell
                                 bellsChanged = true;
+                                
+                                // NEW in 4.19: Find the *calculated* bell from the flat list
+                                const calculatedChildBell = personalBells.find(b => b.bellId === bell.bellId);
+                                
+                                if (!calculatedChildBell || !calculatedChildBell.time) {
+                                    console.warn(`Could not find calculated time for orphan: ${bell.name}. It will be skipped.`);
+                                    // Return the original bell to avoid data loss, though it will remain an orphan
+                                    return bell; 
+                                }
+                                
                                 return {
                                     bellId: bell.bellId,
                                     name: bell.name,
                                     sound: bell.sound,
-                                    // CRITICAL: Add the 'time' property back, using its last calculated value
-                                    time: childBell.time, 
+                                    // CRITICAL: Use the *calculated* time
+                                    time: calculatedChildBell.time, 
                                     // CRITICAL: Remove the 'relative' property
                                     // relative: (REMOVED)
                                 };
