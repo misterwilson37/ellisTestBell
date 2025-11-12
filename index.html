@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.17</title>
+    <title>Ellis Web Bell 4.18</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.17</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.18</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1309,9 +1309,11 @@
 
         let mutedBellIds = new Set(); 
         let bellSoundOverrides = {}; // NEW: Store local sound overrides
-
+        
+        let calculatedPeriodsList = []; // NEW in 4.18: Store the final, time-resolved periods
+        
         let appId; 
-        let isAudioReady = false; 
+        let isAudioReady = false;
         
         // NEW: Audio file state
         let userAudioFiles = []; // { name, url, path }
@@ -1413,82 +1415,123 @@
             }
         }
 
-        /**
-         * NEW: v4.04 - Calculates the absolute time (HH:MM:SS) based on an anchor and offset.
-         * @param {number} anchorSeconds - Anchor time in seconds from midnight.
-         * @param {string} direction - 'before' or 'after'.
-         * @param {number} minutes - Offset minutes.
-         * @param {number} seconds - Offset seconds.
-         * @returns {string} Calculated time in HH:MM:SS format.
-         */
-        function calculateRelativeTime(anchorSeconds, direction, minutes, seconds) {
-            const offsetSeconds = (minutes * 60) + seconds;
-            let targetSeconds;
-
-            if (direction === 'after') {
-                targetSeconds = anchorSeconds + offsetSeconds;
-            } else {
-                targetSeconds = anchorSeconds - offsetSeconds;
-            }
-
-            // Ensure time wraps around 24 hours if necessary (mostly for 'before' midnight)
-            targetSeconds = (targetSeconds % 86400 + 86400) % 86400;
-
-            const h = String(Math.floor(targetSeconds / 3600)).padStart(2, '0');
-            const m = String(Math.floor((targetSeconds % 3600) / 60)).padStart(2, '0');
-            const s = String(targetSeconds % 60).padStart(2, '0');
-
-            return `${h}:${m}:${s}`;
-        }
-        
-        /**
-         * NEW: v4.10 - Handles time calculation for the Relative Bell Modal.
-         * Reads from the new anchor bell dropdown.
-         */
-        function updateCalculatedTime() {
-            if (!currentRelativePeriod || !currentRelativePeriod.bells) {
-                console.warn("updateCalculatedTime: No period bells loaded.");
-                return;
-            }
-
-            const anchorBellSelect = document.getElementById('relative-anchor-bell');
-            const relativeDirection = document.getElementById('relative-direction');
-            const relativeMinutesInput = document.getElementById('relative-minutes');
-            const relativeSecondsInput = document.getElementById('relative-seconds');
-            const calculatedTimeDisplay = document.getElementById('calculated-time');
-            
-            const parentBellId = anchorBellSelect.value;
-            if (!parentBellId) {
-                calculatedTimeDisplay.textContent = "--:--:--";
-                return;
-            }
-
-            // Find the selected parent bell from the state
-            const parentBell = currentRelativePeriod.bells.find(b => b.bellId === parentBellId);
-            if (!parentBell) {
-                console.error("Could not find parent bell with ID:", parentBellId);
-                calculatedTimeDisplay.textContent = "Error";
-                return;
-            }
-
-            const direction = relativeDirection.value;
-            const minutes = parseInt(relativeMinutesInput.value) || 0; 
-            const seconds = parseInt(relativeSecondsInput.value) || 0;
-            
-            const anchorSeconds = timeToSeconds(parentBell.time);
-
-            const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, minutes, seconds);
-            
-            calculatedTimeDisplay.textContent = formatTime12Hour(calculatedTimeHHMMSS, false);
-            
-            // Return the calculated time for the submit handler
-            return calculatedTimeHHMMSS;
-        }
-
         // NEW V4.05: Encapsulate all initialization logic inside this function
         // to prevent "ReferenceError: variable is not defined" crashes.
         (function() {
             
+            /**
+             * NEW in 4.18: Helper to convert "HH:MM:SS" to total seconds. (REFACTORED for scope)
+             * @param {string} time - The time string (HH:MM:SS)
+             * @returns {number} Total seconds from midnight
+             */
+            const timeToSeconds = (time) => { // MODIFIED in 4.18: Changed to const arrow function
+                try {
+                    const [h, m, s] = time.split(':').map(Number);
+                    return (h * 3600) + (m * 60) + (s || 0); // Handle "HH:MM" or "HH:MM:SS"
+                } catch (e) {
+                    return NaN;
+                }
+            };
+            
+            /**
+             * NEW in 4.18: Converts total seconds to "HH:MM:SS" format. (REFACTORED for scope)
+             * @param {number} totalSeconds - Total seconds from midnight.
+             * @returns {string} Time in HH:MM:SS format.
+             */
+            const secondsToTime = (totalSeconds) => { // MODIFIED in 4.18: Changed to const arrow function
+                // Ensure time wraps around 24 hours (86400 seconds)
+                totalSeconds = (totalSeconds % 86400 + 86400) % 86400;
+
+                const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+                const s = String(totalSeconds % 60).padStart(2, '0');
+
+                return `${h}:${m}:${s}`;
+            };
+
+            /**
+             * NEW in 4.18: Generates a unique, prefixed ID for a bell. (REFACTORED for scope)
+             * @returns {string} A unique bell ID (e.g., 'bell_abc123')
+             */
+            const generateBellId = () => { // MODIFIED in 4.18: Changed to const arrow function
+                // Creates a short, 8-character random string
+                const randomPart = Math.random().toString(36).substring(2, 10);
+                return `bell_${randomPart}`;
+            };
+            
+            /**
+             * NEW in 4.18: Calculates the absolute time (HH:MM:SS) based on an anchor and offset. (MOVED/REFACTORED)
+             * @param {number} anchorSeconds - Anchor time in seconds from midnight.
+             * @param {string} direction - 'before' or 'after'.
+             * @param {number} minutes - Offset minutes.
+             * @param {number} seconds - Offset seconds.
+             * @returns {string} Calculated time in HH:MM:SS format.
+             */
+            const calculateRelativeTime = (anchorSeconds, direction, minutes, seconds) => { 
+                const offsetSeconds = (minutes * 60) + seconds;
+                let targetSeconds;
+
+                if (direction === 'after') {
+                    targetSeconds = anchorSeconds + offsetSeconds;
+                } else {
+                    targetSeconds = anchorSeconds - offsetSeconds;
+                }
+
+                // Ensure time wraps around 24 hours if necessary (mostly for 'before' midnight)
+                targetSeconds = (targetSeconds % 86400 + 86400) % 86400;
+
+                const h = String(Math.floor(targetSeconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((targetSeconds % 3600) / 60)).padStart(2, '0');
+                const s = String(targetSeconds % 60).padStart(2, '0');
+
+                return `${h}:${m}:${s}`;
+            };
+            
+            /**
+             * NEW in 4.18: Handles time calculation for the Relative Bell Modal. (MOVED/REFACTORED)
+             * Reads from the new anchor bell dropdown.
+             */
+            const updateCalculatedTime = () => { 
+                if (!currentRelativePeriod || !currentRelativePeriod.bells) {
+                    console.warn("updateCalculatedTime: No period bells loaded.");
+                    return;
+                }
+
+                const anchorBellSelect = document.getElementById('relative-anchor-bell');
+                const relativeDirection = document.getElementById('relative-direction');
+                const relativeMinutesInput = document.getElementById('relative-minutes');
+                const relativeSecondsInput = document.getElementById('relative-seconds');
+                const calculatedTimeDisplay = document.getElementById('calculated-time');
+                
+                const parentBellId = anchorBellSelect.value;
+                if (!parentBellId) {
+                    calculatedTimeDisplay.textContent = "--:--:--";
+                    return;
+                }
+
+                // Find the selected parent bell from the state
+                const parentBell = currentRelativePeriod.bells.find(b => b.bellId === parentBellId);
+                if (!parentBell) {
+                    console.error("Could not find parent bell with ID:", parentBellId);
+                    calculatedTimeDisplay.textContent = "Error";
+                    return;
+                }
+
+                const direction = relativeDirection.value;
+                const minutes = parseInt(relativeMinutesInput.value) || 0; 
+                const seconds = parseInt(relativeSecondsInput.value) || 0;
+                
+                const anchorSeconds = timeToSeconds(parentBell.time);
+
+                const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, minutes, seconds);
+                
+                calculatedTimeDisplay.textContent = formatTime12Hour(calculatedTimeHHMMSS, false);
+                
+                // Return the calculated time for the submit handler
+                return calculatedTimeHHMMSS;
+            };
+
+
             // --- Audio Setup (Tone.js) ---
             async function startAudio() {
                 if (isAudioReady) return;
@@ -2171,45 +2214,7 @@
     
             // --- Local Storage (Custom Bells) ---
             // DELETED: v3.03 - loadCustomBells() and saveCustomBells() removed
-            /**
-             * NEW: v4.10.3 - Converts total seconds to "HH:MM:SS" format.
-             * @param {number} totalSeconds - Total seconds from midnight.
-             * @returns {string} Time in HH:MM:SS format.
-             */
-            function secondsToTime(totalSeconds) {
-                // Ensure time wraps around 24 hours (86400 seconds)
-                totalSeconds = (totalSeconds % 86400 + 86400) % 86400;
-
-                const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-                const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-                const s = String(totalSeconds % 60).padStart(2, '0');
-
-                return `${h}:${m}:${s}`;
-            }
-            // --- NEW: Helper Functions for Req 1, 2, 3 ---
-            /**
-             * NEW: v4.10 - Generates a unique, prefixed ID for a bell.
-             * @returns {string} A unique bell ID (e.g., 'bell_abc123')
-             */
-            function generateBellId() {
-                // Creates a short, 8-character random string
-                const randomPart = Math.random().toString(36).substring(2, 10);
-                return `bell_${randomPart}`;
-            }
-
-            /**
-             * Helper to convert "HH:MM:SS" to total seconds.
-             * @param {string} time - The time string (HH:MM:SS)
-             * @returns {number} Total seconds from midnight
-             */
-            function timeToSeconds(time) {
-                try {
-                    const [h, m, s] = time.split(':').map(Number);
-                    return (h * 3600) + (m * 60) + (s || 0); // Handle "HH:MM" or "HH:MM:SS"
-                } catch (e) {
-                    return NaN;
-                }
-            }
+            // MOVED in 4.18 - Converts total seconds to "HH:MM:SS" format.
     
             // Updated for 4.0 all piecemeal like.  We'll see how it goes.
             /**
@@ -4324,30 +4329,29 @@
                     return;
                 }
                 
-                // 1. Get the target period's bells
-                // Look for the period in the personal structure first, then the shared base schedule.
-                const targetPeriod = personalBellsPeriods.find(p => p.name === periodName) || 
-                                     localSchedulePeriods.find(p => p.name === periodName);
+                /// 1. Get the target period's bells (from the *calculated* list)
+                const targetPeriod = calculatedPeriodsList.find(p => p.name === periodName);
                                      
                 if (!targetPeriod || !targetPeriod.bells || targetPeriod.bells.length < 1) { // MODIFIED in 4.16: Changed >=2 to >=1
                     showUserMessage(`Cannot add relative bells to ${periodName}. A period must have at least one existing bell to anchor to.`);
                     return;
                 }
                 
-                // 2. Determine Anchor Bells (All bells in the period)
-                const sortedBells = [...targetPeriod.bells].sort((a, b) => a.time.localeCompare(b.time));
+                // 2. Use time-resolved bells as anchors
+                // They are already sorted and resolved by resolveAllBellTimes()
+                const resolvedBells = targetPeriod.bells;
 
-                // 3. Store Anchor Data in State (Simplifying state for V4.10)
+                // 3. Store Anchor Data in State
                 currentRelativePeriod = {
                     name: periodName,
-                    bells: sortedBells // Store all bells for anchor selection
+                    bells: resolvedBells // NEW in 4.18: Store time-resolved bells for anchor selection
                 };
     
                 // 4. Populate Modal UI
                 relativePeriodName.textContent = periodName;
 
                 // NEW in 4.16: Populate the Anchor Bell selector (v4.10 logic)
-                const anchorOptionsHtml = sortedBells.map(bell => `
+                const anchorOptionsHtml = resolvedBells.map(bell => ` // MODIFIED in 4.18: Use resolvedBells
                     <option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>
                 `).join('');
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
@@ -4477,6 +4481,8 @@
                 // 1. Run the calculation engine
                 // It reads from the global localSchedulePeriods and personalBellsPeriods
                 const { calculatedPeriods, flatBellList } = resolveAllBellTimes();
+                
+                calculatedPeriodsList = calculatedPeriods; // NEW in 4.18: Store final calculated periods
 
                 // 2. Update the flat 'localSchedule' and 'personalBells' lists (for the clock)
                 localSchedule = flatBellList.filter(b => b.type === 'shared');
@@ -5601,8 +5607,8 @@
                     
                     // --- 2. BELL (ITEM) CONTROLS ---
                     
-                    const bellElement = target.closest('[data-time]'); // NEW in 4.17: Restore bell item finder
-                    if (!bellElement) return; // NEW in 4.17: Guard clause to prevent reference error
+                    const bellElement = target.closest('[data-time]'); // NEW in 4.18: Restore bell item finder
+                    if (!bellElement) return; // NEW in 4.18: Guard clause to prevent reference error
 
                     const bell = {
                         time: bellElement.dataset.time,
@@ -5831,4 +5837,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.17 -->
+<!-- Version 4.18 -->
