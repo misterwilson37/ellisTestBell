@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.10</title>
+    <title>Ellis Web Bell 4.11</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.10</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.11</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2377,6 +2377,37 @@
                 return { calculatedPeriods, flatBellList };
             }
 
+            /**
+             * NEW: v4.11 - Flattens a v4 'periods' array back into a v3 'bells' array.
+             * This ensures backward compatibility for v3 users.
+             * @param {Array} periods - The array of period objects.
+             * @returns {Array} A flat array of v3-compatible bell objects.
+             */
+            function flattenPeriodsToLegacyBells(periods) {
+                let flatBells = [];
+                if (!periods) return flatBells;
+                
+                periods.forEach(period => {
+                    if (period.bells && period.bells.length > 0) {
+                        period.bells.forEach(bell => {
+                            // CRITICAL: Only include static bells (no 'relative' property).
+                            // v3 cannot understand relative bells.
+                            if (!bell.relative) {
+                                flatBells.push({
+                                    time: bell.time,
+                                    name: bell.name,
+                                    sound: bell.sound
+                                    // We intentionally strip bellId and other v4-only data
+                                });
+                            }
+                        });
+                    }
+                });
+                // Sort the final flat list by time, as v3 expects
+                flatBells.sort((a, b) => a.time.localeCompare(b.time));
+                return flatBells;
+            }
+
             // --- END: v4.10.3 - Relative Bell Calculation Engine ---
 
             /**
@@ -3295,7 +3326,10 @@
                             return p;
                         }).filter(p => p.bells.length > 0); // Remove empty periods
     
-                        await updateDoc(scheduleRef, { periods: updatedPeriods });
+                        // NEW: v4.11 - Create legacy bells array
+                        const legacyBells = flattenPeriodsToLegacyBells(updatedPeriods);
+
+                        await updateDoc(scheduleRef, { periods: updatedPeriods, bells: legacyBells });
                         console.log(`Shared bell deleted: ${name} from ${currentSchedule.name}.`);
     
                     } else if (type === 'custom' && activePersonalScheduleId) {
@@ -3342,8 +3376,9 @@
              * @param {string} sound - Original sound URL/Name.
              * @param {string} type - 'shared' or 'custom'.
              */
-            function handleEditBellClick(time, name, sound, type) {
-                currentEditingBell = { time, name, sound, type }; // Store state
+            // MODIFIED: v4.11 - Added 'periodName' to the function signature and state
+            function handleEditBellClick(time, name, sound, type, periodName) {
+                currentEditingBell = { time, name, sound, type, periodName }; // Store state
                 
                 // Set fields
                 editBellTimeInput.value = time;
@@ -3450,7 +3485,9 @@
                         }
                         
                         // No external conflicts or no change in time/name, save directly
-                        await updateDoc(scheduleRef, { periods: updatedPeriods });
+                        // NEW: v4.11 - Create legacy bells array
+                        const legacyBells = flattenPeriodsToLegacyBells(updatedPeriods);
+                        await updateDoc(scheduleRef, { periods: updatedPeriods, bells: legacyBells });
     
                     // --- Case 2: Editing a Custom/Personal Bell (User) ---
                     } else if (oldBell.type === 'custom') {
@@ -3529,8 +3566,10 @@
                     
                     // 1. Update the CURRENT schedule (Always happens)
                     const currentDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
+                    // NEW: v4.11 - Create legacy bells array
+                    const legacyBells = flattenPeriodsToLegacyBells(updatedPeriods);
                     // We use the periods array stored in linkedEditData
-                    batch.update(currentDocRef, { periods: updatedPeriods }); 
+                    batch.update(currentDocRef, { periods: updatedPeriods, bells: legacyBells }); 
     
                     // 2. Update LINKED schedules (Only if applyToAll is true)
                     if (applyToAll) {
@@ -3975,10 +4014,13 @@
                     
                     // Use helper to insert the new bell into the correct period
                     const updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, newBell);
-            
+
+                    // NEW: v4.11 - Create legacy bells array for v3 users
+                    const legacyBells = flattenPeriodsToLegacyBells(updatedPeriods);
+    
                     // Save the entire updated periods array
-                    await updateDoc(scheduleRef, { periods: updatedPeriods });
-            
+                    await updateDoc(scheduleRef, { periods: updatedPeriods, bells: legacyBells });
+    
                     addSharedStatus.textContent = "Bell added successfully!";
                     addSharedBellForm.reset();
                     sharedSoundInput.value = 'ellisBell.mp3';
@@ -4066,9 +4108,12 @@
                             // V4.0 Logic: Find the period and update the bell
                             const targetPeriods = schedule.periods || [];
                             const updatedLinkedPeriods = updatePeriodsOnEdit(targetPeriods, conflictingBell, newBell);
+
+                            // NEW: v4.11 - Create legacy bells array for the *linked* schedule
+                            const linkedLegacyBells = flattenPeriodsToLegacyBells(updatedLinkedPeriods);
                             
                             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', scheduleId);
-                            batch.update(docRef, { periods: updatedLinkedPeriods });
+                            batch.update(docRef, { periods: updatedLinkedPeriods, bells: linkedLegacyBells });
                         }
                     }
             
@@ -4387,8 +4432,11 @@
                 });
     
                 try {
+                    // NEW: v4.11 - Create legacy bells array
+                    const legacyBells = flattenPeriodsToLegacyBells(updatedPeriods);
+
                     // We always write to the 'periods' field for V4.0 schedules
-                    await updateDoc(docRef, { periods: updatedPeriods });
+                    await updateDoc(docRef, { periods: updatedPeriods, bells: legacyBells });
                     
                     renamePeriodStatus.textContent = "Rename successful. Updating view...";
                     
@@ -5564,4 +5612,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.10 -->
+<!-- Version 4.11 -->
