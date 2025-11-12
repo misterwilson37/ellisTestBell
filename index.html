@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.18</title>
+    <title>Ellis Web Bell 4.19</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.18</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.19</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -5587,29 +5587,33 @@
                     const target = e.target;
         
                     // --- 1. PERIOD MANAGEMENT BUTTONS ---
-                    const periodElement = target.closest('details'); // Find the parent period container
-        
-                    if (periodElement) {
-                        const periodName = target.dataset.periodName;
-                        if (!periodName) return;
-        
-                        if (target.classList.contains('rename-period-btn')) {
+                    // NEW in 4.19: Rewritten logic
+                    // Check if the click was on or inside a period management button
+                    const renameBtn = target.closest('.rename-period-btn');
+                    if (renameBtn) {
+                        const periodName = renameBtn.dataset.periodName;
+                        if (periodName) {
                             handleRenamePeriodClick(periodName);
-                            return;
+                            return; // Action handled
                         }
-                        
-                        if (target.classList.contains('add-bell-to-period-btn')) {
-                            // Temporarily redirect to show the form for now
+                    }
+                    
+                    const addBellBtn = target.closest('.add-bell-to-period-btn');
+                    if (addBellBtn) {
+                        const periodName = addBellBtn.dataset.periodName;
+                        if (periodName) {
                             handleShowAddBellForm(periodName);
-                            return;
+                            return; // Action handled
                         }
                     }
                     
                     // --- 2. BELL (ITEM) CONTROLS ---
+                    // If it wasn't a period button, check if it was a bell item control
                     
-                    const bellElement = target.closest('[data-time]'); // NEW in 4.18: Restore bell item finder
-                    if (!bellElement) return; // NEW in 4.18: Guard clause to prevent reference error
+                    const bellElement = target.closest('[data-time]'); // Find the bell item
+                    if (!bellElement) return; // Click was not in a bell item
 
+                    // Now that we have the bellElement, find the bell data
                     const bell = {
                         time: bellElement.dataset.time,
                         name: bellElement.dataset.name,
@@ -5621,6 +5625,7 @@
                         periodName: bellElement.dataset.periodName // NEW: Grab period name
                     };
         
+                    // Check which specific button *within* the bell item was clicked
                     if (target.classList.contains('bell-mute-toggle')) {
                         const bellId = getBellId(bell);
                         if (!bellId) return;
@@ -5631,22 +5636,29 @@
                             mutedBellIds.delete(bellId);
                         }
                         saveMutedBells();
-                        renderCombinedList();
+                        // MODIFIED in 4.19: Call the master recalculate function
+                        recalculateAndRenderAll(); 
                         updateClock(); 
-                        return; 
+                        return; // Action handled
                     }
         
                     // MODIFIED: v4.12.1 - Fixed 'contents' typo to 'contains' and passing full bell object
                     if (target.classList.contains('delete-btn') || target.classList.contains('delete-custom-btn')) {
                         handleDeleteBellClick(bell);
+                        return; // Action handled
                     } else if (target.classList.contains('edit-btn') || target.classList.contains('edit-custom-btn')) {
                         // MODIFIED: Pass periodName to edit function
                         handleEditBellClick(bell.time, bell.name, bell.sound, bell.type, bell.periodName);
+                        return; // Action handled
                     } else if (target.classList.contains('sound-btn')) { 
                         openChangeSoundModal(bell);
+                        return; // Action handled
                     } else if (target.classList.contains('preview-bell-btn')) { // NEW in 4.16: Handle Play button
                         playBell(bell.sound);
+                        return; // Action handled
                     }
+                    
+                    // If no specific button was clicked (e.g., just the bell row), do nothing.
                 }
                 
                 // Event delegation
@@ -5837,4 +5849,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.18 -->
+<!-- Version 4.19 -->
