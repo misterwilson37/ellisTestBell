@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.22</title>
+    <title>Ellis Web Bell 4.23</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.22</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.23</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -4677,6 +4677,11 @@
                         await updateDoc(docRef, { periods: updatedPeriods });
                         renamePeriodStatusMsg.textContent = "Rename successful.";
 
+                        // NEW in 4.23: Force an immediate re-render and clock update
+                        // This prevents a lag from the onSnapshot listener.
+                        recalculateAndRenderAll();
+                        updateClock();
+
                     } else {
                         // --- 2. SHARED SCHEDULE: Save Nickname to localStorage ---
                         if (!activeBaseScheduleId) throw new Error("No active shared schedule.");
@@ -4696,6 +4701,7 @@
                         
                         // Manually re-render to show the change immediately
                         recalculateAndRenderAll();
+                        updateClock(); // NEW in 4.23: Force clock update
                     }
                     
                     // Success: Close modal
@@ -5993,4 +5999,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.22 -->
+<!-- Version 4.23 -->
