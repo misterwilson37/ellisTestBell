@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.15</title>
+    <title>Ellis Web Bell 4.16</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.15</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.16</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1155,6 +1155,7 @@
 
         // Add Shared Bell Form (Admin)
         const addSharedBellForm = document.getElementById('add-shared-bell-form');
+        const sharedPeriodInput = document.getElementById('shared-bell-period'); // NEW in 4.16: For enabling/disabling
         const sharedTimeInput = document.getElementById('shared-bell-time');
         const sharedNameInput = document.getElementById('shared-bell-name');
         const sharedSoundInput = document.getElementById('shared-bell-sound');
@@ -1224,6 +1225,7 @@
 
         // MODIFIED: Custom Bell Form -> Personal Bell Form (v3.03)
         const addPersonalBellForm = document.getElementById('add-personal-bell-form');
+        const personalPeriodInput = document.getElementById('personal-bell-period'); // NEW in 4.16: For enabling/disabling
         const personalTimeInput = document.getElementById('personal-bell-time');
         const personalNameInput = document.getElementById('personal-bell-name'); 
         const personalSoundInput = document.getElementById('personal-bell-sound');
@@ -3268,9 +3270,9 @@
                     scheduleTitle.textContent = personalSchedule.name;
                     
                     // Enable personal bell form
+                    personalPeriodInput.disabled = false; // NEW in 4.16: Enable period selector
                     personalTimeInput.disabled = false;
                     personalNameInput.disabled = false;
-                    personalSoundInput.disabled = false;
                     previewPersonalSoundBtn.disabled = false;
                     addPersonalBellForm.querySelector('button[type="submit"]').disabled = false;
                     personalBellStatus.textContent = `Adding bells to: ${personalSchedule.name}`;
@@ -4327,34 +4329,28 @@
                 const targetPeriod = personalBellsPeriods.find(p => p.name === periodName) || 
                                      localSchedulePeriods.find(p => p.name === periodName);
                                      
-                if (!targetPeriod || !targetPeriod.bells || targetPeriod.bells.length < 2) {
-                    showUserMessage(`Cannot add relative bells to ${periodName}. A period must have at least two existing bells (Start/End) defined.`);
+                if (!targetPeriod || !targetPeriod.bells || targetPeriod.bells.length < 1) { // MODIFIED in 4.16: Changed >=2 to >=1
+                    showUserMessage(`Cannot add relative bells to ${periodName}. A period must have at least one existing bell to anchor to.`);
                     return;
                 }
                 
-                // 2. Determine Anchor Bells (Start/End)
+                // 2. Determine Anchor Bells (All bells in the period)
                 const sortedBells = [...targetPeriod.bells].sort((a, b) => a.time.localeCompare(b.time));
-                const anchorStart = sortedBells[0];
-                const anchorEnd = sortedBells[sortedBells.length - 1];
-                
-                if (!anchorStart || !anchorEnd || anchorStart.time === anchorEnd.time) {
-                     showUserMessage(`Cannot add relative bells to ${periodName}. A period must have distinct Start and End bells.`);
-                     return;
-                }
-    
-                // 3. Store Anchor Data in State
+
+                // 3. Store Anchor Data in State (Simplifying state for V4.10)
                 currentRelativePeriod = {
                     name: periodName,
-                    anchorStart: anchorStart,
-                    anchorEnd: anchorEnd,
-                    startSeconds: timeToSeconds(anchorStart.time),
-                    endSeconds: timeToSeconds(anchorEnd.time)
+                    bells: sortedBells // Store all bells for anchor selection
                 };
     
                 // 4. Populate Modal UI
                 relativePeriodName.textContent = periodName;
-                anchorStartTimeDisplay.textContent = formatTime12Hour(anchorStart.time, true);
-                anchorEndTimeDisplay.textContent = formatTime12Hour(anchorEnd.time, true);
+
+                // NEW in 4.16: Populate the Anchor Bell selector (v4.10 logic)
+                const anchorOptionsHtml = sortedBells.map(bell => `
+                    <option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>
+                `).join('');
+                relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
     
                 // Populate sound dropdowns (need to fetch latest files)
                 updateSoundDropdowns();
@@ -5605,18 +5601,8 @@
                     
                     // --- 2. BELL (ITEM) CONTROLS ---
                     
-                    // Handle Preview
-                    if (target.classList.contains('preview-audio-btn')) {
-                        const url = target.dataset.url;
-                        if (url) {
-                            playBell(url);
-                        }
-                        return; 
-                    }
-        
-                    const bellElement = target.closest('[data-time]');
-                    if (!bellElement) return; // Not a bell item click
-        
+                    // Deleted in 4.16
+
                     const bell = {
                         time: bellElement.dataset.time,
                         name: bellElement.dataset.name,
@@ -5651,6 +5637,8 @@
                         handleEditBellClick(bell.time, bell.name, bell.sound, bell.type, bell.periodName);
                     } else if (target.classList.contains('sound-btn')) { 
                         openChangeSoundModal(bell);
+                    } else if (target.classList.contains('preview-bell-btn')) { // NEW in 4.16: Handle Play button
+                        playBell(bell.sound);
                     }
                 }
                 
@@ -5842,4 +5830,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.15 -->
+<!-- Version 4.16 -->
