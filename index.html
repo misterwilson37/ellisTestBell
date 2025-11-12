@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.26</title>
+    <title>Ellis Web Bell 4.27</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.26</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.27</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2103,7 +2103,9 @@
                                 
                                 <!-- NEW: Rename Period Button -->
                                 <!-- MODIFIED in 4.22: Removed disabled logic. Hidden for anonymous users. -->
+                                <!-- MODIFIED in 4.27.1: Added data-period-origin -->
                                 <button data-period-name="${safePeriodName}" 
+                                        data-period-origin="${isOnlyPersonal ? 'custom' : 'shared'}"
                                         class="rename-period-btn px-3 py-1 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
                                         title="Rename or set nickname for ${safePeriodName} period"
                                         ${isUserAnonymous ? 'style="display: none;"' : ''}>
@@ -3599,9 +3601,9 @@
              */
             // MODIFIED: v4.11 - Added 'periodName' to the function signature and state
             // MODIFIED: v4.20 - Added 'originalSound' to fix override bug
-            function handleEditBellClick(time, name, sound, type, periodName, originalSound) {
-                // MODIFIED in 4.20: Store the original sound in the state
-                currentEditingBell = { time, name, sound: originalSound, type, periodName }; // Store state
+            function handleEditBellClick(time, name, sound, type, periodName, originalSound, bellId) { // MODIFIED in 4.27
+                // MODIFIED in 4.27: Store bellId
+                currentEditingBell = { time, name, sound: originalSound, type, periodName, bellId }; // Store state
                 
                 // Set fields
                 editBellTimeInput.value = time;
@@ -3857,7 +3859,14 @@
              * @returns {Array} The new, updated periods array.
              */
             function updatePeriodsOnEdit(periods, oldBell, newBell) {
-                const oldPeriodName = oldBell.periodName; // Must rely on the periodName stored in the bell data
+                // MODIFIED in 4.27: Use bellId from oldBell state
+                const oldPeriodName = oldBell.periodName; 
+                const bellIdToFind = oldBell.bellId;
+                
+                if (!bellIdToFind) {
+                    console.error("updatePeriodsOnEdit: oldBell is missing a bellId! Aborting edit.");
+                    return periods; // Return original array to prevent data loss
+                }
                 
                 // If the bell name has changed, we need to check if the period name should change too
                 // Note: In V4.03, we rely on the EDIT MODAL to determine which period it belongs to (future refinement)
@@ -3867,17 +3876,34 @@
                 // Find the period containing the old bell
                 const periodIndex = periods.findIndex(p => p.name === oldPeriodName);
     
-                if (periodIndex === -1) return periods; // Period not found, return original array
+                if (periodIndex === -1) {
+                    console.warn(`updatePeriodsOnEdit: Could not find period "${oldPeriodName}".`);
+                    return periods; // Period not found, return original array
+                }
     
                 const period = periods[periodIndex];
+                let bellFound = false; // NEW in 4.27: Flag to see if we found the bell
                 const updatedBells = period.bells.map(bell => {
-                    // Find by original time and name
-                    if (bell.time === oldBell.time && bell.name === oldBell.name) {
-                        // Return the updated bell
-                        return { ...bell, ...newBell }; 
+                    // MODIFIED in 4.27: Find by bellId
+                    if (bell.bellId === bellIdToFind) {
+                        bellFound = true; // Mark as found
+                        
+                        // Create a new, static bell object
+                        // This explicitly removes the 'relative' property
+                        // by only including the new static data.
+                        return { 
+                            bellId: bell.bellId, // Keep the existing ID
+                            time: newBell.time,
+                            name: newBell.name,
+                            sound: newBell.sound
+                        };
                     }
                     return bell;
                 });
+
+                if (!bellFound) {
+                    console.warn(`updatePeriodsOnEdit: Did not find bellId "${bellIdToFind}" in period "${oldPeriodName}".`);
+                }
     
                 // Reconstruct the periods array
                 const updatedPeriods = [...periods];
@@ -4595,8 +4621,9 @@
             /**
              * NEW: v4.03 - Opens the Rename Period Modal.
              * @param {string} periodName - The name of the period to rename.
+             * @param {string} periodOrigin - 'custom' or 'shared'. (NEW in 4.27.1)
              */
-            function handleRenamePeriodClick(periodName) {
+            function handleRenamePeriodClick(periodName, periodOrigin) { // MODIFIED in 4.27.1
                 // MODIFIED in 4.22: Removed permission check, added anonymous check.
                 if (isUserAnonymous) {
                     showUserMessage("Please sign in to rename periods or set nicknames.");
@@ -4606,10 +4633,15 @@
                 // Determine if we are on a personal schedule
                 const isOnPersonalSchedule = !!activePersonalScheduleId;
     
+                // MODIFIED in 4.27.1: This logic is now correct.
+                // If we are on a personal schedule AND the period is a 'custom' one,
+                // the type is 'personal' (destructive rename).
+                // In ALL other cases, it's a 'shared' type (nickname).
+                const finalType = (isOnPersonalSchedule && periodOrigin === 'custom') ? 'personal' : 'shared';
+                
                 currentRenamingPeriod = {
                     name: periodName,
-                    // MODIFIED in 4.22: Type is based on *active schedule*, not period origin
-                    type: isOnPersonalSchedule ? 'personal' : 'shared' 
+                    type: finalType 
                 };
     
                 // Populate modal
@@ -5728,8 +5760,9 @@
                     const renameBtn = target.closest('.rename-period-btn');
                     if (renameBtn) {
                         const periodName = renameBtn.dataset.periodName;
+                        const periodOrigin = renameBtn.dataset.periodOrigin || 'shared'; // NEW in 4.27.1
                         if (periodName) {
-                            handleRenamePeriodClick(periodName);
+                            handleRenamePeriodClick(periodName, periodOrigin); // MODIFIED in 4.27.1
                             return; // Action handled
                         }
                     }
@@ -5784,8 +5817,10 @@
                         handleDeleteBellClick(bell);
                         return; // Action handled
                     } else if (target.classList.contains('edit-btn') || target.classList.contains('edit-custom-btn')) {
+                        // MODIFIED in 4.19: Pass periodName to edit function
                         // MODIFIED in 4.20: Pass periodName AND originalSound to edit function
-                        handleEditBellClick(bell.time, bell.name, bell.sound, bell.type, bell.periodName, bell.originalSound);
+                        // MODIFIED in 4.27: Pass bellId to edit function
+                        handleEditBellClick(bell.time, bell.name, bell.sound, bell.type, bell.periodName, bell.originalSound, bell.bellId);
                         return; // Action handled
                     } else if (target.classList.contains('sound-btn')) {
                         openChangeSoundModal(bell);
@@ -6001,4 +6036,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.26 -->
+<!-- Version 4.27 -->
