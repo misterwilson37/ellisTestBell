@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.11</title>
+    <title>Ellis Web Bell 4.12</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -521,7 +521,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.11</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.12</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -889,6 +889,32 @@
                     <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Bell</button>
                 </div>
             </form>
+        </div>
+
+        <!-- **** NEW: v4.12.2 - Orphan Bell Handling Modal **** -->
+        <div id="orphan-handling-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+                <h3 class="text-xl font-medium mb-4 text-red-700">Warning: This is a Parent Bell!</h3>
+                <p class="text-gray-700 mb-4">You are trying to delete "<strong id="orphan-parent-name">...</strong>". This bell is the "parent" for the following child bell(s):</p>
+                
+                <div id="orphan-child-list" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4 space-y-1 bg-gray-50 mb-6">
+                    <!-- Child bells will be injected here by JS -->
+                </div>
+
+                <p class="text-gray-700 mb-6">How do you want to handle these "orphaned" bells?</p>
+                
+                <div class_="mt-6 flex flex-col gap-3">
+                    <button type="button" id="orphan-action-independent" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Make Children Independent (Keep their current time)
+                    </button>
+                    <button type="button" id="orphan-action-delete" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                        Delete Parent AND All Child Bells
+                    </button>
+                    <button type="button" id="orphan-action-cancel" class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 mt-2">
+                        Cancel (Do nothing)
+                    </button>
+                </div>
+            </div>
         </div>
         
         <!-- NEW: v4.03 - Rename Period Modal -->
@@ -2408,8 +2434,42 @@
                 return flatBells;
             }
 
-            // --- END: v4.10.3 - Relative Bell Calculation Engine ---
+            // --- NEW: v4.12.2 - Orphan Handling Logic ---
 
+            /**
+             * Finds all bells that are direct children of the given parentBellId.
+             * @param {string} parentBellId - The unique ID of the bell being deleted.
+             * @returns {Array} An array of child bell objects.
+             */
+            function findBellChildren(parentBellId) {
+                if (!parentBellId) return [];
+
+                const allPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
+                let children = [];
+
+                allPeriods.forEach(period => {
+                    period.bells.forEach(bell => {
+                        if (bell.relative && bell.relative.parentBellId === parentBellId) {
+                            children.push({
+                                ...bell,
+                                periodName: period.name // Tag with periodName for the update
+                            });
+                        }
+                    });
+                });
+                return children;
+            }
+            
+            /**
+             * Closes the orphan handling modal and clears state.
+             */
+            function closeOrphanModal() {
+                document.getElementById('orphan-handling-modal').classList.add('hidden');
+                // We clear bellToDelete *after* the action is complete, not here.
+            }
+
+            // --- END: v4.12.2 - Orphan Handling Logic ---
+            
             /**
              * NEW: v4.0 - Sorts periods chronologically based on the time of their first bell.
              * @param {Array} periods - Array of period objects.
@@ -3286,19 +3346,44 @@
              * @param {string} name - The name of the bell to delete.
              * @param {string} type - 'shared' or 'custom'.
              */
-            function handleDeleteBellClick(time, name, type) {
-                bellToDelete = { time, name, type }; // Store for confirmation
+            // MODIFIED: v4.12.2 - "Orphan-Catcher" Logic
+            function handleDeleteBellClick(bell) {
+                // 1. Store the bell we're trying to delete
+                bellToDelete = bell; 
                 
-                confirmDeleteBellText.textContent = `Are you sure you want to delete the "${name}" bell at ${formatTime12Hour(time, true)}? This action cannot be undone.`;
-                confirmDeleteBellModal.classList.remove('hidden');
+                // 2. Check if this bell has any children
+                const children = findBellChildren(bell.bellId);
+
+                if (children.length > 0) {
+                    // --- SCENARIO 1: IT'S A PARENT ---
+                    // Show the new orphan handling modal
+                    
+                    document.getElementById('orphan-parent-name').textContent = bell.name;
+                    
+                    const childList = document.getElementById('orphan-child-list');
+                    childList.innerHTML = children.map(c => 
+                        `<li class="text-sm"><b>${c.periodName}:</b> ${c.name}</li>`
+                    ).join('');
+                    
+                    document.getElementById('orphan-handling-modal').classList.remove('hidden');
+                    
+                } else {
+                    // --- SCENARIO 2: IT'S NOT A PARENT ---
+                    // Show the simple "Are you sure?" modal
+                    confirmDeleteBellText.textContent = `Are you sure you want to delete the "${bell.name}" bell at ${formatTime12Hour(bell.time, true)}? This action cannot be undone.`;
+                    confirmDeleteBellModal.classList.remove('hidden');
+                }
             }
     
             /**
              * NEW: v3.02 (4.03?) - Executes the deletion of the bell (V4.0 Period Safe).
              */
+            // MODIFIED: v4.12.1 - Refactored to use bellId and periodName for deletion
             async function confirmDeleteBell() {
                 if (!bellToDelete) return;
-                const { time, name, type } = bellToDelete;
+                
+                // bellToDelete is now the full bell object from handleBellListClick
+                const { bellId, name, periodName, type } = bellToDelete; 
                 
                 try {
                     // Determine if we are deleting a SHARED or PERSONAL bell
@@ -3313,14 +3398,13 @@
                         const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
                         if (!currentSchedule) throw new Error("Schedule not found.");
     
-                        // Find the period and delete the bell from its array
-                        // NOTE: currentSchedule.periods must be used for V4.0 documents
                         const targetPeriods = currentSchedule.periods || currentSchedule.bells && migrateLegacyBellsToPeriods(currentSchedule.bells) || [];
     
                         const updatedPeriods = targetPeriods.map(p => {
-                            if (p.bells.some(b => b.time === time && b.name === name)) {
-                                // Found the period containing the bell
-                                const newBells = p.bells.filter(b => b.time !== time || b.name !== name);
+                            // Find the correct period by name
+                            if (p.name === periodName) {
+                                // Filter out the bell by its unique ID
+                                const newBells = p.bells.filter(b => b.bellId !== bellId);
                                 return { ...p, bells: newBells };
                             }
                             return p;
@@ -3340,11 +3424,11 @@
                         // Delete from the personal schedule (V4.0 logic)
                         const existingPeriods = docSnap.data().periods || docSnap.data().bells && migrateLegacyBellsToPeriods(docSnap.data().bells) || [];
                         
-                        // Find the period and delete the bell from its array
                         const updatedPeriods = existingPeriods.map(p => {
-                            if (p.bells.some(b => b.time === time && b.name === name)) {
-                                // Found the period containing the bell
-                                const newBells = p.bells.filter(b => b.time !== time || b.name !== name);
+                            // Find the correct period by name
+                            if (p.name === periodName) {
+                                // Filter out the bell by its unique ID
+                                const newBells = p.bells.filter(b => b.bellId !== bellId);
                                 return { ...p, bells: newBells };
                             }
                             return p;
@@ -5495,6 +5579,8 @@
                         name: bellElement.dataset.name,
                         sound: bellElement.dataset.sound,
                         type: bellElement.dataset.type,
+                        // NEW: v4.12.1 - Add bellId
+                        bellId: bellElement.dataset.bellId, 
                         originalSound: bellElement.dataset.originalSound,
                         periodName: bellElement.dataset.periodName // NEW: Grab period name
                     };
@@ -5514,8 +5600,9 @@
                         return; 
                     }
         
+                    // MODIFIED: v4.12.1 - Fixed 'contents' typo to 'contains' and passing full bell object
                     if (target.classList.contains('delete-btn') || target.classList.contains('delete-custom-btn')) {
-                        handleDeleteBellClick(bell.time, bell.name, bell.type);
+                        handleDeleteBellClick(bell);
                     } else if (target.classList.contains('edit-btn') || target.classList.contains('edit-custom-btn')) {
                         // MODIFIED: Pass periodName to edit function
                         handleEditBellClick(bell.time, bell.name, bell.sound, bell.type, bell.periodName);
@@ -5561,6 +5648,106 @@
     
                 // DELETED: v3.03 - loadCustomBells()
                 // loadCustomBells();
+
+                // --- NEW: v4.12.2 - Orphan Modal Listeners ---
+                document.getElementById('orphan-action-cancel').addEventListener('click', () => {
+                    closeOrphanModal();
+                    bellToDelete = null; // Clear the pending deletion
+                });
+
+                document.getElementById('orphan-action-delete').addEventListener('click', () => {
+                    // This is "Delete Parent AND All Children"
+                    // We'll handle the child deletion logic inside confirmDeleteBell
+                    // by checking for 'bellToDelete.children' (which we will add).
+                    
+                    // We'll tag the children onto the object for the delete function
+                    bellToDelete.children = findBellChildren(bellToDelete.bellId); 
+                    
+                    closeOrphanModal();
+                    confirmDeleteBell(); // Call the original delete function
+                });
+
+                document.getElementById('orphan-action-independent').addEventListener('click', () => {
+                    // This is "Make Children Independent"
+                    // After this, we will *still* call confirmDeleteBell to delete the parent.
+                    handleMakeOrphansIndependent();
+                });
+            }
+
+            /**
+             * NEW: v4.12.2 - Converts all children of 'bellToDelete' to static bells.
+             */
+            async function handleMakeOrphansIndependent() {
+                if (!bellToDelete) return;
+                
+                const children = findBellChildren(bellToDelete.bellId);
+                if (children.length === 0) {
+                    // No children, just proceed with deleting the parent
+                    closeOrphanModal();
+                    confirmDeleteBell();
+                    return;
+                }
+
+                console.log(`Making ${children.length} children independent...`);
+
+                // We need to find which document to update (shared or personal)
+                // Since only personal schedules can have relative bells,
+                // we can assume we are updating the activePersonalScheduleId.
+                if (!activePersonalScheduleId) {
+                    showUserMessage("Error: No active personal schedule. Cannot make children independent.");
+                    return;
+                }
+                
+                const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                
+                try {
+                    const docSnap = await getDoc(personalScheduleRef);
+                    if (!docSnap.exists()) throw new Error("Personal schedule not found.");
+
+                    const existingPeriods = docSnap.data().periods || [];
+                    
+                    // Create a map of children by their bellId for quick lookup
+                    const childMap = new Map(children.map(c => [c.bellId, c]));
+
+                    const updatedPeriods = existingPeriods.map(period => {
+                        let bellsChanged = false;
+                        const newBells = period.bells.map(bell => {
+                            if (childMap.has(bell.bellId)) {
+                                // This is a child bell. Convert it!
+                                const childBell = childMap.get(bell.bellId);
+                                bellsChanged = true;
+                                return {
+                                    bellId: bell.bellId,
+                                    name: bell.name,
+                                    sound: bell.sound,
+                                    // CRITICAL: Add the 'time' property back, using its last calculated value
+                                    time: childBell.time, 
+                                    // CRITICAL: Remove the 'relative' property
+                                    // relative: (REMOVED)
+                                };
+                            }
+                            return bell;
+                        });
+
+                        if (bellsChanged) {
+                            return { ...period, bells: newBells };
+                        }
+                        return period;
+                    });
+
+                    // Save the updated periods (with independent children)
+                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+                    
+                    console.log("Children are now independent. Proceeding to delete parent.");
+                    
+                    // Now that children are safe, delete the parent
+                    closeOrphanModal();
+                    confirmDeleteBell(); 
+
+                } catch (error) {
+                    console.error("Error making orphans independent:", error);
+                    showUserMessage(`Error: ${error.message}`);
+                }
             }
             
             // --- Start the App ---
@@ -5612,4 +5799,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.11 -->
+<!-- Version 4.12 -->
