@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.27</title>
+    <title>Ellis Web Bell 4.28</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.27</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.28</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -899,9 +899,68 @@
             </form>
         </div>
 
+        <!-- **** NEW: v4.28 - Add Bell Type (Choice) Modal **** -->
+        <div id="add-bell-type-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+                <h3 class="text-xl font-medium mb-4">Add Bell</h3>
+                <p class="text-gray-700 mb-6">What type of bell do you want to add to <strong id="add-bell-type-period-name">...</strong>?</p>
+                
+                <div class="mt-6 flex flex-col gap-3">
+                    <button type="button" id="add-bell-type-static" class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <span class="font-semibold">Static Time Bell</span>
+                        <span class="block text-sm opacity-90">Set a specific time (e.g., 10:30:00 AM)</span>
+                    </button>
+                    <button type="button" id="add-bell-type-relative" class="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <span class="font-semibold">Relative Time Bell</span>
+                        <span class="block text-sm opacity-90">Set time based on another bell (e.g., 5 min before)</span>
+                    </button>
+                    <button type="button" id="add-bell-type-cancel" class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 mt-2">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- **** NEW: v4.28 - Add Static Bell Modal **** -->
+        <div id="add-static-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <form id="add-static-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+                <h3 class="text-2xl font-medium mb-4">Add Static Bell</h3>
+                <p class="text-gray-700 mb-6">Adding a new bell to the period <strong id="add-static-period-name">...</strong>.</p>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="add-static-bell-time" class="block text-sm font-medium text-gray-700">Time (HH:MM:SS)</label>
+                        <input type="time" id="add-static-bell-time" step="1" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="add-static-bell-name" class="block text-sm font-medium text-gray-700">Bell Name</label>
+                        <input type="text" id="add-static-bell-name" placeholder="e.g. My Reminder" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                
+                <div class="flex items-end gap-2">
+                    <div class="flex-grow">
+                        <label for="add-static-bell-sound" class="block text-sm font-medium text-gray-700">Sound</label>
+                        <select id="add-static-bell-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <!-- Options will be populated by JS -->
+                        </select>
+                    </div>
+                    <button type="button" id="preview-add-static-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                        &#9654;
+                    </button>
+                </div>
+
+                <p id="add-static-bell-status" class="text-red-600 text-sm mt-4 hidden"></p>
+    
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="add-static-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Bell</button>
+                </div>
+            </form>
+        </div>
+
         <!-- **** NEW: v4.12.2 - Orphan Bell Handling Modal **** -->
-        <div id="orphan-handling-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
-            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <div id="orphan-handling-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
                 <h3 class="text-xl font-medium mb-4 text-red-700">Warning: This is a Parent Bell!</h3>
                 <p class="text-gray-700 mb-4">You are trying to delete "<strong id="orphan-parent-name">...</strong>". This bell is the "parent" for the following child bell(s):</p>
                 
@@ -1180,6 +1239,23 @@
         const orphanActionIndependent = document.getElementById('orphan-action-independent');
         const orphanActionDelete = document.getElementById('orphan-action-delete');
         const orphanActionCancel = document.getElementById('orphan-action-cancel');
+
+        // --- NEW: v4.28 - Add Bell Choice and Static Bell Modals ---
+        const addBellTypeModal = document.getElementById('add-bell-type-modal');
+        const addBellTypePeriodName = document.getElementById('add-bell-type-period-name');
+        const addBellTypeStaticBtn = document.getElementById('add-bell-type-static');
+        const addBellTypeRelativeBtn = document.getElementById('add-bell-type-relative');
+        const addBellTypeCancelBtn = document.getElementById('add-bell-type-cancel');
+
+        const addStaticBellModal = document.getElementById('add-static-bell-modal');
+        const addStaticBellForm = document.getElementById('add-static-bell-form');
+        const addStaticPeriodName = document.getElementById('add-static-period-name');
+        const addStaticBellTime = document.getElementById('add-static-bell-time');
+        const addStaticBellName = document.getElementById('add-static-bell-name');
+        const addStaticBellSound = document.getElementById('add-static-bell-sound');
+        const previewAddStaticSoundBtn = document.getElementById('preview-add-static-sound');
+        const addStaticBellStatus = document.getElementById('add-static-bell-status');
+        const addStaticBellCancelBtn = document.getElementById('add-static-bell-cancel');
 
         // --- NEW: v4.14d - RESTORING ADMIN & CONFLICT MODAL VARIABLES ---
         
@@ -4443,7 +4519,7 @@
             }
     
             /**
-             * MODIFIED: v4.04 - Opens the Relative Bell Modal instead of scrolling to the form.
+             * MODIFIED: v4.28 - Opens the new "Add Bell Type" choice modal.
              * @param {string} periodName - The period that was clicked.
              */
             function handleShowAddBellForm(periodName) {
@@ -4452,36 +4528,81 @@
                     return;
                 }
                 
-                /// 1. Get the target period's bells (from the *calculated* list)
+                // 1. Store the period name in the state
+                // We re-use currentRelativePeriod state to store the context
+                currentRelativePeriod = {
+                    name: periodName
+                    // We'll populate the bells property if/when the relative modal is chosen
+                };
+                
+                // 2. Populate and show the choice modal
+                addBellTypePeriodName.textContent = periodName;
+                addBellTypeModal.classList.remove('hidden');
+            }
+
+            /**
+             * NEW: v4.28 - Opens the Static Bell Modal.
+             */
+            function openStaticBellModal() {
+                if (!currentRelativePeriod || !currentRelativePeriod.name) {
+                    console.error("openStaticBellModal: No period context found.");
+                    return;
+                }
+                const periodName = currentRelativePeriod.name;
+
+                // 1. Populate modal UI
+                addStaticPeriodName.textContent = periodName;
+                addStaticBellForm.reset(); // Clear any previous inputs
+                addStaticBellStatus.classList.add('hidden');
+    
+                // 2. Populate sound dropdowns
+                // We copy the HTML from the main personal sound dropdown
+                const staticSoundSelect = document.getElementById('add-static-bell-sound');
+                const personalSoundSelect = document.getElementById('personal-bell-sound');
+                if (staticSoundSelect && personalSoundSelect) {
+                    staticSoundSelect.innerHTML = personalSoundSelect.innerHTML;
+                    staticSoundSelect.value = 'ellisBell.mp3';
+                }
+    
+                // 3. Show Modal
+                addStaticBellModal.classList.remove('hidden');
+            }
+
+            /**
+             * NEW: v4.28 - Opens the Relative Bell Modal (contains old logic from handleShowAddBellForm).
+             */
+            function openRelativeBellModal() {
+                if (!currentRelativePeriod || !currentRelativePeriod.name) {
+                    console.error("openRelativeBellModal: No period context found.");
+                    return;
+                }
+                const periodName = currentRelativePeriod.name;
+
+                // 1. Get the target period's bells (from the *calculated* list)
                 const targetPeriod = calculatedPeriodsList.find(p => p.name === periodName);
                                      
-                if (!targetPeriod || !targetPeriod.bells || targetPeriod.bells.length < 1) { // MODIFIED in 4.16: Changed >=2 to >=1
+                if (!targetPeriod || !targetPeriod.bells || targetPeriod.bells.length < 1) {
                     showUserMessage(`Cannot add relative bells to ${periodName}. A period must have at least one existing bell to anchor to.`);
                     return;
                 }
                 
                 // 2. Use time-resolved bells as anchors
-                // They are already sorted and resolved by resolveAllBellTimes()
                 const resolvedBells = targetPeriod.bells;
 
-                // 3. Store Anchor Data in State
-                currentRelativePeriod = {
-                    name: periodName,
-                    bells: resolvedBells // NEW in 4.18: Store time-resolved bells for anchor selection
-                };
+                // 3. Store Anchor Data in State (add bells to existing state)
+                currentRelativePeriod.bells = resolvedBells;
     
                 // 4. Populate Modal UI
                 relativePeriodName.textContent = periodName;
 
-                // NEW in 4.16: Populate the Anchor Bell selector (v4.10 logic)
-                const anchorOptionsHtml = resolvedBells.map(bell => ` // MODIFIED in 4.18: Use resolvedBells
+                const anchorOptionsHtml = resolvedBells.map(bell => `
                     <option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>
                 `).join('');
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
     
-                // Populate sound dropdowns (need to fetch latest files)
-                updateSoundDropdowns();
-                relativeBellSoundSelect.value = 'ellisBell.mp3'; // Default sound
+                // Populate sound dropdowns
+                updateSoundDropdowns(); // This function updates all registered dropdowns
+                relativeBellSoundSelect.value = 'ellisBell.mp3';
     
                 // Initial calculation
                 updateCalculatedTime(); 
@@ -4596,8 +4717,73 @@
             }
 
             /**
-             * NEW: v4.10.3 - Master function to recalculate all bells and update the UI.
-             * This is called by both shared and personal schedule listeners.
+             * NEW: v4.28 - Submits the new "static" bell from the modal.
+             * This re-uses the logic from handleAddPersonalBell (the form at the bottom).
+             */
+            async function handleAddStaticBellSubmit(e) {
+                e.preventDefault();
+                addStaticBellStatus.classList.add('hidden');
+                
+                if (!currentRelativePeriod || !currentRelativePeriod.name || !activePersonalScheduleId) {
+                    addStaticBellStatus.textContent = "Error: No schedule context.";
+                    addStaticBellStatus.classList.remove('hidden');
+                    return;
+                }
+
+                // 1. Get all values from the form
+                const periodName = currentRelativePeriod.name;
+                const time = addStaticBellTime.value;
+                const name = addStaticBellName.value.trim();
+                const sound = addStaticBellSound.value;
+                
+                if (!time || !name) {
+                    addStaticBellStatus.textContent = "Time and Name are required.";
+                    addStaticBellStatus.classList.remove('hidden');
+                    return;
+                }
+                
+                // 2. Create the new bell object
+                const newBell = { time, name, sound, bellId: generateBellId() };
+    
+                // 3. Check for nearby bell conflict
+                const allBells = [...localSchedule, ...personalBells];
+                const nearbyBell = findNearbyBell(time, allBells);
+                
+                if (nearbyBell) {
+                    // Show an error in the modal.
+                    addStaticBellStatus.textContent = `Error: This time is within 60s of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time, true)}).`;
+                    addStaticBellStatus.classList.remove('hidden');
+                    return;
+                } 
+                
+                // 4. No conflict, add directly to Firestore
+                const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                try {
+                    const docSnap = await getDoc(personalScheduleRef);
+                    if (!docSnap.exists()) {
+                        throw new Error("Personal schedule doc not found.");
+                    }
+                    
+                    const existingPeriods = docSnap.data().periods || [];
+                    const updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, newBell);
+
+                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+
+                    // Success
+                    addStaticBellModal.classList.add('hidden');
+                    addStaticBellForm.reset();
+                    currentRelativePeriod = null;
+                    showUserMessage(`Static bell "${name}" added to ${periodName}!`);
+                    
+                } catch (error) {
+                    console.error("Error adding static bell:", error);
+                    addStaticBellStatus.textContent = `Error: ${error.message}`;
+                    addStaticBellStatus.classList.remove('hidden');
+                }
+            }
+
+            /**
+             * NEW: v4.10.3 - Master function to recalculate all bells and update the UI.             * This is called by both shared and personal schedule listeners.
              */
             // MODIFIED: v4.13 - This function no longer overwrites its source arrays.
             function recalculateAndRenderAll() {
@@ -5733,9 +5919,34 @@
                 relativeDirection.addEventListener('change', updateCalculatedTime);
                 relativeMinutesInput.addEventListener('input', updateCalculatedTime);
                 relativeSecondsInput.addEventListener('input', updateCalculatedTime);
+
+                // --- NEW: v4.28 - Add Bell Choice Modal Listeners ---
+                addBellTypeCancelBtn.addEventListener('click', () => {
+                    addBellTypeModal.classList.add('hidden');
+                    currentRelativePeriod = null;
+                });
+                addBellTypeStaticBtn.addEventListener('click', () => {
+                    addBellTypeModal.classList.add('hidden');
+                    openStaticBellModal();
+                });
+                addBellTypeRelativeBtn.addEventListener('click', () => {
+                    addBellTypeModal.classList.add('hidden');
+                    openRelativeBellModal();
+                });
+
+                // --- NEW: v4.28 - Add Static Bell Modal Listeners ---
+                addStaticBellForm.addEventListener('submit', handleAddStaticBellSubmit);
+                addStaticBellCancelBtn.addEventListener('click', () => {
+                    addStaticBellModal.classList.add('hidden');
+                    addStaticBellForm.reset();
+                    currentRelativePeriod = null;
+                });
+                previewAddStaticSoundBtn.addEventListener('click', () => {
+                    playBell(addStaticBellSound.value);
+                });
                 
                 signOutBtn.addEventListener('click', signOutUser);
-    
+                    
                 // Sound previews
                 previewPersonalSoundBtn.addEventListener('click', () => playBell(personalSoundInput.value)); // MODIFIED: v3.03
                 previewSharedSoundBtn.addEventListener('click', () => playBell(sharedSoundInput.value));
@@ -6036,4 +6247,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.27 -->
+<!-- Version 4.28 -->
