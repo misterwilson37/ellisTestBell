@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.21</title>
+    <title>Ellis Web Bell 4.22</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.21</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.22</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -951,6 +951,18 @@
                 </div>
             </form>
         </div>
+
+        <!-- NEW: v4.22 - General User Message Modal -->
+        <div id="user-message-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+                <h3 id="user-message-title" class="text-xl font-medium mb-4">Notification</h3>
+                <p id="user-message-text" class="text-gray-700 mb-6">...</p>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="user-message-ok" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">OK</button>
+                </div>
+            </div>
+        </div>
+
         <!-- NEW: Audio Manager Panel (Hidden for anonymous users) -->
         <div id="audio-manager-panel" class="auth-required mt-12">
             <!-- MODIFIED: v3.09 - Made H2 a cursor-pointer -->
@@ -1155,6 +1167,12 @@
         const renamePeriodStatusMsg = document.getElementById('rename-period-status-msg');
         const renamePeriodCancelBtn = document.getElementById('rename-period-cancel-btn');
 
+        // NEW: v4.22 - User Message Modal
+        const userMessageModal = document.getElementById('user-message-modal');
+        const userMessageTitle = document.getElementById('user-message-title');
+        const userMessageText = document.getElementById('user-message-text');
+        const userMessageOkBtn = document.getElementById('user-message-ok');
+
         // Orphan Modal (v4.12.2)
         const orphanHandlingModal = document.getElementById('orphan-handling-modal');
         const orphanParentName = document.getElementById('orphan-parent-name');
@@ -1326,6 +1344,7 @@
 
         let mutedBellIds = new Set(); 
         let bellSoundOverrides = {}; // NEW: Store local sound overrides
+        let periodNameOverrides = {}; // NEW in 4.22: Store local period nicknames
         
         let calculatedPeriodsList = []; // NEW in 4.18: Store the final, time-resolved periods
         
@@ -1394,6 +1413,33 @@
                 localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
             } catch (e) {
                 console.error("Failed to save sound overrides", e);
+            }
+        }
+
+        // --- NEW in 4.22: Period Nickname Override Functions ---
+        function getPeriodOverrideKey(scheduleId, originalPeriodName) {
+            if (!scheduleId || !originalPeriodName) return null;
+            return `${scheduleId}-${originalPeriodName}`;
+        }
+
+        function loadPeriodNameOverrides() {
+            try {
+                const stored = localStorage.getItem('periodNameOverrides');
+                if (stored) {
+                    periodNameOverrides = JSON.parse(stored);
+                    console.log(`Loaded ${Object.keys(periodNameOverrides).length} period nicknames.`);
+                }
+            } catch (e) {
+                console.error("Failed to load period nicknames", e);
+                periodNameOverrides = {};
+            }
+        }
+
+        function savePeriodNameOverrides() {
+            try {
+                localStorage.setItem('periodNameOverrides', JSON.stringify(periodNameOverrides));
+            } catch (e) {
+                console.error("Failed to save period nicknames", e);
             }
         }
 
@@ -2030,11 +2076,17 @@
 
 
                 // Start Period Header (Collapsible <details> tag)
+                // NEW in 4.22: Check for period nickname
+                const originalPeriodName = period.name;
+                const overrideKey = getPeriodOverrideKey(activeBaseScheduleId, originalPeriodName);
+                const displayPeriodName = periodNameOverrides[overrideKey] || originalPeriodName;
+                const titleAttr = displayPeriodName !== originalPeriodName ? `title="Original: ${originalPeriodName}"` : '';
+
                 let periodHtml = `
                     <details class="group border-b border-gray-200" open>
                         <summary class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                             <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2 sm:mb-0">
-                                <span class="text-xl font-bold text-gray-800">${period.name}</span>
+                                <span class="text-xl font-bold text-gray-800" ${titleAttr}>${displayPeriodName}</span>
                                 ${isOnlyPersonal ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">CUSTOM PERIOD</span>' : (isPersonalPeriod ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">PERSONAL</span>' : '')}
                                 <span class="text-gray-600 text-sm mt-1 sm:mt-0">${firstBellTime} - ${lastBellTime}</span>
                             </div>
@@ -2050,10 +2102,11 @@
                                 </button>
                                 
                                 <!-- NEW: Rename Period Button -->
+                                <!-- MODIFIED in 4.22: Removed disabled logic. Hidden for anonymous users. -->
                                 <button data-period-name="${safePeriodName}" 
-                                        class="rename-period-btn px-3 py-1 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
-                                        title="Rename the ${safePeriodName} period"
-                                        ${!canRename ? 'disabled' : ''}>
+                                        class="rename-period-btn px-3 py-1 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                                        title="Rename or set nickname for ${safePeriodName} period"
+                                        ${isUserAnonymous ? 'style="display: none;"' : ''}>
                                     Rename
                                 </button>
     
@@ -4542,28 +4595,40 @@
              * @param {string} periodName - The name of the period to rename.
              */
             function handleRenamePeriodClick(periodName) {
-                // Determine if the period is shared or personal-only
-                const isShared = localSchedulePeriods.some(p => p.name === periodName);
-                const isPersonal = personalBellsPeriods.some(p => p.name === periodName);
-                const isOnlyPersonal = isPersonal && !isShared;
-                
-                // Security check: Admins can rename shared. Users can rename personal-only.
-                const canRename = (document.body.classList.contains('admin-mode') && isShared) || isOnlyPersonal;
-                
-                if (!canRename) {
-                    showUserMessage("Error: You do not have permission to rename this period.");
+                // MODIFIED in 4.22: Removed permission check, added anonymous check.
+                if (isUserAnonymous) {
+                    showUserMessage("Please sign in to rename periods or set nicknames.");
                     return;
                 }
+                
+                // Determine if we are on a personal schedule
+                const isOnPersonalSchedule = !!activePersonalScheduleId;
     
                 currentRenamingPeriod = {
                     name: periodName,
-                    type: isShared ? 'shared' : 'personal'
+                    // MODIFIED in 4.22: Type is based on *active schedule*, not period origin
+                    type: isOnPersonalSchedule ? 'personal' : 'shared' 
                 };
     
                 // Populate modal
+                const modalTitle = renamePeriodModal.querySelector('h3');
+                const renameInput = document.getElementById('rename-period-new-name');
+
+                if (isOnPersonalSchedule) {
+                    modalTitle.textContent = "Rename Period";
+                    renameInput.placeholder = "e.g. My Science Block";
+                } else {
+                    modalTitle.textContent = "Set Period Nickname";
+                    renameInput.placeholder = "e.g. Thorfth";
+                }
+
                 // MODIFIED in 4.20: Use new unique variable names
                 renamePeriodOldName.textContent = periodName;
-                renamePeriodNewNameInput.value = periodName;
+                
+                // NEW in 4.22: Check for existing override to populate input
+                const overrideKey = getPeriodOverrideKey(activeBaseScheduleId, periodName);
+                renamePeriodNewNameInput.value = periodNameOverrides[overrideKey] || periodName;
+
                 renamePeriodStatusMsg.classList.add('hidden');
                 
                 renamePeriodModal.classList.remove('hidden');
@@ -4571,80 +4636,93 @@
     
             /**
              * NEW: v4.03 - Submits the period rename action.
+             * MODIFIED: v4.22 - Now handles "Rename" (personal) vs "Nickname" (shared).
              */
             async function handleRenamePeriodSubmit(e) {
                 e.preventDefault();
                 if (!currentRenamingPeriod) return;
     
                 const { name: oldName, type } = currentRenamingPeriod;
-                // MODIFIED in 4.20: Use new unique variable name
                 const newName = renamePeriodNewNameInput.value.trim();
     
-                if (!newName || newName === oldName) {
-                    renamePeriodModal.classList.add('hidden');
+                if (!newName) {
+                    renamePeriodStatusMsg.textContent = "Name cannot be empty.";
+                    renamePeriodStatusMsg.classList.remove('hidden');
                     return;
                 }
     
-                // MODIFIED in 4.20: Use new unique variable name
-                renamePeriodStatusMsg.textContent = "Renaming...";
+                renamePeriodStatusMsg.textContent = "Saving...";
                 renamePeriodStatusMsg.classList.remove('hidden');
-                
-                let targetPeriods = [];
-                let docRef;
-    
-                // Determine if we are updating a SHARED or PERSONAL period structure
-                if (type === 'shared') {
-                    if (!document.body.classList.contains('admin-mode') || !activeBaseScheduleId) {
-                        showUserMessage("Permission denied or no active schedule.");
-                        return;
-                    }
-                    // Use localSchedulePeriods (the base schedule's periods)
-                    targetPeriods = localSchedulePeriods; 
-                    docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
-                } else if (type === 'personal' && activePersonalScheduleId) {
-                    // Use personalBellsPeriods (the user's custom periods)
-                    targetPeriods = personalBellsPeriods;
-                    docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-                } else {
-                    showUserMessage("Error: Cannot rename period without active schedule.");
-                    return;
-                }
-    
-                // 1. Rename the period object
-                const updatedPeriods = targetPeriods.map(p => {
-                    if (p.name === oldName) {
-                        // This is the period object being renamed
-                        return { ...p, name: newName };
-                    }
-                    return p;
-                });
-    
-                try {
-                    // NEW: v4.11 - Create legacy bells array
-                    const legacyBells = flattenPeriodsToLegacyBells(updatedPeriods);
 
-                    // We always write to the 'periods' field for V4.0 schedules
-                    await updateDoc(docRef, { periods: updatedPeriods, bells: legacyBells });
+                // --- NEW v4.22 Logic ---
+
+                try {
+                    if (type === 'personal') {
+                        // --- 1. PERSONAL SCHEDULE: Destructive Rename ---
+                        if (!activePersonalScheduleId) throw new Error("No active personal schedule.");
+                        
+                        // Use personalBellsPeriods (the user's custom periods)
+                        const targetPeriods = personalBellsPeriods;
+                        const docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+
+                        // Rename the period object
+                        const updatedPeriods = targetPeriods.map(p => {
+                            if (p.name === oldName) {
+                                return { ...p, name: newName };
+                            }
+                            return p;
+                        });
+
+                        // We always write to the 'periods' field for V4.0 schedules
+                        await updateDoc(docRef, { periods: updatedPeriods });
+                        renamePeriodStatusMsg.textContent = "Rename successful.";
+
+                    } else {
+                        // --- 2. SHARED SCHEDULE: Save Nickname to localStorage ---
+                        if (!activeBaseScheduleId) throw new Error("No active shared schedule.");
+
+                        const overrideKey = getPeriodOverrideKey(activeBaseScheduleId, oldName);
+                        if (!overrideKey) throw new Error("Could not create override key.");
+
+                        if (newName === oldName) {
+                            // If name is set back to original, delete the override
+                            delete periodNameOverrides[overrideKey];
+                        } else {
+                            periodNameOverrides[overrideKey] = newName;
+                        }
+                        
+                        savePeriodNameOverrides();
+                        renamePeriodStatusMsg.textContent = "Nickname saved.";
+                        
+                        // Manually re-render to show the change immediately
+                        recalculateAndRenderAll();
+                    }
                     
-                    // MODIFIED in 4.20: Use new unique variable name
-                    renamePeriodStatusMsg.textContent = "Rename successful. Updating view...";
-                    
-                    // The onSnapshot listener will handle the UI refresh.
+                    // Success: Close modal
                     setTimeout(() => {
                         renamePeriodModal.classList.add('hidden');
                         currentRenamingPeriod = null;
-                    }, 1500);
-    
+                    }, 1000);
+
                 } catch (error) {
                     console.error("Error renaming period:", error);
-                    // MODIFIED in 4.20: Use new unique variable name
-                    renamePeriodStatusMsg.textContent = `Error saving name: ${error.message}`;
+                    renamePeriodStatusMsg.textContent = `Error saving: ${error.message}`;
                 }
             }
     
-            // NEW: v4.03 - Simple message box
-            function showUserMessage(message) {
-                alert(message); // Using alert() temporarily for simple messages until a dedicated modal is built
+            /**
+             * NEW: v4.03 - Simple message box
+             * MODIFIED: v4.22 - Replaced alert() with a custom modal.
+             */
+            function showUserMessage(message, title = "Notification") {
+                if (!userMessageModal) {
+                    // Fallback if modal isn't ready, but avoid alert()
+                    console.warn(`showUserMessage: ${title} - ${message}`);
+                    return;
+                }
+                userMessageTitle.textContent = title;
+                userMessageText.textContent = message;
+                userMessageModal.classList.remove('hidden');
             }
                 
             async function handleMultiAddSubmit(e) {
@@ -5334,8 +5412,9 @@
                 initFirebase();
                 loadMutedBells(); 
                 loadSoundOverrides(); // NEW: Load sound overrides
+                loadPeriodNameOverrides(); // NEW in 4.22: Load period nicknames
 
-                // NEW V4.06: Initialize Relative Bell DOM elements inside init() 
+                // NEW V4.06: Initialize Relative Bell DOM elements inside init()
                 // MODIFIED: v4.14 - Declarations moved to global scope.
                 // We just do a check here to ensure they loaded.
                 if (!relativeBellModal || !editBellModal || !changeSoundModal || !confirmDeleteBellModal || !renamePeriodModal || !orphanHandlingModal) {
@@ -5714,6 +5793,11 @@
                 // Event delegation
                 combinedBellListElement.addEventListener('click', handleBellListClick);
                 
+                // NEW: v4.22 - User Message Modal Listener
+                userMessageOkBtn.addEventListener('click', () => {
+                    userMessageModal.classList.add('hidden');
+                });
+
                 // Mute All / Unmute All
                 const muteAllListBtn = document.getElementById('mute-all-list-btn');
                 const unmuteAllListBtn = document.getElementById('unmute-all-list-btn');
@@ -5909,4 +5993,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.21 -->
+<!-- Version 4.22 -->
