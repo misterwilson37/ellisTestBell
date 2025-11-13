@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.28</title>
+    <title>Ellis Web Bell 4.29</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.28</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.29</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2163,7 +2163,8 @@
                         <summary class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                             <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2 sm:mb-0">
                                 <span class="text-xl font-bold text-gray-800" ${titleAttr}>${displayPeriodName}</span>
-                                ${isOnlyPersonal ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">CUSTOM PERIOD</span>' : (isPersonalPeriod ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">PERSONAL</span>' : '')}
+                                <!-- MODIFIED in 4.29: Use 'period.origin' and only show "CUSTOM" for periods created by the user -->
+                                ${period.origin === 'personal' ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full" title="This is a custom period you created.">CUSTOM</span>' : ''}
                                 <span class="text-gray-600 text-sm mt-1 sm:mt-0">${firstBellTime} - ${lastBellTime}</span>
                             </div>
                             
@@ -2528,10 +2529,39 @@
              * }
              */
             function resolveAllBellTimes() {
-                const allPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
+                // MODIFIED in 4.29: MERGE shared and personal periods instead of just concatenating
+                const mergedPeriodsMap = new Map();
+                
+                // 1. Add all base shared periods
+                localSchedulePeriods.forEach(period => {
+                    mergedPeriodsMap.set(period.name, { 
+                        ...period, 
+                        bells: [...period.bells], // Ensure we have a unique array
+                        origin: 'shared' // NEW: Mark origin
+                    });
+                });
+                
+                // 2. Merge in personal periods
+                personalBellsPeriods.forEach(period => {
+                    if (mergedPeriodsMap.has(period.name)) {
+                        // Period exists, merge bells and update origin
+                        const basePeriod = mergedPeriodsMap.get(period.name);
+                        basePeriod.bells = [...basePeriod.bells, ...period.bells];
+                        basePeriod.origin = 'merged'; // It's a shared period with personal bells
+                    } else {
+                        // This is a new, "custom" period
+                        mergedPeriodsMap.set(period.name, { 
+                            ...period, 
+                            origin: 'personal' // NEW: Mark as fully custom
+                        });
+                    }
+                });
+                
+                const allPeriods = Array.from(mergedPeriodsMap.values());
+                // --- END 4.29 MERGE LOGIC ---
+
                 if (allPeriods.length === 0) {
-                    return { calculatedPeriods: [], flatBellList: [] };
-                }
+                    return { calculatedPeriods: [], flatBellList: [] };                }
 
                 // 1. Create a master map of all bells by bellId
                 const bellMap = new Map();
@@ -2554,7 +2584,10 @@
 
                 // 2. Iterate through all periods and calculate times for their bells
                 const calculatedPeriods = allPeriods.map(period => {
-                    const calculatedBells = period.bells.map(bell => {
+                    // NEW in 4.29: Pass the 'origin' tag through
+                    const periodOrigin = period.origin || 'shared'; 
+
+                    const calculatedBells = period.bells.map(bell => {                        
                         // Calculate the time recursively
                         const calculatedTime = calculateRelativeBellTime(bell, bellMap);
                         
@@ -2562,20 +2595,16 @@
                         return {
                             ...bell,
                             time: calculatedTime, // This will be null if calculation failed
-                            // Add 'type' for rendering
-                            // MODIFIED: v4.13 - This logic is more robust and survives the race condition.
-                            // We check if the *source* array contains a period with this name.
-                            type: personalBellsPeriods.some(p => p.name === period.name) ? 'custom' : 'shared'
+                            // MODIFIED in 4.29: Use the new periodOrigin to determine type
+                            type: (periodOrigin === 'personal' || periodOrigin === 'merged') ? 'custom' : 'shared'
                         };
                     }).filter(bell => bell.time !== null); // Filter out any bells that failed (orphans, circular)
-
                     // 3. Re-sort bells within the period by their new calculated time
                     calculatedBells.sort((a, b) => a.time.localeCompare(b.time));
 
-                    return { ...period, bells: calculatedBells };
+                    return { ...period, bells: calculatedBells }; // This now includes the 'origin' tag
                 })
                 .filter(period => period.bells.length > 0); // Filter out periods with no valid bells
-
                 // 4. Create the final flat list for the clock
                 let flatBellList = [];
                 calculatedPeriods.forEach(period => {
@@ -4560,6 +4589,8 @@
                 const staticSoundSelect = document.getElementById('add-static-bell-sound');
                 const personalSoundSelect = document.getElementById('personal-bell-sound');
                 if (staticSoundSelect && personalSoundSelect) {
+                    // MODIFIED in 4.29: Ensure sounds are populated first
+                    updateSoundDropdowns();
                     staticSoundSelect.innerHTML = personalSoundSelect.innerHTML;
                     staticSoundSelect.value = 'ellisBell.mp3';
                 }
@@ -4601,8 +4632,13 @@
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
     
                 // Populate sound dropdowns
-                updateSoundDropdowns(); // This function updates all registered dropdowns
-                relativeBellSoundSelect.value = 'ellisBell.mp3';
+                // MODIFIED in 4.29: Copy from personal select, which is guaranteed to be populated
+                const personalSoundSelect = document.getElementById('personal-bell-sound');
+                if (relativeBellSoundSelect && personalSoundSelect) {
+                    updateSoundDropdowns(); // Ensure personal select is populated
+                    relativeBellSoundSelect.innerHTML = personalSoundSelect.innerHTML;
+                    relativeBellSoundSelect.value = 'ellisBell.mp3';
+                }
     
                 // Initial calculation
                 updateCalculatedTime(); 
@@ -5373,7 +5409,10 @@
                     { el: multiBellSoundInput, myGroup: 'multi-my-sounds-optgroup', sharedGroup: 'multi-shared-sounds-optgroup' },
                     { el: editBellSoundInput, myGroup: 'edit-my-sounds-optgroup', sharedGroup: 'edit-shared-sounds-optgroup' },
                     { el: changeSoundSelect, myGroup: 'change-my-sounds-optgroup', sharedGroup: 'change-shared-sounds-optgroup' }, 
-                    { el: quickBellSoundSelect, myGroup: 'quick-my-sounds-optgroup', sharedGroup: 'quick-shared-sounds-optgroup' } 
+                    { el: quickBellSoundSelect, myGroup: 'quick-my-sounds-optgroup', sharedGroup: 'quick-shared-sounds-optgroup' },
+                    // NEW in 4.29: Add the missing modal dropdowns from v4.28
+                    { el: addStaticBellSound, myGroup: 'add-static-my-sounds-optgroup', sharedGroup: 'add-static-shared-sounds-optgroup' },
+                    { el: relativeBellSoundSelect, myGroup: 'relative-my-sounds-optgroup', sharedGroup: 'relative-shared-sounds-optgroup' }
                 ];
             
                 // Create options HTML
@@ -5385,8 +5424,9 @@
                 // Update all dropdowns
                 selects.forEach(item => {
                     if (!item.el) return; // Guard clause
-                    const myGroup = item.el.querySelector(`#${item.myGroup}`);
-                    const sharedGroup = item.el.querySelector(`#${item.sharedGroup}`);
+                    // MODIFIED in 4.29: Find optgroups by class, not ID, since IDs aren't unique for new modals
+                    const myGroup = item.el.querySelector('optgroup[label="My Sounds"]');
+                    const sharedGroup = item.el.querySelector('optgroup[label="Shared Sounds"]');
                     
                     if (myGroup) {
                         myGroup.innerHTML = mySoundsHtml;
@@ -5946,7 +5986,7 @@
                 });
                 
                 signOutBtn.addEventListener('click', signOutUser);
-                    
+
                 // Sound previews
                 previewPersonalSoundBtn.addEventListener('click', () => playBell(personalSoundInput.value)); // MODIFIED: v3.03
                 previewSharedSoundBtn.addEventListener('click', () => playBell(sharedSoundInput.value));
@@ -6247,4 +6287,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.28 -->
+<!-- Version 4.29 -->
