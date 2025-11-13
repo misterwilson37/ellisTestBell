@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.37</title>
+    <title>Ellis Web Bell 4.38</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.37</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.38</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1443,6 +1443,9 @@
 
         let keepAliveOscillator = null; // NEW in 4.34: "Anti-sleep" oscillator
 
+        let oscillatorAlertInterval = null; // NEW in 4.38: For pre-bell wake-up
+        let isOscillatorAlert = false; // NEW in 4.38: Flag for pre-bell wake-up
+
         let lastClockCheckTimestamp = 0; // NEW in 4.35: For missed bell recovery
         let currentDay = new Date().getDay(); // NEW in 4.35: To clear missed bells
 
@@ -2082,6 +2085,39 @@
                     }
                 }
     
+                // --- NEW in 4.38: Pre-Bell Wake-up Logic ---
+                // If a bell is approaching (under 60s) and we're not in "alert mode",
+                // start "pulsing" the silent oscillator to keep the browser awake.
+                if (activeTimerMillis < 60000 && !isOscillatorAlert && keepAliveOscillator) {
+                    console.log("Bell approaching. Entering oscillator alert mode.");
+                    isOscillatorAlert = true;
+                    if (oscillatorAlertInterval) clearInterval(oscillatorAlertInterval); // Clear just in case
+                    
+                    // "Pulse" the volume of the silent oscillator every 2 seconds
+                    oscillatorAlertInterval = setInterval(() => {
+                        if (keepAliveOscillator) {
+                            // Ramp to slightly "louder" (still inaudible) and back
+                            keepAliveOscillator.volume.rampTo(-99, 0.2);
+                            setTimeout(() => {
+                                if (keepAliveOscillator) {
+                                    keepAliveOscillator.volume.rampTo(-100, 0.2);
+                                }
+                            }, 1000); // 1s at -99, 1s at -100
+                        }
+                    }, 2000);
+                } 
+                // If the next bell is far away and we're still in "alert mode", stop.
+                else if (activeTimerMillis > 60000 && isOscillatorAlert && keepAliveOscillator) {
+                    console.log("Bell has passed. Exiting oscillator alert mode.");
+                    isOscillatorAlert = false;
+                    if (oscillatorAlertInterval) {
+                        clearInterval(oscillatorAlertInterval);
+                        oscillatorAlertInterval = null;
+                    }
+                    // Ensure volume is reset
+                    keepAliveOscillator.volume.value = -100;
+                }
+
                 // --- 5. Ring Logic (MODIFIED in 4.35: Missed Bell Recovery) ---
                 
                 // A. Check if the day has rolled over. If so, clear the timestamp.
@@ -2440,31 +2476,13 @@
                 }
             }
     
-            // --- Local Storage (Custom Bells) ---
-            // DELETED: v3.03 - loadCustomBells() and saveCustomBells() removed
-            // MOVED in 4.18 - Converts total seconds to "HH:MM:SS" format.
-    
-            // Updated for 4.0 all piecemeal like.  We'll see how it goes.
-            /**
-             * NEW: v4.0 - Converts the period structure into a flat, time-sorted list of bells.
-             * @param {Array} periodList - Array of { name, bells: [...] } objects.
-             * @returns {Array} Flat array of bell objects.
-             */
+            // DELETED in 4.38: This function is no longer used.
+            // The 'resolveAllBellTimes' engine now creates the flat bell list.
+            /*
             function flattenPeriodsToBells(periodList) {
-                if (!periodList || periodList.length === 0) return [];
-                let flatBells = [];
-                periodList.forEach(period => {
-                    if (period.bells && period.isEnabled) {
-                        period.bells.forEach(bell => {
-                            // Inherit period context into the bell object
-                            flatBells.push({ ...bell, periodName: period.name }); 
-                        });
-                    }
-                });
-                // Final sort by time to ensure chronological order for the clock
-                flatBells.sort((a, b) => a.time.localeCompare(b.time));
-                return flatBells;
+                ...
             }
+            */
     
             /**
              * MODIFIED: v4.07 - Final robust logic for migrating old flat bell structure to the new period structure.
@@ -3050,20 +3068,20 @@
                 const allBells = [...localSchedule, ...personalBells];
                 const nearbyBell = findNearbyBell(time, allBells);
                 
+                // MODIFIED in 4.38: Use the simpler, inline error from the new static bell modal
+                // instead of opening the 'nearby-bell-modal'.
                 if (nearbyBell) {
-                    // Store pending bell
-                    pendingPersonalBell = { time, name, sound, type: 'custom', periodName }; // Store period name
-                    // v3.25: Set action type
-                    pendingPersonalBellAction = 'add';
-                    pendingPersonalBellOriginal = null;
-                    
-                    // Show modal
-                    nearbyBellName.textContent = nearbyBell.name;
-                    nearbyBellTime.textContent = formatTime12Hour(nearbyBell.time, true); 
-                    nearbyBellCustomControls.style.display = 'flex';
-                    nearbyBellModal.classList.remove('hidden');
+                    // Show an error in the form's status area.
+                    personalBellStatus.textContent = `Error: This time is within 60s of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time, true)}).`;
+                    personalBellStatus.classList.remove('text-gray-600');
+                    personalBellStatus.classList.add('text-red-600');
+                    return; // Stop the submission
                 } else {
                     // No conflict, add directly to Firestore using V4.0 logic
+                    personalBellStatus.textContent = `Adding bells to: ${personalSchedule.name}`; // Reset status
+                    personalBellStatus.classList.add('text-gray-600');
+                    personalBellStatus.classList.remove('text-red-600');
+                    
                     const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                     try {
                         const docSnap = await getDoc(personalScheduleRef);
@@ -3276,6 +3294,13 @@
                                 keepAliveOscillator.dispose();
                                 keepAliveOscillator = null;
                             }
+                            
+                            // NEW in 4.38: Stop the alert interval
+                            if (oscillatorAlertInterval) {
+                                clearInterval(oscillatorAlertInterval);
+                                oscillatorAlertInterval = null;
+                            }
+                            isOscillatorAlert = false; // Reset flag
 
                             if (clockIntervalId) {
                                 clearInterval(clockIntervalId);
@@ -4857,27 +4882,13 @@
                 relativeBellModal.classList.remove('hidden');
             }
     
-            /**
-             * NEW: v4.1 - Handles the time calculation and submission for the Relative Bell Modal.
-             */
+            // DELETED in 4.38: This function is no longer used.
+            // The 'updateCalculatedTime' function now handles this logic.
+            /*
             async function handleRelativeTimeChange() {
-                if (!currentRelativePeriod) return;
-    
-                const anchor = relativeAnchor.value;
-                const direction = relativeDirection.value;
-                const minutes = parseInt(relativeMinutesInput.value) || 0;
-                const seconds = parseInt(relativeSecondsInput.value) || 0;
-                
-                const anchorSeconds = anchor === 'start' 
-                    ? currentRelativePeriod.startSeconds 
-                    : currentRelativePeriod.endSeconds;
-    
-                const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, minutes, seconds);
-                
-                calculatedTimeDisplay.textContent = formatTime12Hour(calculatedTimeHHMMSS, false);
-                
-                return calculatedTimeHHMMSS;
+                ...
             }
+            */
     
             /**
              * MODIFIED: v4.10 - Submits the new "relative" bell object.
@@ -6524,6 +6535,12 @@
                         keepAliveOscillator = null;
                     }
                     
+                    // NEW in 4.39: Stop the alert interval
+                    if (oscillatorAlertInterval) {
+                        clearInterval(oscillatorAlertInterval);
+                        oscillatorAlertInterval = null;
+                    }
+                    
                     // If the Firebase app is initialized, ensure we delete it on page unload
                     // to prevent stale connections/tokens causing CORS/Fetch errors on next load.
                     if (auth && auth.app) {
@@ -6564,4 +6581,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.37 -->
+<!-- Version 4.38 -->
