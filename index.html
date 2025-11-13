@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.31</title>
+    <title>Ellis Web Bell 4.32</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.31</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.32</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1434,7 +1434,11 @@
         
         let appId; 
         let isAudioReady = false;
-        
+
+        // NEW in 4.32: State flags to prevent race conditions on schedule load
+        let isBaseScheduleLoaded = false;
+        let isPersonalScheduleLoaded = false;
+
         // NEW: Audio file state
         let userAudioFiles = []; // { name, url, path }
         let sharedAudioFiles = []; // { name, url, path }
@@ -2128,11 +2132,11 @@
                 const isPersonalPeriod = personalBellsPeriods.some(p => p.name === period.name);
                 const isOnlyPersonal = isPersonalPeriod && !isSharedPeriod; // True if this period was custom-added by the user
 
-                // *** CRITICAL FIX: DEFINE ANCHOR VARIABLES HERE ***
-                const sortedBellsForAnchor = [...period.bells].sort((a, b) => a.time.localeCompare(b.time));
-                const anchorStart = sortedBellsForAnchor[0] || {};
-                const anchorEnd = sortedBellsForAnchor[sortedBellsForAnchor.length - 1] || {};
-                // *** END CRITICAL FIX ***
+                // *** DELETED in 4.32: These anchor variables are no longer used. ***
+                // const sortedBellsForAnchor = [...period.bells].sort((a, b) => a.time.localeCompare(b.time));
+                // const anchorStart = sortedBellsForAnchor[0] || {};
+                // const anchorEnd = sortedBellsForAnchor[sortedBellsForAnchor.length - 1] || {};
+                // *** END DELETION ***
                 
                 // --- Determine Management Permissions ---
                 const isAdmin = document.body.classList.contains('admin-mode');
@@ -2249,9 +2253,11 @@
                                         <!-- NEW v4.04: Anchor Icon Logic -->
                                         <span class="font-medium text-gray-800 truncate block flex items-center" title="${safeName}">
                                             ${safeName}
-                                            ${(bell.name === anchorStart.name && bell.time === anchorStart.time) || (bell.name === anchorEnd.name && bell.time === anchorEnd.time) ?
-                                                `<span class="ml-2 text-blue-500" title="Period Anchor Bell">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 12H9v5.24c-1.72-.4-3-1.89-3-3.74h-2c0 2.8 2.2 5 5 5v2h2v-2c2.8 0 5-2.2 5-5h-2c0 1.85-1.28 3.34-3 3.74V12h-1zM12 2a4 4 0 0 0-4 4c0 2.21 1.79 4 4 4s4-1.79 4-4a4 4 0 0 0-4-4zm0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                                            <!-- MODIFIED in 4.32: Anchor icon now indicates a 'shared' (admin-controlled) bell, not first/last in period -->
+                                            ${bell.type === 'shared' ?
+                                                `<span class="ml-2 text-blue-500" title="Shared Bell (Admin Controlled)">
+                                                    <!-- MODIFIED in 4.32: Replaced disjointed path with a single, connected path -->
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-1 6v5.24c-1.72-.4-3-1.89-3-3.74h-2c0 2.8 2.2 5 5 5v2h2v-2c2.8 0 5-2.2 5-5h-2c0 1.85-1.28 3.34-3 3.74V11h-2z"/></svg>
                                                 </span>` : ''}
                                             
                                             <!-- NEW: v4.10.3 - Relative Bell Icon -->
@@ -2506,8 +2512,12 @@
                     const parentBell = bellMap.get(bell.relative.parentBellId);
                     if (!parentBell) {
                         console.warn(`Could not find parent bell (ID: ${bell.relative.parentBellId}) for bell "${bell.name}". It may be orphaned.`);
-                        // MODIFIED in 4.31: Return the bell itself as an orphan
-                        return { ...bell, isOrphan: true };
+                        
+                        // NEW in 4.32: Find last known time to prevent defaulting to 00:00:00
+                        const oldBellState = personalBells.find(b => b.bellId === bell.bellId);
+                        const fallbackTime = oldBellState?.time || "00:00:00"; // Use old time or default
+                        
+                        return { ...bell, isOrphan: true, fallbackTime: fallbackTime };
                     }
 
                     // 2c. Recursively find the parent's time
@@ -2638,10 +2648,10 @@
                         // and add the 'isOrphan' flag for the UI (future use)
                         bells: orphans.map(orphan => ({
                             ...orphan,
-                            time: "00:00:00", // Assign a static time for rendering
+                            // MODIFIED in 4.32: Use the fallbackTime
+                            time: orphan.fallbackTime || "00:00:00", 
                             type: "custom", // Mark as custom
                             name: `(Orphan) ${orphan.name}`,
-                            isOrphan: true // Flag for UI
                         }))
                     });
                 }
@@ -3373,6 +3383,10 @@
                 
             // MODIFIED: v4.02 - Complete rewrite to handle period structures and legacy data
             function setActiveSchedule(prefixedId) {
+                // NEW in 4.32: Reset loading flags
+                isBaseScheduleLoaded = false;
+                isPersonalScheduleLoaded = false;
+                
                 // Unsubscribe from *both* listeners
                 if (activeScheduleListenerUnsubscribe) {
                     activeScheduleListenerUnsubscribe();
@@ -3437,6 +3451,9 @@
     
                     scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', scheduleId);
                     activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
+                        // NEW in 4.32: Mark base schedule as loaded
+                        isBaseScheduleLoaded = true;
+                        
                         if (docSnap.exists()) {
                             const scheduleData = docSnap.data();
                             if (activePersonalScheduleId === null) { 
@@ -3531,6 +3548,9 @@
                     // 2. Listen to the PERSONAL schedule
                     const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                     activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
+                        // NEW in 4.32: Mark personal schedule as loaded
+                        isPersonalScheduleLoaded = true;
+
                         if (docSnap.exists()) {
                             const personalData = docSnap.data();
                              // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
@@ -4798,6 +4818,9 @@
                 const minutes = parseInt(document.getElementById('relative-minutes').value) || 0;
                 const seconds = parseInt(document.getElementById('relative-seconds').value) || 0;
                 
+                // NEW in 4.32: Get bellName from the input field
+                const bellName = document.getElementById('relative-bell-name').value.trim();
+
                 if (!bellName) {
                     relativeBellStatus.textContent = "Bell Name is required.";
                     relativeBellStatus.classList.remove('hidden');
@@ -4951,10 +4974,18 @@
             }
 
             /**
-             * NEW: v4.10.3 - Master function to recalculate all bells and update the UI.             * This is called by both shared and personal schedule listeners.
+             * NEW: v4.10.3 - Master function to recalculate all bells and update the UI.             
+             * This is called by both shared and personal schedule listeners.
              */
             // MODIFIED: v4.13 - This function no longer overwrites its source arrays.
             function recalculateAndRenderAll() {
+                // NEW in 4.32: Guard against race condition on personal schedule load
+                if (activePersonalScheduleId && (!isBaseScheduleLoaded || !isPersonalScheduleLoaded)) {
+                    console.warn("Delaying calculation: base and personal schedules have not both loaded.");
+                    return; // Exit, wait for the other listener to fire
+                }
+                // console.log("Running recalculateAndRenderAll..."); // Good for debugging
+
                 // 1. Run the calculation engine
                 // It reads from the global localSchedulePeriods and personalBellsPeriods
                 const { calculatedPeriods, flatBellList } = resolveAllBellTimes();
@@ -6423,4 +6454,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.31 -->
+<!-- Version 4.32 -->
