@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.38</title>
+    <title>Ellis Web Bell 4.39</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.38</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.39</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2170,7 +2170,9 @@
                 if (quickBellEndTime && nowTimestamp >= quickBellEndTime.getTime() && (nowTimestamp - lastRingTimestamp > RING_COOLDOWN)) {
                     console.log("Ringing Quick Bell");
                     ringBell({ name: "Quick Bell", sound: quickBellSound });
-                    lastRingTimestamp = nowTimestamp; // Set cooldown timestamp
+                    // MODIFIED in 4.39: DO NOT set the lastRingTimestamp.
+                    // This prevents a quick bell from "eating" a nearby schedule bell.
+                    // lastRingTimestamp = nowTimestamp;
                     quickBellEndTime = null; // Clear the quick bell
                 }
     
@@ -3657,18 +3659,43 @@
 
                         if (docSnap.exists()) {
                             const personalData = docSnap.data();
-                             // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
+
+                            // --- NEW in 4.38: One-Time Bell ID Migration ---
+                            let needsMigration = false;
+                            let periodsToUse = [];
+
                             if (personalData.periods && personalData.periods.length > 0) {
-                                personalBellsPeriods = personalData.periods;
+                                periodsToUse = personalData.periods;
                             } else if (personalData.bells && personalData.bells.length > 0) {
-                                // Migrate the user's legacy flat bells for in-memory use.
-                                personalBellsPeriods = migrateLegacyBellsToPeriods(personalData.bells);
-                                console.log("Reading personal schedule using LEGACY structure.");
-                            } else {
-                                personalBellsPeriods = [];
+                                // This is a legacy schedule, migrate it
+                                periodsToUse = migrateLegacyBellsToPeriods(personalData.bells);
+                                needsMigration = true; // Force save if we just migrated periods
+                                console.log("Running migration from flat 'bells' to 'periods' structure.");
                             }
                             
-                            // DELETED in v4.30: This logic is now handled by recalculateAndRenderAll
+                            // Now check for missing bellIds within the periods
+                            periodsToUse.forEach(period => {
+                                period.bells.forEach(bell => {
+                                    if (!bell.bellId) {
+                                        bell.bellId = generateBellId();
+                                        needsMigration = true;
+                                        console.log(`Assigning new permanent bellId to ${bell.name} in ${period.name}`);
+                                    }
+                                });
+                            });
+
+                            if (needsMigration) {
+                                console.log("Saving migrated bell data (with new bellIds) back to Firestore...");
+                                // Save the updated data back.
+                                // We do this as a 'fire-and-forget' in the background.
+                                // We also clear the old 'bells' field to complete the migration.
+                                updateDoc(personalScheduleRef, { periods: periodsToUse, bells: [] }) 
+                                    .then(() => console.log("Personal schedule migration successful."))
+                                    .catch(err => console.error("Error saving bellId migration:", err));
+                            }
+                            // --- END 4.38 Migration ---
+                            
+                            personalBellsPeriods = periodsToUse;
                             
                             console.log("Personal schedule bells updated.");
                         } else {
@@ -6535,7 +6562,7 @@
                         keepAliveOscillator = null;
                     }
                     
-                    // NEW in 4.39: Stop the alert interval
+                    // NEW in 4.38: Stop the alert interval
                     if (oscillatorAlertInterval) {
                         clearInterval(oscillatorAlertInterval);
                         oscillatorAlertInterval = null;
@@ -6581,4 +6608,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.38 -->
+<!-- Version 4.39 -->
