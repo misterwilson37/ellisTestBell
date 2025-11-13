@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.32</title>
+    <title>Ellis Web Bell 4.33</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.32</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.33</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1439,6 +1439,10 @@
         let isBaseScheduleLoaded = false;
         let isPersonalScheduleLoaded = false;
 
+        let isScheduleReady = false; // NEW in 4.33: Flag to start clock
+
+        let keepAliveOscillator = null; // NEW in 4.33 "Anti-sleep" oscillator
+
         // NEW: Audio file state
         let userAudioFiles = []; // { name, url, path }
         let sharedAudioFiles = []; // { name, url, path }
@@ -1693,11 +1697,23 @@
                     isAudioReady = true;
                     statusElement.textContent = "Audio ready. Monitoring bells...";
     
-                    if (auth.currentUser) {
-                        console.log("Audio ready, user signed in. Starting clock.");
+                    // MODIFIED in 4.33: Check if schedule is *also* ready
+                    if (auth.currentUser && isScheduleReady) { 
+                        console.log("Audio ready, schedule is ready. Starting clock.");
                         if (clockIntervalId) clearInterval(clockIntervalId);
                         updateClock(); 
                         clockIntervalId = setInterval(updateClock, 1000);
+                    } else if (auth.currentUser) {
+                        console.log("Audio ready, but schedule is not. Clock will start after schedule loads.");
+                    }
+    
+                    // NEW in 4.33: Start a silent, looping oscillator to prevent AudioContext suspension.
+                    if (!keepAliveOscillator) {
+                        keepAliveOscillator = new Tone.Oscillator({
+                            frequency: 1, // 1 Hz (inaudible)
+                            volume: -100, // -100 dB (inaudible)
+                        }).toDestination().start();
+                        console.log("Started silent keep-alive oscillator.");
                     }
     
                 } catch (e) {
@@ -3115,10 +3131,9 @@
                                 
                                 audioOverlay.classList.remove('hidden');
                             } else {
-                                console.log("User signed in, audio ready. Starting clock.");
-                                if (clockIntervalId) clearInterval(clockIntervalId);
-                                updateClock();
-                                clockIntervalId = setInterval(updateClock, 1000);
+                                // MODIFIED in 4.33: Removed auto-start. Clock will be started
+                                // by recalculateAndRenderAll() when the schedule is loaded.
+                                console.log("User signed in, audio ready. Waiting for schedule to start clock.");
                             }
             
                             document.body.classList.add('authenticated');
@@ -3200,7 +3215,15 @@
                             console.log("User is signed out.");
                             userId = null;
                             isUserAnonymous = true;
+                            isScheduleReady = false; // NEW in 4.33: Reset flag
                             
+                            // NEW in 4.33: Stop the keep-alive oscillator
+                            if (keepAliveOscillator) {
+                                keepAliveOscillator.stop();
+                                keepAliveOscillator.dispose();
+                                keepAliveOscillator = null;
+                            }
+
                             if (clockIntervalId) {
                                 clearInterval(clockIntervalId);
                                 clockIntervalId = null;
@@ -5001,6 +5024,20 @@
                 
                 // 4. Pass the calculated data *directly* to the render function
                 renderCombinedList(calculatedPeriods);
+
+                // NEW in 4.33: The schedule is now loaded and calculated.
+                // This is the "key" that allows the clock to start.
+                if (!isScheduleReady) {
+                    console.log("Schedule is now ready.");
+                    isScheduleReady = true;
+                }
+                
+                // If audio is also ready, start the clock now.
+                if (isAudioReady && !clockIntervalId) {
+                    console.log("Schedule is ready, audio is ready. Starting clock.");
+                    updateClock();
+                    clockIntervalId = setInterval(updateClock, 1000);
+                }
             }
             
             /**
@@ -5033,12 +5070,14 @@
                 const modalTitle = renamePeriodModal.querySelector('h3');
                 const renameInput = document.getElementById('rename-period-new-name');
 
-                if (isOnPersonalSchedule) {
+                // MODIFIED in 4.33: Check finalType, not isOnPersonalSchedule,
+                // to correctly show "Set Period Nickname" for shared periods.
+                if (finalType === 'personal') {
                     modalTitle.textContent = "Rename Period";
-                    renameInput.placeholder = "e.g. My Science Block";
+                    renameInput.placeholder = "e.g. Mini-Planning Period (1)";
                 } else {
                     modalTitle.textContent = "Set Period Nickname";
-                    renameInput.placeholder = "e.g. Thorfth";
+                    renameInput.placeholder = "e.g. Thorfth Period";
                 }
 
                 // MODIFIED in 4.20: Use new unique variable names
@@ -6414,6 +6453,13 @@
             // --- NEW in 3.46: App Cleanup Listener (Fix for Safari CORS/Fetch Errors on Refresh) ---
             window.addEventListener('beforeunload', () => {
                 try {
+                    // NEW in 4.33: Stop keep-alive oscillator
+                    if (keepAliveOscillator) {
+                        keepAliveOscillator.stop();
+                        keepAliveOscillator.dispose();
+                        keepAliveOscillator = null;
+                    }
+                    
                     // If the Firebase app is initialized, ensure we delete it on page unload
                     // to prevent stale connections/tokens causing CORS/Fetch errors on next load.
                     if (auth && auth.app) {
@@ -6454,4 +6500,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.32 -->
+<!-- Version 4.33 -->
