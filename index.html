@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.36</title>
+    <title>Ellis Web Bell 4.37</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.36</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.37</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2619,8 +2619,9 @@
                 localSchedulePeriods.forEach(period => {
                     mergedPeriodsMap.set(period.name, { 
                         ...period, 
-                        bells: [...period.bells], // Ensure we have a unique array
-                        origin: 'shared' // NEW: Mark origin
+                        // MODIFIED in 4.37: Tag bells with their origin
+                        bells: period.bells.map(b => ({ ...b, _originType: 'shared' })),
+                        origin: 'shared' // Mark origin
                     });
                 });
                 
@@ -2629,12 +2630,16 @@
                     if (mergedPeriodsMap.has(period.name)) {
                         // Period exists, merge bells and update origin
                         const basePeriod = mergedPeriodsMap.get(period.name);
-                        basePeriod.bells = [...basePeriod.bells, ...period.bells];
+                        // MODIFIED in 4.37: Tag bells with their origin
+                        const personalBells = period.bells.map(b => ({ ...b, _originType: 'custom' }));
+                        basePeriod.bells = [...basePeriod.bells, ...personalBells];
                         basePeriod.origin = 'merged'; // It's a shared period with personal bells
                     } else {
                         // This is a new, "custom" period
                         mergedPeriodsMap.set(period.name, { 
                             ...period, 
+                            // MODIFIED in 4.37: Tag bells with their origin
+                            bells: period.bells.map(b => ({ ...b, _originType: 'custom' })),
                             origin: 'personal' // NEW: Mark as fully custom
                         });
                     }
@@ -2690,8 +2695,9 @@
                         return {
                             ...bell,
                             time: calculatedTime, // This will be null if calculation failed
-                            // MODIFIED in 4.29: Use the new periodOrigin to determine type
-                            type: (periodOrigin === 'personal' || periodOrigin === 'merged') ? 'custom' : 'shared'
+                            // MODIFIED in 4.37: Use the bell's origin, not the period's.
+                            // If _originType isn't set, default to shared (legacy).
+                            type: bell._originType === 'custom' ? 'custom' : 'shared'
                         };
                     }).filter(bell => bell.time !== null); // Filter out any bells that failed (orphans, circular)
                     // 3. Re-sort bells within the period by their new calculated time
@@ -3731,16 +3737,21 @@
                         }
                         
                         // Delete from the shared schedule (V4.0 logic)
-                        const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
-                        if (!currentSchedule) throw new Error("Schedule not found.");
+                        // MODIFIED in 4.37: Use the global state, not a fresh DB read.
+                        // This prevents a stale write.
+                        const targetPeriods = localSchedulePeriods || [];
     
-                        const targetPeriods = currentSchedule.periods || currentSchedule.bells && migrateLegacyBellsToPeriods(currentSchedule.bells) || [];
-    
+                        // NEW in 4.37: Create a Set of all bell IDs to delete (parent + children)
+                        const childIds = (children || []).map(c => c.bellId);
+                        const idsToDelete = new Set([bellId, ...childIds]);
+                        console.log(`Deleting ${idsToDelete.size} shared bell(s): ${name} and ${childIds.length} children.`);
+
                         const updatedPeriods = targetPeriods.map(p => {
                             // Find the correct period by name
                             if (p.name === periodName) {
                                 // Filter out the bell by its unique ID
-                                const newBells = p.bells.filter(b => b.bellId !== bellId);
+                                // MODIFIED in 4.37: Use the idsToDelete Set
+                                const newBells = p.bells.filter(b => !idsToDelete.has(b.bellId));
                                 return { ...p, bells: newBells };
                             }
                             return p;
@@ -3754,11 +3765,10 @@
     
                     } else if (type === 'custom' && activePersonalScheduleId) {
                         const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-                        const docSnap = await getDoc(personalScheduleRef);
-                        if (!docSnap.exists()) throw new Error("Personal schedule not found.");
-    
-                        // Delete from the personal schedule (V4.0 logic)
-                        const existingPeriods = docSnap.data().periods || docSnap.data().bells && migrateLegacyBellsToPeriods(docSnap.data().bells) || [];
+                        
+                        // MODIFIED in 4.37: Use the global state, not a fresh getDoc().
+                        // This prevents a stale write.
+                        const existingPeriods = personalBellsPeriods || [];
                         
                         // NEW: v4.13b - Create a Set of all bell IDs to delete
                         const childIds = (children || []).map(c => c.bellId);
@@ -6554,4 +6564,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.36 -->
+<!-- Version 4.37 -->
