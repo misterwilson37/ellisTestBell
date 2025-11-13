@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.30</title>
+    <title>Ellis Web Bell 4.31</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.30</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.31</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -857,8 +857,8 @@
                 <div class="mb-4">
                     <label for="relative-direction" class="block text-sm font-medium text-gray-700 mb-1">Time Direction</label>
                     <select id="relative-direction" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="before">Before Anchor</option>
-                        <option value="after">After Anchor</option>
+                        <option value="before">Before Parent</option>
+                        <option value="after">After Parent</option>
                     </select>
                 </div>
     
@@ -889,6 +889,15 @@
                 </div>
     
                 <p id="relative-time-preview" class="text-lg font-medium text-blue-600 mt-4">Calculated Time: <span id="calculated-time">--:--:--</span></p>
+                
+                <!-- NEW in 4.31: Convert to Static (for editing) -->
+                <div id="convert-to-static-container" class="hidden mt-4 p-3 bg-gray-100 rounded-lg">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="convert-to-static-checkbox" class="h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+                        <span class="text-sm font-medium text-gray-700">Convert to static bell at <strong id="convert-to-static-time">--:--:--</strong></span>
+                    </label>
+                </div>
+
                 <p id="relative-bell-status" class="text-red-600 text-sm mt-2 hidden"></p>
     
                 <div class="mt-6 flex justify-end gap-3">
@@ -2230,7 +2239,8 @@
                                 data-time="${bell.time}" data-name="${safeName}" 
                                 data-sound="${bell.sound}" data-type="${bell.type}"
                                 data-bell-id="${bell.bellId || getBellId(bell)}"
-                                data-original-sound="${originalSound}" data-period-name="${period.name}">
+                                data-original-sound="${originalSound}" data-period-name="${period.name}"
+                                data-is-relative="${!!bell.relative}"> <!-- NEW in 4.31 -->
                                 
                                 <!-- Bell Info (Time, Name, Sound) (left) -->
                                 <div class="flex items-center space-x-4 min-w-0 flex-grow">
@@ -2496,7 +2506,8 @@
                     const parentBell = bellMap.get(bell.relative.parentBellId);
                     if (!parentBell) {
                         console.warn(`Could not find parent bell (ID: ${bell.relative.parentBellId}) for bell "${bell.name}". It may be orphaned.`);
-                        return null; // Orphan bell
+                        // MODIFIED in 4.31: Return the bell itself as an orphan
+                        return { ...bell, isOrphan: true };
                     }
 
                     // 2c. Recursively find the parent's time
@@ -2581,14 +2592,26 @@
                     });
                 });
 
+                // DELETED in 4.31.1: This line caused the global SyntaxError
+                // });
+
                 // 2. Iterate through all periods and calculate times for their bells
-                const calculatedPeriods = allPeriods.map(period => {
+                let orphans = []; // NEW in 4.31: Array to store orphaned bells
+                const calculatedPeriods = allPeriods.map(period => { // MODIFIED in 4.31: Restored this line
                     // NEW in 4.29: Pass the 'origin' tag through
                     const periodOrigin = period.origin || 'shared'; 
-
+ 
                     const calculatedBells = period.bells.map(bell => {                        
                         // Calculate the time recursively
-                        const calculatedTime = calculateRelativeBellTime(bell, bellMap);
+                        const calculatedResult = calculateRelativeBellTime(bell, bellMap); // MODIFIED in 4.31
+                        // MODIFIED in 4.31: Check the result
+                        let calculatedTime = null;
+                        if (calculatedResult && typeof calculatedResult === 'object' && calculatedResult.isOrphan) {
+                            orphans.push(calculatedResult); // Add to orphan list
+                            calculatedTime = null; // Do not include in this period
+                        } else {
+                            calculatedTime = calculatedResult; // This is the HH:MM:SS string
+                        }
                         
                         // Create a new bell object with the calculated time
                         return {
@@ -2604,6 +2627,25 @@
                     return { ...period, bells: calculatedBells }; // This now includes the 'origin' tag
                 })
                 .filter(period => period.bells.length > 0); // Filter out periods with no valid bells
+
+                // NEW in 4.31: Add the "Orphaned Bells" period if any were found
+                if (orphans.length > 0) {
+                    calculatedPeriods.push({
+                        name: "Orphaned Bells",
+                        origin: "personal", // So they are editable/deletable
+                        isEnabled: true,
+                        // Give them a 'time' of 00:00:00 so they sort to the top
+                        // and add the 'isOrphan' flag for the UI (future use)
+                        bells: orphans.map(orphan => ({
+                            ...orphan,
+                            time: "00:00:00", // Assign a static time for rendering
+                            type: "custom", // Mark as custom
+                            name: `(Orphan) ${orphan.name}`,
+                            isOrphan: true // Flag for UI
+                        }))
+                    });
+                }
+
                 // 4. Create the final flat list for the clock
                 let flatBellList = [];
                 calculatedPeriods.forEach(period => {
@@ -3667,46 +3709,140 @@
                     bellToDelete = null;
                 }
             }
+
+            /**
+             * NEW: v4.31 - Finds the raw (pre-calculation) bell object from the period lists.
+             */
+            function findRawBellById(bellId) {
+                if (!bellId) return null;
+                // Check personal periods first, as they are the only ones editable by users
+                for (const period of personalBellsPeriods) {
+                    const bell = period.bells.find(b => b.bellId === bellId);
+                    if (bell) return { ...bell, periodName: period.name };
+                }
+                // Fallback: check shared periods (for future admin editing)
+                for (const period of localSchedulePeriods) {
+                    const bell = period.bells.find(b => b.bellId === bellId);
+                    if (bell) return { ...bell, periodName: period.name };
+                }
+                return null;
+            }
+
+            /**
+             * NEW: v4.31 - Opens the Relative Bell Modal for *editing*.
+             */
+            function openEditRelativeModal(bell) {
+                const rawBell = findRawBellById(bell.bellId);
+                if (!rawBell || !rawBell.relative) {
+                    console.error("Tried to edit a relative bell but could not find its raw data.", bell);
+                    showUserMessage("Error: Could not find this bell's original data. It may be an orphan.");
+                    return;
+                }
+
+                // 1. Store this bell as the one being edited
+                currentEditingBell = rawBell;
+
+                // 2. We need to populate the "Parent Bell" dropdown
+                // This re-uses the logic from `openRelativeBellModal`
+                const targetPeriod = calculatedPeriodsList.find(p => p.name === bell.periodName);
+                if (!targetPeriod) {
+                    showUserMessage(`Error: Could not find period ${bell.periodName}.`);
+                    return;
+                }
+                const resolvedBells = targetPeriod.bells;
+                // Store resolved bells for the time calculator
+                currentRelativePeriod = {
+                    name: bell.periodName,
+                    bells: resolvedBells
+                };
                 
+                // 3. Populate Modal UI
+                relativePeriodName.textContent = bell.periodName;
+                relativeBellForm.reset();
+                relativeBellStatus.classList.add('hidden');
+
+                // 4. Populate Parent Bell dropdown
+                const anchorOptionsHtml = resolvedBells.map(b => `
+                    <option value="${b.bellId}">${b.name} (${formatTime12Hour(b.time, true)})</option>
+                `).join('');
+                relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
+
+                // 5. Populate fields with the bell's saved data
+                relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
+                relativeBellNameInput.value = rawBell.name;
+                relativeBellSoundSelect.value = rawBell.sound;
+
+                const offset = rawBell.relative.offsetSeconds;
+                if (offset < 0) {
+                    relativeDirection.value = 'before';
+                    relativeMinutesInput.value = Math.floor(Math.abs(offset) / 60);
+                    relativeSecondsInput.value = Math.abs(offset) % 60;
+                } else {
+                    relativeDirection.value = 'after';
+                    relativeMinutesInput.value = Math.floor(offset / 60);
+                    relativeSecondsInput.value = offset % 60;
+                }
+                
+                // 6. Populate sound dropdowns
+                const personalSoundSelect = document.getElementById('personal-bell-sound');
+                if (relativeBellSoundSelect && personalSoundSelect) {
+                    updateSoundDropdowns();
+                    relativeBellSoundSelect.innerHTML = personalSoundSelect.innerHTML;
+                    relativeBellSoundSelect.value = rawBell.sound; // Select the bell's sound
+                }
+
+                // 7. Show "Convert to Static" checkbox
+                document.getElementById('convert-to-static-container').classList.remove('hidden');
+                document.getElementById('convert-to-static-checkbox').checked = false;
+                
+                // 8. Update and show the calculated time
+                const calculatedTime = updateCalculatedTime();
+                document.getElementById('convert-to-static-time').textContent = formatTime12Hour(calculatedTime, false);
+                
+                // 9. Show Modal
+                relativeBellModal.classList.remove('hidden');
+            }
                 
             /**
-             * NEW: v3.02 (4.03?) - Opens the modal to edit a bell.
-             * @param {string} time - Original time.
-             * @param {string} name - Original name.
-             * @param {string} type - 'shared' or 'custom'.
+             * MODIFIED: v4.31 - Router function to open the correct edit modal.
+             * @param {object} bell - The bell object from the list click.
              */
-            // MODIFIED: v4.11 - Added 'periodName' to the function signature and state
-            // MODIFIED: v4.20 - Added 'originalSound' to fix override bug
-            function handleEditBellClick(time, name, sound, type, periodName, originalSound, bellId) { // MODIFIED in 4.27
-                // MODIFIED in 4.27: Store bellId
-                currentEditingBell = { time, name, sound: originalSound, type, periodName, bellId }; // Store state
-                
-                // Set fields
-                editBellTimeInput.value = time;
-                editBellNameInput.value = name;
-                // MODIFIED in 4.20: Use originalSound to populate the modal
-                editBellSoundInput.value = originalSound;
-                editBellStatus.classList.add('hidden'); // Clear status
-                
-                // Populate sound dropdowns again to ensure custom files are available
-                updateSoundDropdowns();
-                
-                // Select the current sound
-                // MODIFIED in 4.20: Use originalSound to select the correct dropdown value
-                editBellSoundInput.value = originalSound; 
-
-                // NEW in 4.21: Show/hide the override checkbox
-                if (type === 'shared') {
-                    editBellOverrideContainer.classList.remove('hidden');
-                    editBellOverrideCheckbox.checked = false; // Default to not overriding
+            function handleEditBellClick(bell) {
+                // 1. Check if it's a relative bell
+                if (bell.isRelative && bell.type === 'custom') {
+                    // It's a relative bell, open the relative editor
+                    openEditRelativeModal(bell);
                 } else {
-                    editBellOverrideContainer.classList.add('hidden');
-                    editBellOverrideCheckbox.checked = false;
+                    // It's a static bell, open the static editor
+                    // (This is the original logic)
+                    currentEditingBell = { ...bell }; // Store state
+                    
+                    // Set fields
+                    editBellTimeInput.value = bell.time;
+                    editBellNameInput.value = bell.name;
+                    editBellSoundInput.value = bell.originalSound; // Use originalSound
+                    editBellStatus.classList.add('hidden'); // Clear status
+                    
+                    updateSoundDropdowns();
+                    editBellSoundInput.value = bell.originalSound; 
+
+                    if (bell.type === 'shared') {
+                        editBellOverrideContainer.classList.remove('hidden');
+                        editBellOverrideCheckbox.checked = false;
+                    } else {
+                        editBellOverrideContainer.classList.add('hidden');
+                        editBellOverrideCheckbox.checked = false;
+                    }
+                    editBellModal.classList.remove('hidden');
                 }
-    
-                // Show modal
-                editBellModal.classList.remove('hidden');
             }
+
+            /**
+             editBellModal.classList.add('hidden');
+            }
+                
+            // DELETED in 4.31: Removed duplicate/old handleEditBellClick function.
+            // The new router function is located below.
     
             /**
              * NEW: v3.25 (4.03?) - Executes the edit of a personal bell (used by conflict resolution).
@@ -4651,8 +4787,11 @@
                 
                 if (!currentRelativePeriod || !activePersonalScheduleId) return;
 
+                // --- MODIFIED in 4.31: Get Edit Mode data ---
+                const isEditing = !!currentEditingBell;
+                const convertToStatic = document.getElementById('convert-to-static-checkbox').checked;
+
                 // 1. Get all values from the form
-                const bellName = document.getElementById('relative-bell-name').value.trim();
                 const bellSound = document.getElementById('relative-bell-sound').value;
                 const parentBellId = document.getElementById('relative-anchor-bell').value;
                 const direction = document.getElementById('relative-direction').value;
@@ -4675,20 +4814,32 @@
                 if (direction === 'before') {
                     totalOffsetSeconds = -totalOffsetSeconds; // Make it negative
                 }
-
+ 
                 // 3. Create the new bell object
-                // *** THIS IS THE NEW STRUCTURE ***
-                const newBell = {
-                    name: bellName,
-                    sound: bellSound,
-                    bellId: generateBellId(),
-                    // We NO LONGER save 'time'
-                    // Instead, we save the 'relative' dependency object
-                    relative: {
-                        parentBellId: parentBellId,
-                        offsetSeconds: totalOffsetSeconds
-                    }
-                };
+                let finalBell;
+
+                if (isEditing && convertToStatic) {
+                    // --- Case 1: Editing and Converting to Static ---
+                    const calculatedTime = updateCalculatedTime(); // Get the HH:MM:SS time
+                    finalBell = {
+                        name: bellName,
+                        sound: bellSound,
+                        bellId: currentEditingBell.bellId, // Keep existing ID
+                        time: calculatedTime // This makes it a static bell
+                        // 'relative' property is removed
+                    };
+                } else {
+                    // --- Case 2: Adding new or Editing existing Relative Bell ---
+                    finalBell = {
+                        name: bellName,
+                        sound: bellSound,
+                        bellId: isEditing ? currentEditingBell.bellId : generateBellId(),
+                        relative: {
+                            parentBellId: parentBellId,
+                            offsetSeconds: totalOffsetSeconds
+                        }
+                    };
+                }
                 
                 const periodName = currentRelativePeriod.name;
 
@@ -4704,7 +4855,16 @@
                     const docSnap = await getDoc(personalScheduleRef);
                     const existingPeriods = docSnap.data().periods || [];
                     
-                    const updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, newBell);
+                    // MODIFIED in 4.31: Use correct function based on mode
+                    let updatedPeriods;
+                    if (isEditing) {
+                        // Find the old bell and replace it with finalBell
+                        const oldBell = currentEditingBell;
+                        updatedPeriods = updatePeriodsOnEdit(existingPeriods, oldBell, finalBell);
+                    } else {
+                        // Add the new finalBell
+                        updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, finalBell);
+                    }
     
                     await updateDoc(personalScheduleRef, { periods: updatedPeriods });
     
@@ -4715,6 +4875,7 @@
                     relativeBellForm.reset();
                     relativeBellModal.classList.add('hidden');
                     currentRelativePeriod = null;
+                    currentEditingBell = null; // NEW in 4.31: Clear edit state
                     
                 } catch (error) {
                     console.error("Error adding relative bell:", error);
@@ -5922,8 +6083,10 @@
                     relativeBellModal.classList.add('hidden');
                     relativeBellForm.reset();
                     currentRelativePeriod = null;
+                    currentEditingBell = null; // NEW in 4.31
+                    document.getElementById('convert-to-static-container').classList.add('hidden'); // NEW in 4.31
                 });
-
+ 
                 // Update calculated time whenever an input changes
                 // MODIFIED: v4.10.2a - Use the new variable name
                 relativeAnchorBellSelect.addEventListener('change', updateCalculatedTime);
@@ -6013,9 +6176,10 @@
                         // NEW: v4.12.1 - Add bellId
                         bellId: bellElement.dataset.bellId, 
                         originalSound: bellElement.dataset.originalSound,
-                        periodName: bellElement.dataset.periodName // NEW: Grab period name
+                        periodName: bellElement.dataset.periodName, // NEW: Grab period name
+                        isRelative: bellElement.dataset.isRelative === 'true' // NEW in 4.31
                     };
-
+ 
                     // Check which specific button *within* the bell item was clicked
                     if (target.classList.contains('bell-mute-toggle')) {
                         const bellId = getBellId(bell);
@@ -6042,7 +6206,8 @@
                         // MODIFIED in 4.19: Pass periodName to edit function
                         // MODIFIED in 4.20: Pass periodName AND originalSound to edit function
                         // MODIFIED in 4.27: Pass bellId to edit function
-                        handleEditBellClick(bell.time, bell.name, bell.sound, bell.type, bell.periodName, bell.originalSound, bell.bellId);
+                        // MODIFIED in 4.31: Pass the full bell object
+                        handleEditBellClick(bell);
                         return; // Action handled
                     } else if (target.classList.contains('sound-btn')) {
                         openChangeSoundModal(bell);
@@ -6258,4 +6423,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.30 -->
+<!-- Version 4.31 -->
