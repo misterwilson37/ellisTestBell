@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.33</title>
+    <title>Ellis Web Bell 4.34</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.33</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.34</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1441,7 +1441,10 @@
 
         let isScheduleReady = false; // NEW in 4.33: Flag to start clock
 
-        let keepAliveOscillator = null; // NEW in 4.33 "Anti-sleep" oscillator
+        let keepAliveOscillator = null; // NEW in 4.34: "Anti-sleep" oscillator
+
+        let lastClockCheckTimestamp = 0; // NEW in 4.35: For missed bell recovery
+        let currentDay = new Date().getDay(); // NEW in 4.35: To clear missed bells
 
         // NEW: Audio file state
         let userAudioFiles = []; // { name, url, path }
@@ -1945,6 +1948,19 @@
                 }
             }
     
+            /**
+             * NEW in 4.35: Helper to get a Date object for a bell's time on a specific day.
+             * @param {string} timeString - The HH:MM:SS time of the bell.
+             * @param {Date} referenceDate - The "current" date object (from updateClock).
+             * @returns {Date} A Date object for the bell on the reference day.
+             */
+            function getDateForBellTime(timeString, referenceDate) {
+                const [h, m, s] = timeString.split(':').map(Number);
+                const bellDate = new Date(referenceDate);
+                bellDate.setHours(h, m, s, 0); // Set time, clear milliseconds
+                return bellDate;
+            }
+
             // MODIFIED: v3.22 -> v3.23 - Grammar changes
             function updateClock() {
                 const now = new Date();
@@ -2066,29 +2082,60 @@
                     }
                 }
     
-                // --- 5. Ring Logic (Unchanged) ---
-                const bellToRing = allBells.find(bell => bell.time === currentTimeHHMMSS);
+                // --- 5. Ring Logic (MODIFIED in 4.35: Missed Bell Recovery) ---
                 
-                // MODIFIED: Added cooldown check
-                if (bellToRing && lastBellRingTime !== currentTimeHHMMSS && (nowTimestamp - lastRingTimestamp > RING_COOLDOWN)) {
-                    const bellId = getBellId(bellToRing);
-                    if (mutedBellIds.has(bellId)) {
-                        console.log(`Skipping bell (Muted): ${bellToRing.name}`);
-                        statusElement.textContent = `Skipped (Muted): ${bellToRing.name}`;
-                    } else {
-                        ringBell(bellToRing); // This is fire-and-forget, which is fine
+                // A. Check if the day has rolled over. If so, clear the timestamp.
+                const newDay = now.getDay();
+                if (newDay !== currentDay) {
+                    console.log("Day has changed. Resetting missed bell check.");
+                    lastClockCheckTimestamp = 0; // Force reset
+                    currentDay = newDay;
+                }
+
+                // B. On first run, just set the timestamp and wait for the next second.
+                if (lastClockCheckTimestamp === 0) {
+                    lastClockCheckTimestamp = nowTimestamp;
+                } else if (nowTimestamp > lastClockCheckTimestamp) {
+                    // C. Find all bells that *should have* rung between the last check and now
+                    const bellsToRing = allBells.filter(bell => {
+                        const bellDate = getDateForBellTime(bell.time, now);
+                        const bellTimestamp = bellDate.getTime();
+                        
+                        return bellTimestamp > lastClockCheckTimestamp && // After the last check
+                               bellTimestamp <= nowTimestamp;            // and at or before now
+                    });
+                    
+                    if (bellsToRing.length > 0) {
+                        console.log(`Found ${bellsToRing.length} missed bell(s) to ring.`);
+                        // Sort them just in case
+                        bellsToRing.sort((a, b) => a.time.localeCompare(b.time));
+
+                        // Ring them all, but only if cooldown has passed
+                        if (nowTimestamp - lastRingTimestamp > RING_COOLDOWN) {
+                            // For now, just ring the *last* one if multiple were missed
+                            const bell = bellsToRing[bellsToRing.length - 1];
+                            const bellId = getBellId(bell);
+                            
+                            if (mutedBellIds.has(bellId)) {
+                                console.log(`Skipping bell (Muted): ${bell.name}`);
+                                statusElement.textContent = `Skipped (Muted): ${bell.name}`;
+                            } else {
+                                ringBell(bell); // fire-and-forget
+                            }
+                            lastRingTimestamp = nowTimestamp; // Set cooldown
+                        }
                     }
-                    lastBellRingTime = currentTimeHHMMSS;
-                    lastRingTimestamp = nowTimestamp; // Set cooldown timestamp
                 }
                 
-                // --- NEW: Ring Logic (Quick Bell) ---
+                // D. Always update the timestamp for the next check
+                lastClockCheckTimestamp = nowTimestamp;
+
+                // --- Ring Logic (Quick Bell) ---
                 if (quickBellEndTime && nowTimestamp >= quickBellEndTime.getTime() && (nowTimestamp - lastRingTimestamp > RING_COOLDOWN)) {
                     console.log("Ringing Quick Bell");
                     ringBell({ name: "Quick Bell", sound: quickBellSound });
                     lastRingTimestamp = nowTimestamp; // Set cooldown timestamp
                     quickBellEndTime = null; // Clear the quick bell
-                    lastBellRingTime = null; // Clear schedule bell tracker
                 }
     
                 // MODIFIED: Reset status text logic
@@ -6500,4 +6547,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.33 -->
+<!-- Version 4.34 -->
