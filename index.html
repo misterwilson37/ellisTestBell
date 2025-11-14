@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.40</title>
+    <title>Ellis Web Bell 4.41</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.40</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.41</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2041,8 +2041,11 @@
                 // --- NEW in 4.38: Pre-Bell Wake-up Logic ---
                 // If a bell is approaching (under 60s) and we're not in "alert mode",
                 // start "pulsing" the silent oscillator to keep the browser awake.
-                if (activeTimerMillis < 60000 && !isOscillatorAlert && keepAliveOscillator) {
-                    console.log("Bell approaching. Entering oscillator alert mode.");
+                // MODIFIED in 4.41: Widen window from 60s to 180s (3 minutes)
+                if (activeTimerMillis < 180000 && !isOscillatorAlert && keepAliveOscillator) {
+                    // NEW in 4.41: Added timestamp to log
+                    const nowStr = formatTime12Hour(currentTimeHHMMSS, false);
+                    console.log(`Bell approaching. Entering oscillator alert mode. (Actual: ${nowStr})`);
                     isOscillatorAlert = true;
                     if (oscillatorAlertInterval) clearInterval(oscillatorAlertInterval); // Clear just in case
                     
@@ -2060,8 +2063,11 @@
                     }, 2000);
                 } 
                 // If the next bell is far away and we're still in "alert mode", stop.
-                else if (activeTimerMillis > 60000 && isOscillatorAlert && keepAliveOscillator) {
-                    console.log("Bell has passed. Exiting oscillator alert mode.");
+                // MODIFIED in 4.41: Widen window from 60s to 180s (3 minutes)
+                else if (activeTimerMillis > 180000 && isOscillatorAlert && keepAliveOscillator) {
+                    // NEW in 4.41: Added timestamp to log
+                    const nowStr = formatTime12Hour(currentTimeHHMMSS, false);
+                    console.log(`Bell has passed. Exiting oscillator alert mode. (Actual: ${nowStr})`);
                     isOscillatorAlert = false;
                     if (oscillatorAlertInterval) {
                         clearInterval(oscillatorAlertInterval);
@@ -2145,7 +2151,11 @@
             }
             
             async function ringBell(bell) {
-                console.log("Ringing bell:", bell.name);
+                // NEW in 4.41: Detailed logging for ring accuracy
+                const actualTime = new Date();
+                const actualTimeHHMMSS = `${String(actualTime.getHours()).padStart(2, '0')}:${String(actualTime.getMinutes()).padStart(2, '0')}:${String(actualTime.getSeconds()).padStart(2, '0')}`;
+                console.log(`Ringing bell: "${bell.name}" | Scheduled: ${bell.time} | Actual: ${actualTimeHHMMSS}`);
+                
                 await playBell(bell.sound); // Now awaits the async playBell
                 statusElement.textContent = `Ringing: ${bell.name}`;
                 const safeName = bell.name.replace(/"/g, '&quot;');
@@ -6488,4 +6498,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.40 -->
+<!-- Version 4.41 -->
