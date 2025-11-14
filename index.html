@@ -545,9 +545,10 @@
         <!-- MODIFIED: This card now shows countdown AND current time -->
         <!-- NEW in 4.44: Converted to 2-column grid for Visual Cues -->
         <div class="bg-white rounded-xl shadow-md mb-8 overflow-hidden">
-            <div class="grid grid-cols-1 md:grid-cols-3">
+            <!-- MODIFIED in 4.45: Widened text column to 3/4 on desktop -->
+            <div class="grid grid-cols-1 md:grid-cols-4">
                 <!-- Column 1: Visual Cue -->
-                <div id="visual-cue-container" class="md:col-span-1 bg-gray-800 flex items-center justify-center p-6 min-h-[200px] md:min-h-0">
+                <div id="visual-cue-container" class="md:col-span-1 bg-gray-800 flex items-center justify-center p-6 min-h-[200px] md:min-h-0 overflow-hidden">
                     <!-- Default SVG or Image will be injected here by JS -->
                     <svg id="default-visual-cue" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-gray-500">
                         <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
@@ -555,7 +556,8 @@
                 </div>
                 
                 <!-- Column 2: Countdown / Clock -->
-                <div class="md:col-span-2 p-6 md:p-10">
+                <!-- MODIFIED in 4.45: Changed to col-span-3 -->
+                <div class="md:col-span-3 p-6 md:p-10">
                     <!-- NEW: Restructured countdown/clock -->
                     <div class="text-center">
                         <!-- Line 1: "The time is HH:MM:SS. There are" -->
@@ -2487,7 +2489,8 @@
                 // NEW in 4.44: Get Visual Cue for list icon
                 const visualKey = getVisualOverrideKey(activeBaseScheduleId, originalPeriodName);
                 const visualValue = periodVisualOverrides[visualKey] || "";
-                const visualIconHtml = getVisualHtml(visualValue, originalPeriodName);
+                // MODIFIED in 4.45: Use the new 'Icon' function
+                const visualIconHtml = getVisualIconHtml(visualValue, originalPeriodName);
 
                 let periodHtml = `
                     <details class="group border-b border-gray-200" open>
@@ -2521,9 +2524,9 @@
                                 <button data-period-name="${safePeriodName}" 
                                         data-period-origin="${isOnlyPersonal ? 'custom' : 'shared'}"
                                         class="rename-period-btn px-3 py-1 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                                        title="Rename or set nickname for ${safePeriodName} period"
+                                        title="Edit period details for ${safePeriodName}"
                                         ${isUserAnonymous ? 'style="display: none;"' : ''}>
-                                    Rename
+                                    Edit Period
                                 </button>
     
                                 <span class="hidden sm:inline-block ml-2 text-gray-600">
@@ -5927,6 +5930,51 @@
                 }
                 // Fallback
                 return getDefaultVisualCue(periodName);
+            }
+
+            /**
+             * NEW: v4.45 - Generates default SVG visual cues for *small icons*.
+             * @param {string} periodName - The name of the period.
+             * @returns {string} An HTML string for an SVG tag.
+             */
+            function getDefaultVisualCueIcon(periodName) {
+                const p = periodName.toLowerCase();
+                let svgContent = '';
+                
+                if (p.includes('lunch')) {
+                    // Fork and Knife for Lunch
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5V12.97c2.09-.13 3.75-1.85 3.75-3.97V2h-2v7zm5-3v8h2.5v10h2.5V2h-5z"/></svg>`;
+                } else if (p.includes('passing') || p.includes('between')) {
+                    // "Walk" sign for passing periods
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M14.5 4.5c0-1.38-1.12-2.5-2.5-2.5S9.5 3.12 9.5 4.5 10.62 7 12 7s2.5-1.12 2.5-2.5zM15 22v-6h1.5v-5.5c0-1.1-.9-2-2-2h-5c-1.1 0-2 .9-2 2V16H9v6h6z"/></svg>`;
+                } else {
+                    // Default: Number or Letter
+                    const match = p.match(/(\d+)(?:st|nd|rd|th)?|([a-z])/);
+                    let text = '?';
+                    if (match) {
+                        text = (match[1] || match[2]).toUpperCase();
+                    }
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor">${text}</text></svg>`;
+                }
+                
+                // Return as a full HTML string for injection (with small padding)
+                return `<div class="w-full h-full p-1.5 text-gray-400">${svgContent}</div>`;
+            }
+
+            /**
+             * NEW: v4.45 - Gets the HTML for a *small icon* visual cue.
+             */
+            function getVisualIconHtml(value, periodName) {
+                if (!value) {
+                    return getDefaultVisualCueIcon(periodName);
+                }
+                if (value.startsWith('[DEFAULT]')) {
+                    return getDefaultVisualCueIcon(value.replace('[DEFAULT] ', ''));
+                }
+                if (value.startsWith('http')) {
+                    return `<img src="${value}" alt="Icon" class="w-full h-full object-cover">`;
+                }
+                return getDefaultVisualCueIcon(periodName);
             }
     
             /**
