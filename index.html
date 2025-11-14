@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.45</title>
+    <title>Ellis Web Bell 4.46</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.45</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.46</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1004,7 +1004,8 @@
                     </select>
                 </div>
                 
-                <div id="edit-period-image-preview" class="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 mb-4">
+                <!-- MODIFIED in 4.46: Changed h-32 to aspect-square for a square preview -->
+                <div id="edit-period-image-preview" class="w-full aspect-square max-h-48 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 mb-4">
                     <span class="text-gray-400">Image Preview</span>
                 </div>
                 
@@ -2496,7 +2497,8 @@
                     <details class="group border-b border-gray-200" open>
                         <summary class="flex items-start justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                             <!-- NEW in 4.44: Small Visual Cue Icon -->
-                            <div class="period-visual-cue-icon w-10 h-10 bg-gray-800 rounded-full flex-shrink-0 flex items-center justify-center mr-3 overflow-hidden">
+                            <!-- MODIFIED in 4.46: Changed from rounded-full to rounded-lg -->
+                            <div class="period-visual-cue-icon w-10 h-10 bg-gray-800 rounded-lg flex-shrink-0 flex items-center justify-center mr-3 overflow-hidden">
                                 ${visualIconHtml}
                             </div>
                         
@@ -5562,11 +5564,12 @@
                 if (userVisualFiles.length === 0) {
                     myVisualFilesList.innerHTML = '<p class="text-gray-500 col-span-full">You have not uploaded any visuals.</p>';
                 } else {
-                    myVisualFilesList.innerHTML = userVisualFiles.map(file => {
+                   myVisualFilesList.innerHTML = userVisualFiles.map(file => {
                         const isShared = sharedVisualFiles.some(sharedFile => sharedFile.name === file.name);
                         return `
                         <div class="relative group border rounded-lg overflow-hidden shadow-sm">
-                            <img src="${file.url}" alt="${file.name}" class="w-full h-24 object-contain bg-gray-100" loading="lazy">
+                            <!-- MODIFIED in 4.46: Changed h-24 to aspect-square for a square preview -->
+                            <img src="${file.url}" alt="${file.name}" class="w-full aspect-square object-contain bg-gray-100" loading="lazy">
                             <p class="text-xs text-gray-700 p-2 truncate" title="${file.name}">${file.name}</p>
                             <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-2">
                                 ${!isShared && isAdmin ? `<button class="make-visual-public-btn text-xs px-2 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 w-full" data-path="${file.path}" data-name="${file.name}">Make Public</button>` : ''}
@@ -5583,7 +5586,8 @@
                 } else {
                     sharedVisualFilesList.innerHTML = sharedVisualFiles.map(file => `
                         <div class="relative group border rounded-lg overflow-hidden shadow-sm">
-                            <img src="${file.url}" alt="${file.name}" class="w-full h-24 object-contain bg-gray-100" loading="lazy">
+                            <!-- MODIFIED in 4.46: Changed h-24 to aspect-square for a square preview -->
+                            <img src="${file.url}" alt="${file.name}" class="w-full aspect-square object-contain bg-gray-100" loading="lazy">
                             <p class="text-xs text-gray-700 p-2 truncate" title="${file.name}">${file.name}</p>
                             <p class="text-xs text-gray-500 px-2 pb-2 truncate" title="Owner: ${file.owner}">(by ${file.owner})</p>
                             <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-2">
@@ -5926,7 +5930,8 @@
                 }
                 if (value.startsWith('http')) {
                     // Case 3: It's an uploaded image URL
-                    return `<img src="${value}" alt="Visual Cue" class="w-full h-full object-contain">`;
+                    // MODIFIED in 4.46: Force to a large square, not w-full h-full
+                    return `<img src="${value}" alt="Visual Cue" class="w-32 h-32 sm:w-48 sm:h-48 object-contain">`;
                 }
                 // Fallback
                 return getDefaultVisualCue(periodName);
@@ -5957,8 +5962,9 @@
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor">${text}</text></svg>`;
                 }
                 
-                // Return as a full HTML string for injection (with small padding)
-                return `<div class="w-full h-full p-1.5 text-gray-400">${svgContent}</div>`;
+                // Return as a full HTML string for injection
+                // MODIFIED in 4.46: Force to a large square, not w-full h-full
+                return `<div class="w-32 h-32 sm:w-48 sm:h-48 p-4 text-gray-400">${svgContent}</div>`;
             }
 
             /**
@@ -7355,4 +7361,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.45 -->
+<!-- Version 4.46 -->
