@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.43</title>
+    <title>Ellis Web Bell 4.45</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.43</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.45</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -543,31 +543,46 @@
         </header>
 
         <!-- MODIFIED: This card now shows countdown AND current time -->
-        <div class="bg-white p-6 md:p-10 rounded-xl shadow-md mb-8">
-            <!-- NEW: Restructured countdown/clock -->
-            <div class="text-center">
-                <!-- Line 1: "The time is HH:MM:SS. There are" -->
-                <div id="live-clock-sentence" class="text-2xl font-medium text-gray-600 tabular-nums">
-                    Loading...
+        <!-- NEW in 4.44: Converted to 2-column grid for Visual Cues -->
+        <div class="bg-white rounded-xl shadow-md mb-8 overflow-hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3">
+                <!-- Column 1: Visual Cue -->
+                <div id="visual-cue-container" class="md:col-span-1 bg-gray-800 flex items-center justify-center p-6 min-h-[200px] md:min-h-0">
+                    <!-- Default SVG or Image will be injected here by JS -->
+                    <svg id="default-visual-cue" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-gray-500">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
                 </div>
-                <!-- Line 2: "HH:MM:SS" (countdown) -->
-                <div id="countdown-display" class="text-6xl md:text-8xl font-bold text-gray-800 tabular-nums my-2">
-                    --:--
+                
+                <!-- Column 2: Countdown / Clock -->
+                <div class="md:col-span-2 p-6 md:p-10">
+                    <!-- NEW: Restructured countdown/clock -->
+                    <div class="text-center">
+                        <!-- Line 1: "The time is HH:MM:SS. There are" -->
+                        <div id="live-clock-sentence" class="text-2xl font-medium text-gray-600 tabular-nums">
+                        Loading...
+                    </div>
+                    <!-- Line 2: "HH:MM:SS" (countdown) -->
+                    <div id="countdown-display" class="text-6xl md:text-8xl font-bold text-gray-800 tabular-nums my-2">
+                        --:--
+                    </div>
+                    <!-- Line 3: "until XXBELLXX" -->
+                    <div id="next-bell-sentence" class="text-2xl font-medium text-gray-600">
+                        until the next bell.
+                    </div>
+                    <!-- MODIFIED: v3.21 -> v3.22 - This line's content logic is updated -->
+                    <div id="next-bell-info" class="text-lg text-gray-500 mt-2">
+                        <!-- JS will populate this -->
+                    </div>
                 </div>
-                <!-- Line 3: "until XXBELLXX" -->
-                <div id="next-bell-sentence" class="text-2xl font-medium text-gray-600">
-                    until the next bell.
-                </div>
-                <!-- MODIFIED: v3.21 -> v3.22 - This line's content logic is updated -->
-                <div id="next-bell-info" class="text-lg text-gray-500 mt-2">
-                    <!-- JS will populate this -->
-                </div>
-            </div>
 
-            <!-- Status messages remain -->
-            <div class="text-center text-gray-500 text-lg mt-6"> <!-- Added more margin -->
-                Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
-            </div>
+                <!-- Status messages remain -->
+                <div class="text-center text-gray-500 text-lg mt-6"> <!-- Added more margin -->
+                    Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
+                </div>
+            
+            </div> <!-- NEW in 4.44: Close col-span-2 div -->
+        </div> <!-- NEW in 4.44: Close grid div -->
 
             <!-- DELETED: Old Mute Controls -->
 
@@ -950,29 +965,52 @@
             </div>
         </div>
         
-        <!-- NEW: v4.03 - Rename Period Modal -->
-        <div id="rename-period-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="rename-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
-                <h3 class="text-2xl font-medium mb-6">Rename Period</h3>
+        <!-- DELETED in 4.44: Replaced by 'edit-period-details-modal' -->
+        <!-- <div id="rename-period-modal" ...> ... </div> -->
+
+        <!-- **** NEW: v4.44 - Confirm Delete VISUAL Modal **** -->
+        <div id="confirm-delete-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+                <h3 class="text-xl font-medium mb-4">Delete Visual File</h3>
+                <p id="confirm-delete-visual-text" class="text-gray-700 mb-6">Are you sure you want to delete this visual? Any periods using it will revert to the default.</p>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="delete-visual-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="delete-visual-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete Anyway</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- **** NEW: v4.44 - Edit Period Details Modal (Replaces Rename Modal) **** -->
+        <div id="edit-period-details-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <form id="edit-period-details-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+                <h3 class="text-2xl font-medium mb-6">Edit Period Details</h3>
                 
                 <p class="text-gray-700 mb-4">
-                    You are renaming the period: <strong id="rename-period-old-name">...</strong>
+                    Original Name: <strong id="edit-period-old-name">...</strong>
                 </p>
                 
-                <div>
-                    <!-- MODIFIED in 4.20: Unique ID for label 'for' -->
-                    <label for="rename-period-new-name" class="block text-sm font-medium text-gray-700">New Period Name</label>
-                    <!-- MODIFIED in 4.20: Unique ID -->
-                    <input type="text" id="rename-period-new-name" placeholder="e.g. My Science Block" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="mb-4">
+                    <label for="edit-period-new-name" class="block text-sm font-medium text-gray-700">Period Nickname</label>
+                    <input type="text" id="edit-period-new-name" placeholder="e.g. My Science Block" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 
-                <!-- MODIFIED in 4.20: Unique ID -->
-                <p id="rename-period-status-msg" class="text-blue-600 text-sm mt-4 hidden"></p>
-    
+                <div class="mb-4">
+                    <label for="edit-period-image-select" class="block text-sm font-medium text-gray-700">Visual Cue</label>
+                    <select id="edit-period-image-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- Options populated by JS -->
+                        <option value="">Loading visuals...</option>
+                    </select>
+                </div>
+                
+                <div id="edit-period-image-preview" class="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 mb-4">
+                    <span class="text-gray-400">Image Preview</span>
+                </div>
+                
+                <p id="edit-period-status-msg" class="text-blue-600 text-sm mt-4 hidden"></p>
+
                 <div class="mt-6 flex justify-end gap-3">
-                    <!-- MODIFIED in 4.20: Unique ID -->
-                    <button type="button" id="rename-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Name</button>
+                    <button type="button" id="edit-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -1089,6 +1127,47 @@
                     <h3 class="text-lg font-medium text-gray-800 mb-2">Shared Audio Files</h3>
                     <div id="shared-audio-files-list" class="space-y-2">
                         <p class="text-gray-500">Loading...</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- **** NEW: v4.44 - Visual Manager Panel **** -->
+        <div id="visual-manager-panel" class="auth-required mt-12">
+            <h2 class="text-2xl font-semibold mb-4 cursor-pointer" title="Click to refresh file lists">My Visual Manager</h2>
+            <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
+                
+                <!-- Visual Upload Form -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">Upload New Visual File</h3>
+                    <p class="text-sm text-gray-600 mb-4">Files must be under 1MB. (Supports .png, .jpg, .svg, .gif)</p>
+                    <input type="file" id="visual-upload-input" accept="image/*">
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <label for="visual-upload-input" class="w-full sm:w-auto cursor-pointer px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors text-center">
+                            Choose File...
+                        </label>
+                        <span id="visual-file-name" class="text-gray-700 sm:mt-2">No file chosen.</span>
+                    </div>
+                    <button type="button" id="visual-upload-btn" class="mt-3 w-full sm:w-auto px-6 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50" disabled>
+                        Upload Visual
+                    </button>
+                    <p id="visual-upload-status" class="text-blue-600 text-sm mt-3 hidden"></p>
+                </div>
+
+                <!-- My Visual Files List -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">My Visuals</h3>
+                    <div id="my-visual-files-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        <p class="text-gray-500 col-span-full">Loading...</p>
+                    </div>
+                </div>
+
+                <!-- Shared Visual Files List -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-medium text-gray-800 mb-2">Shared Visuals</h3>
+                    <div id="shared-visual-files-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        <p class="text-gray-500 col-span-full">Loading...</p>
                     </div>
                 </div>
 
@@ -1248,14 +1327,14 @@
         const deleteBellConfirmBtn = document.getElementById('delete-bell-confirm');
         const deleteBellCancelBtn = document.getElementById('delete-bell-cancel');
         
-        // Rename Period Modal
-        const renamePeriodModal = document.getElementById('rename-period-modal');
-        const renamePeriodForm = document.getElementById('rename-period-form');
-        // MODIFIED in 4.20: Use unique IDs to avoid conflict with Rename Schedule Modal
-        const renamePeriodOldName = document.getElementById('rename-period-old-name');
-        const renamePeriodNewNameInput = document.getElementById('rename-period-new-name');
-        const renamePeriodStatusMsg = document.getElementById('rename-period-status-msg');
-        const renamePeriodCancelBtn = document.getElementById('rename-period-cancel-btn');
+        // DELETED in 4.44: Variables for old rename-period-modal
+        // Replaced by edit-period-details-modal variables
+        // const renamePeriodModal = ...
+        // const renamePeriodForm = ...
+        // const renamePeriodOldName = ...
+        // const renamePeriodNewNameInput = ...
+        // const renamePeriodStatusMsg = ...
+        // const renamePeriodCancelBtn = ...
 
         // NEW: v4.22 - User Message Modal
         const userMessageModal = document.getElementById('user-message-modal');
@@ -1276,6 +1355,29 @@
         const multiAddRelativePeriodList = document.getElementById('multi-add-relative-period-list');
         const multiAddRelativeStatus = document.getElementById('multi-add-relative-status');
         const multiAddRelativeCancelBtn = document.getElementById('multi-add-relative-cancel');
+
+        // NEW in 4.44: Visual Cue Manager
+        const visualCueContainer = document.getElementById('visual-cue-container');
+        const visualUploadInput = document.getElementById('visual-upload-input');
+        const visualFileName = document.getElementById('visual-file-name');
+        const visualUploadBtn = document.getElementById('visual-upload-btn');
+        const visualUploadStatus = document.getElementById('visual-upload-status');
+        const myVisualFilesList = document.getElementById('my-visual-files-list');
+        const sharedVisualFilesList = document.getElementById('shared-visual-files-list');
+        const confirmDeleteVisualModal = document.getElementById('confirm-delete-visual-modal');
+        const confirmDeleteVisualText = document.getElementById('confirm-delete-visual-text');
+        const deleteVisualCancelBtn = document.getElementById('delete-visual-cancel');
+        const deleteVisualConfirmBtn = document.getElementById('delete-visual-confirm');
+
+        // NEW in 4.44: Edit Period Details Modal (Replaces Rename Period Modal)
+        const editPeriodModal = document.getElementById('edit-period-details-modal');
+        const editPeriodForm = document.getElementById('edit-period-details-form');
+        const editPeriodOldName = document.getElementById('edit-period-old-name');
+        const editPeriodNewNameInput = document.getElementById('edit-period-new-name');
+        const editPeriodImageSelect = document.getElementById('edit-period-image-select');
+        const editPeriodImagePreview = document.getElementById('edit-period-image-preview');
+        const editPeriodStatusMsg = document.getElementById('edit-period-status-msg');
+        const editPeriodCancelBtn = document.getElementById('edit-period-cancel-btn');
 
         // Orphan Modal (v4.12.2)
         const orphanHandlingModal = document.getElementById('orphan-handling-modal');
@@ -1491,6 +1593,14 @@
         let userAudioFiles = []; // { name, url, path }
         let sharedAudioFiles = []; // { name, url, path }
         let fileToUpload = null; // Holds the File object
+        
+        // NEW in 4.44: Visual File State
+        let userVisualFiles = []; // { name, url, path }
+        let sharedVisualFiles = []; // { name, url, path }
+        let visualFileToUpload = null; // Holds the Image File object
+        let visualToDelete = null; // State for visual deletion
+        let periodVisualOverrides = {}; // Store local visual cue choices
+
         const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
         // --- Mute Helper Functions ---
@@ -1576,6 +1686,33 @@
                 localStorage.setItem('periodNameOverrides', JSON.stringify(periodNameOverrides));
             } catch (e) {
                 console.error("Failed to save period nicknames", e);
+            }
+        }
+
+        // --- NEW in 4.44: Period Visual Override Functions ---
+        function getVisualOverrideKey(scheduleId, originalPeriodName) {
+            if (!scheduleId || !originalPeriodName) return null;
+            return `${scheduleId}-${originalPeriodName}`;
+        }
+
+        function loadVisualOverrides() {
+            try {
+                const stored = localStorage.getItem('periodVisualOverrides');
+                if (stored) {
+                    periodVisualOverrides = JSON.parse(stored);
+                    console.log(`Loaded ${Object.keys(periodVisualOverrides).length} period visual overrides.`);
+                }
+            } catch (e) {
+                console.error("Failed to load visual overrides", e);
+                periodVisualOverrides = {};
+            }
+        }
+
+        function saveVisualOverrides() {
+            try {
+                localStorage.setItem('periodVisualOverrides', JSON.stringify(periodVisualOverrides));
+            } catch (e) {
+                console.error("Failed to save visual overrides", e);
             }
         }
 
@@ -2225,6 +2362,34 @@
                     lastBellRingTime = null;
                     if (isAudioReady) statusElement.textContent = "Monitoring...";
                 }
+
+                // --- NEW in 4.44: Update Visual Cue ---
+                try {
+                    // Find the *current* period based on the countdown
+                    const currentPeriod = (activeTimerMillis < millisToScheduleBell) 
+                        ? null // It's a Quick Bell, no period
+                        : (scheduleBellObject ? calculatedPeriodsList.find(p => p.name === scheduleBellObject.periodName) : null);
+
+                    let visualHtml = '';
+                    if (currentPeriod) {
+                        const visualKey = getVisualOverrideKey(activeBaseScheduleId, currentPeriod.name);
+                        const visualValue = periodVisualOverrides[visualKey] || "";
+                        visualHtml = getVisualHtml(visualValue, currentPeriod.name);
+                    } else if (millisToQuickBell < Infinity) {
+                        // Special icon for Quick Bell
+                        visualHtml = `<div class="w-full h-full p-8 text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg></div>`;
+                    } else {
+                        // Default / Passing Period
+                        visualHtml = getDefaultVisualCue("Passing Period");
+                    }
+                    
+                    // Inject into main container
+                    if (visualCueContainer.innerHTML !== visualHtml) {
+                        visualCueContainer.innerHTML = visualHtml;
+                    }
+                } catch (e) {
+                    console.error("Error updating visual cue:", e);
+                }
             }
             
             // --- NEW: Quick Bell Function ---
@@ -2319,12 +2484,23 @@
                 const displayPeriodName = periodNameOverrides[overrideKey] || originalPeriodName;
                 const titleAttr = displayPeriodName !== originalPeriodName ? `title="Original: ${originalPeriodName}"` : '';
 
+                // NEW in 4.44: Get Visual Cue for list icon
+                const visualKey = getVisualOverrideKey(activeBaseScheduleId, originalPeriodName);
+                const visualValue = periodVisualOverrides[visualKey] || "";
+                const visualIconHtml = getVisualHtml(visualValue, originalPeriodName);
+
                 let periodHtml = `
                     <details class="group border-b border-gray-200" open>
-                        <summary class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
-                            <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2 sm:mb-0">
-                                <span class="text-xl font-bold text-gray-800" ${titleAttr}>${displayPeriodName}</span>
-                                <!-- MODIFIED in 4.29: Use 'period.origin' and only show "CUSTOM" for periods created by the user -->
+                        <summary class="flex items-start justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <!-- NEW in 4.44: Small Visual Cue Icon -->
+                            <div class="period-visual-cue-icon w-10 h-10 bg-gray-800 rounded-full flex-shrink-0 flex items-center justify-center mr-3 overflow-hidden">
+                                ${visualIconHtml}
+                            </div>
+                        
+                            <div class="flex-grow flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2 sm:mb-0">
+                                    <span class="text-xl font-bold text-gray-800" ${titleAttr}>${displayPeriodName}</span>
+                                    <!-- MODIFIED in 4.29: Use 'period.origin' and only show "CUSTOM" for periods created by the user -->
                                 ${period.origin === 'personal' ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full" title="This is a custom period you created.">CUSTOM</span>' : ''}
                                 <span class="text-gray-600 text-sm mt-1 sm:mt-0">${firstBellTime} - ${lastBellTime}</span>
                             </div>
@@ -2355,8 +2531,9 @@
                                     <span class="group-open:inline-block hidden">&#9650;</span>
                                 </span>
                             </div>
-                        </summary>
-                        <div class="p-0">
+                        </div> <!-- NEW in 4.44: Close flex-grow wrapper -->
+                    </summary>
+                    <div class="p-0">
                     `;
     
                     // ... (Render Bells inside the Period) ...
@@ -3254,6 +3431,10 @@
                                 renderAudioFileManager();
                                 updateSoundDropdowns();
                             }
+
+                            // NEW in 4.44: Load Visuals
+                            loadVisualOverrides();
+                            await loadAllVisualFiles();
                             
                             if (isAudioReady) {
                                 statusElement.textContent = "Connected. Monitoring bells...";
@@ -4781,8 +4962,13 @@
                     });
                 }
                 
-                // Return the updated array (now sorted by the first bell time)
-                return sortPeriodsByFirstBell(updatedPeriods);
+                // Return the updated array (unsorted)
+                // DELETED in 4.45: This sort is invalid.
+                // It was trying to sort periods, but a newly-added relative bell
+                // has no 'time' property, causing the 'a.time.localeCompare' error.
+                // The main calculation engine will handle sorting *after* times are calculated.
+                // return sortPeriodsByFirstBell(updatedPeriods);
+                return updatedPeriods;
             }
     
             /**
@@ -5258,142 +5444,489 @@
                 }
             }
             
+            // --- NEW in 4.44: Visual File Management Functions ---
+            
             /**
-             * NEW: v4.03 - Opens the Rename Period Modal.
-             * @param {string} periodName - The name of the period to rename.
-             * @param {string} periodOrigin - 'custom' or 'shared'. (NEW in 4.27.1)
+             * NEW: v4.44 - Handles selection of a visual file.
              */
-            function handleRenamePeriodClick(periodName, periodOrigin) { // MODIFIED in 4.27.1
-                // MODIFIED in 4.22: Removed permission check, added anonymous check.
+            function handleVisualFileSelected(e) {
+                const file = e.target.files[0];
+                if (!file) {
+                    visualFileName.textContent = "No file chosen.";
+                    visualUploadBtn.disabled = true;
+                    visualFileToUpload = null;
+                    return;
+                }
+                if (file.size > MAX_FILE_SIZE) {
+                    visualFileName.textContent = `File is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 1MB.`;
+                    visualFileName.classList.add('text-red-600');
+                    visualUploadBtn.disabled = true;
+                    visualFileToUpload = null;
+                    return;
+                }
+                visualFileToUpload = file;
+                visualFileName.textContent = file.name;
+                visualFileName.classList.remove('text-red-600');
+                visualUploadBtn.disabled = false;
+            }
+
+            /**
+             * NEW: v4.44 - Uploads the selected visual file.
+             */
+            async function handleVisualUpload() {
+                if (!visualFileToUpload || isUserAnonymous || !userId) {
+                    console.error("No file or user not logged in.");
+                    return;
+                }
+                visualUploadBtn.disabled = true;
+                visualUploadStatus.textContent = `Uploading ${visualFileToUpload.name}...`;
+                visualUploadStatus.classList.remove('hidden');
+
+                try {
+                    const storageRef = ref(storage, `visuals/users/${userId}/${visualFileToUpload.name}`);
+                    const metadata = {
+                        contentType: visualFileToUpload.type,
+                        customMetadata: {
+                            'owner': userId,
+                            'ownerEmail': auth.currentUser.email || 'unknown'
+                        }
+                    };
+                    await uploadBytes(storageRef, visualFileToUpload, metadata);
+                    visualUploadStatus.textContent = "Upload successful! Refreshing list...";
+                    visualFileToUpload = null;
+                    visualUploadInput.value = '';
+                    visualFileName.textContent = "No file chosen.";
+                    await loadAllVisualFiles();
+                    setTimeout(() => visualUploadStatus.classList.add('hidden'), 3000);
+                } catch (error) {
+                    console.error("Visual upload failed:", error);
+                    visualUploadStatus.textContent = `Upload failed: ${error.message}`;
+                } finally {
+                    visualUploadBtn.disabled = false;
+                }
+            }
+
+            /**
+             * NEW: v4.44 - Loads all visual files (user and shared).
+             */
+            async function loadAllVisualFiles() {
+                // 1. Load User's Private Files
+                if (!isUserAnonymous && userId) {
+                    myVisualFilesList.innerHTML = '<p class="text-gray-500 col-span-full">Loading my visuals...</p>';
+                    const userFolderRef = ref(storage, `visuals/users/${userId}`);
+                    try {
+                        const userFilesResult = await listAll(userFolderRef);
+                        userVisualFiles = await Promise.all(userFilesResult.items.map(async (itemRef) => {
+                            const url = await getDownloadURL(itemRef);
+                            return { name: itemRef.name, url: url, path: itemRef.fullPath };
+                        }));
+                    } catch (e) { 
+                        console.error("Error loading user visuals:", e); 
+                        userVisualFiles = [];
+                    }
+                } else {
+                    userVisualFiles = [];
+                }
+
+                // 2. Load Public/Shared Files
+                sharedVisualFilesList.innerHTML = '<p class="text-gray-500 col-span-full">Loading shared visuals...</p>';
+                const publicFolderRef = ref(storage, 'visuals/public');
+                try {
+                    const publicFilesResult = await listAll(publicFolderRef);
+                    sharedVisualFiles = await Promise.all(publicFilesResult.items.map(async (itemRef) => {
+                        const url = await getDownloadURL(itemRef);
+                        const meta = await getMetadata(itemRef);
+                        const owner = meta.customMetadata?.ownerEmail || 'unknown';
+                        return { name: itemRef.name, url: url, path: itemRef.fullPath, owner: owner };
+                    }));
+                } catch (e) { 
+                    console.error("Error loading shared visuals:", e); 
+                    sharedVisualFiles = [];
+                }
+
+                // 3. Render the lists
+                renderVisualFileManager();
+                // 4. Update dropdowns
+                updateVisualDropdowns(); 
+            }
+
+            /**
+             * NEW: v4.44 - Renders the visual file manager lists.
+             */
+            function renderVisualFileManager() {
+                const isAdmin = document.body.classList.contains('admin-mode');
+                // Render My Files
+                if (userVisualFiles.length === 0) {
+                    myVisualFilesList.innerHTML = '<p class="text-gray-500 col-span-full">You have not uploaded any visuals.</p>';
+                } else {
+                    myVisualFilesList.innerHTML = userVisualFiles.map(file => {
+                        const isShared = sharedVisualFiles.some(sharedFile => sharedFile.name === file.name);
+                        return `
+                        <div class="relative group border rounded-lg overflow-hidden shadow-sm">
+                            <img src="${file.url}" alt="${file.name}" class="w-full h-24 object-contain bg-gray-100" loading="lazy">
+                            <p class="text-xs text-gray-700 p-2 truncate" title="${file.name}">${file.name}</p>
+                            <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-2">
+                                ${!isShared && isAdmin ? `<button class="make-visual-public-btn text-xs px-2 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 w-full" data-path="${file.path}" data-name="${file.name}">Make Public</button>` : ''}
+                                ${isShared ? `<span class="text-xs font-medium text-white">(Published)</span>` : ''}
+                                <button class="delete-visual-btn text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 w-full" data-path="${file.path}" data-url="${file.url}">Delete</button>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+                
+                // Render Shared Files
+                if (sharedVisualFiles.length === 0) {
+                    sharedVisualFilesList.innerHTML = '<p class="text-gray-500 col-span-full">No shared visuals are available.</p>';
+                } else {
+                    sharedVisualFilesList.innerHTML = sharedVisualFiles.map(file => `
+                        <div class="relative group border rounded-lg overflow-hidden shadow-sm">
+                            <img src="${file.url}" alt="${file.name}" class="w-full h-24 object-contain bg-gray-100" loading="lazy">
+                            <p class="text-xs text-gray-700 p-2 truncate" title="${file.name}">${file.name}</p>
+                            <p class="text-xs text-gray-500 px-2 pb-2 truncate" title="Owner: ${file.owner}">(by ${file.owner})</p>
+                            <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-2">
+                                ${isAdmin ? `<button class="delete-visual-btn text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 w-full" data-path="${file.path}" data-url="${file.url}">Delete</button>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            /**
+             * NEW: v4.44 - Handles clicks in the visual manager list (delete, make public).
+             */
+            async function handleVisualListClick(e) {
+                const target = e.target;
+                
+                // Handle Delete
+                if (target.classList.contains('delete-visual-btn')) {
+                    const path = target.dataset.path;
+                    const url = target.dataset.url;
+                    if (!path || !url) return;
+                    
+                    visualToDelete = { path, url };
+                    // TODO: Check if visual is in use
+                    confirmDeleteVisualText.textContent = "Are you sure you want to delete this visual? Any periods using it will revert to the default.";
+                    confirmDeleteVisualModal.classList.remove('hidden');
+                }
+                
+                // Handle Make Public
+                if (target.classList.contains('make-visual-public-btn')) {
+                    if (!document.body.classList.contains('admin-mode')) return;
+                    
+                    const sourcePath = target.dataset.path;
+                    const fileName = target.dataset.name;
+                    const destPath = `visuals/public/${fileName}`;
+                    
+                    target.disabled = true;
+                    target.textContent = "Publishing...";
+                    
+                    try {
+                        const sourceRef = ref(storage, sourcePath);
+                        const destRef = ref(storage, destPath);
+                        const metadata = await getMetadata(sourceRef);
+                        const bytes = await getBytes(sourceRef);
+                        
+                        const publicMetadata = { 
+                            contentType: metadata.contentType,
+                            customMetadata: metadata.customMetadata || { 'owner': userId, 'ownerEmail': auth.currentUser.email || 'unknown' } 
+                        };
+                        
+                        await uploadBytes(destRef, bytes, publicMetadata);
+                        
+                        visualUploadStatus.textContent = `${fileName} is now public.`;
+                        visualUploadStatus.classList.remove('hidden');
+                        await loadAllVisualFiles();
+                        setTimeout(() => visualUploadStatus.classList.add('hidden'), 3000);
+            
+                    } catch(error) {
+                        console.error("Failed to make visual public:", error);
+                        visualUploadStatus.textContent = `Error: ${error.message}`;
+                        visualUploadStatus.classList.remove('hidden');
+                        target.disabled = false;
+                        target.textContent = "Make Public";
+                    }
+                }
+            }
+            
+            /**
+             * NEW: v4.44 - Executes the deletion of the visual file.
+             */
+            async function confirmDeleteVisual() {
+                if (!visualToDelete) return;
+                const { path, url } = visualToDelete;
+                
+                if (path.startsWith('visuals/public') && !document.body.classList.contains('admin-mode')) {
+                    console.error("Permission denied to delete shared visual.");
+                    return;
+                }
+
+                try {
+                    visualUploadStatus.textContent = "Deleting file...";
+                    visualUploadStatus.classList.remove('hidden');
+                    
+                    const fileRef = ref(storage, path);
+                    await deleteObject(fileRef);
+                    
+                    // NEW in 4.44: Update all periods using this visual
+                    let clearedCount = 0;
+                    for (const key in periodVisualOverrides) {
+                        if (periodVisualOverrides[key] === url) {
+                            delete periodVisualOverrides[key];
+                            clearedCount++;
+                        }
+                    }
+                    if (clearedCount > 0) {
+                        saveVisualOverrides();
+                        console.log(`Cleared ${clearedCount} visual overrides that used the deleted file.`);
+                    }
+                    
+                    visualUploadStatus.textContent = "File deleted.";
+                    await loadAllVisualFiles();
+                
+                } catch (error) {
+                    console.error("Failed to delete visual:", error);
+                    visualUploadStatus.textContent = `Error: ${error.message}`;
+                } finally {
+                    confirmDeleteVisualModal.classList.add('hidden');
+                    visualToDelete = null;
+                    setTimeout(() => visualUploadStatus.classList.add('hidden'), 3000);
+                }
+            }
+
+            // --- END: v4.44 Visual File Management Functions ---
+            
+            // DELETED in 4.44: Replaced by openEditPeriodModal
+            // function handleRenamePeriodClick(periodName, periodOrigin) { ... }
+    
+            // DELETED in 4.44: Replaced by handleSubmitEditPeriodDetails (coming next)
+            // async function handleRenamePeriodSubmit(e) { ... }
+            
+            /**
+             * NEW: v4.44 - Opens the new "Edit Period Details" modal.
+             * This replaces the old handleRenamePeriodClick function.
+             */
+            function openEditPeriodModal(periodName, periodOrigin) {
                 if (isUserAnonymous) {
-                    showUserMessage("Please sign in to rename periods or set nicknames.");
+                    showUserMessage("Please sign in to edit period details.");
                     return;
                 }
                 
                 // Determine if we are on a personal schedule
                 const isOnPersonalSchedule = !!activePersonalScheduleId;
-    
-                // MODIFIED in 4.27.1: This logic is now correct.
-                // If we are on a personal schedule AND the period is a 'custom' one,
-                // the type is 'personal' (destructive rename).
-                // In ALL other cases, it's a 'shared' type (nickname).
                 const finalType = (isOnPersonalSchedule && periodOrigin === 'custom') ? 'personal' : 'shared';
                 
+                // Store state for the submit handler
                 currentRenamingPeriod = {
                     name: periodName,
                     type: finalType 
                 };
     
                 // Populate modal
-                const modalTitle = renamePeriodModal.querySelector('h3');
-                const renameInput = document.getElementById('rename-period-new-name');
-
-                // MODIFIED in 4.33: Check finalType, not isOnPersonalSchedule,
-                // to correctly show "Set Period Nickname" for shared periods.
+                const modalTitle = editPeriodModal.querySelector('h3');
+                
                 if (finalType === 'personal') {
-                    modalTitle.textContent = "Rename Period";
-                    renameInput.placeholder = "e.g. Mini-Planning Period (1)";
+                    modalTitle.textContent = "Edit Period Details";
+                    editPeriodNewNameInput.placeholder = "e.g. My Custom Period";
                 } else {
-                    modalTitle.textContent = "Set Period Nickname";
-                    renameInput.placeholder = "e.g. Thorfth Period";
+                    modalTitle.textContent = "Set Period Nickname & Visual";
+                    editPeriodNewNameInput.placeholder = "e.g. 1st Period";
                 }
 
-                // MODIFIED in 4.20: Use new unique variable names
-                renamePeriodOldName.textContent = periodName;
+                editPeriodOldName.textContent = periodName;
                 
-                // NEW in 4.22: Check for existing override to populate input
+                // Check for existing nickname override
                 const overrideKey = getPeriodOverrideKey(activeBaseScheduleId, periodName);
-                renamePeriodNewNameInput.value = periodNameOverrides[overrideKey] || periodName;
+                editPeriodNewNameInput.value = periodNameOverrides[overrideKey] || periodName;
 
-                renamePeriodStatusMsg.classList.add('hidden');
+                // NEW in 4.44: Populate Visual Cue dropdown
+                updateVisualDropdowns(); // Ensure list is fresh
                 
-                renamePeriodModal.classList.remove('hidden');
+                // Get saved visual
+                const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
+                const savedVisual = periodVisualOverrides[visualKey] || "";
+                editPeriodImageSelect.value = savedVisual;
+                
+                // Show preview
+                editPeriodImagePreview.innerHTML = getVisualHtml(savedVisual, periodName);
+                
+                editPeriodStatusMsg.classList.add('hidden');
+                editPeriodModal.classList.remove('hidden');
             }
     
             /**
-             * NEW: v4.03 - Submits the period rename action.
-             * MODIFIED: v4.22 - Now handles "Rename" (personal) vs "Nickname" (shared).
+             * NEW: v4.44 - Submits the period rename/nickname/visual cue.
+             * This replaces the old handleRenamePeriodSubmit function.
              */
-            async function handleRenamePeriodSubmit(e) {
+            async function handleSubmitEditPeriodDetails(e) {
                 e.preventDefault();
                 if (!currentRenamingPeriod) return;
-    
-                const { name: oldName, type } = currentRenamingPeriod;
-                const newName = renamePeriodNewNameInput.value.trim();
-    
-                if (!newName) {
-                    renamePeriodStatusMsg.textContent = "Name cannot be empty.";
-                    renamePeriodStatusMsg.classList.remove('hidden');
-                    return;
-                }
-    
-                renamePeriodStatusMsg.textContent = "Saving...";
-                renamePeriodStatusMsg.classList.remove('hidden');
 
-                // --- NEW v4.22 Logic ---
+                const { name: originalPeriodName, type } = currentRenamingPeriod;
+                const newNickname = editPeriodNewNameInput.value.trim();
+                const newVisualCue = editPeriodImageSelect.value; // NEW in 4.44
+                
+                editPeriodStatusMsg.textContent = "Saving...";
+                editPeriodStatusMsg.classList.remove('hidden');
 
                 try {
                     if (type === 'personal') {
-                        // --- 1. PERSONAL SCHEDULE: Destructive Rename ---
-                        if (!activePersonalScheduleId) throw new Error("No active personal schedule.");
+                        // --- 1. Save a PERSONAL period RENAME ---
+                        if (!newNickname || newNickname === "") {
+                            editPeriodStatusMsg.textContent = "Period name cannot be empty.";
+                            return;
+                        }
                         
-                        // Use personalBellsPeriods (the user's custom periods)
-                        const targetPeriods = personalBellsPeriods;
-                        const docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-
-                        // Rename the period object
-                        const updatedPeriods = targetPeriods.map(p => {
-                            if (p.name === oldName) {
-                                return { ...p, name: newName };
+                        // We must update the 'personalBellsPeriods' array and save to Firestore
+                        let periodFound = false;
+                        const updatedPeriods = personalBellsPeriods.map(p => {
+                            if (p.name === originalPeriodName) {
+                                periodFound = true;
+                                return { ...p, name: newNickname };
                             }
                             return p;
                         });
 
-                        // We always write to the 'periods' field for V4.0 schedules
-                        await updateDoc(docRef, { periods: updatedPeriods });
-                        renamePeriodStatusMsg.textContent = "Rename successful.";
+                        if (!periodFound) throw new Error("Could not find personal period to rename.");
+
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+                        
+                        editPeriodStatusMsg.textContent = "Rename successful.";
                         
                         // NEW in 4.36: Update the global state immediately
-                        // This prevents a "stale" render.
                         personalBellsPeriods = updatedPeriods;
 
-                        // NEW in 4.23: Force an immediate re-render and clock update
-                        // This prevents a lag from the onSnapshot listener.
-                        recalculateAndRenderAll();
-                        updateClock();
-
                     } else {
-                        // --- 2. SHARED SCHEDULE: Save Nickname to localStorage ---
-                        if (!activeBaseScheduleId) throw new Error("No active shared schedule.");
-
-                        const overrideKey = getPeriodOverrideKey(activeBaseScheduleId, oldName);
-                        if (!overrideKey) throw new Error("Could not create override key.");
-
-                        if (newName === oldName) {
-                            // If name is set back to original, delete the override
-                            delete periodNameOverrides[overrideKey];
+                        // --- 2. Save a SHARED period NICKNAME ---
+                        const overrideKey = getPeriodOverrideKey(activeBaseScheduleId, originalPeriodName);
+                        
+                        if (newNickname && newNickname !== originalPeriodName) {
+                            periodNameOverrides[overrideKey] = newNickname;
                         } else {
-                            periodNameOverrides[overrideKey] = newName;
+                            // If name is blank or same as original, delete the override
+                            delete periodNameOverrides[overrideKey];
                         }
-                        
-                        savePeriodNameOverrides();
-                        renamePeriodStatusMsg.textContent = "Nickname saved.";
-                        
-                        // Manually re-render to show the change immediately
-                        recalculateAndRenderAll();
-                        updateClock(); // NEW in 4.23: Force clock update
+                        savePeriodNameOverrides(); // Save to localStorage
+                        editPeriodStatusMsg.textContent = "Nickname saved.";
                     }
+
+                    // NEW in 4.44: Save Visual Cue
+                    const visualKey = getVisualOverrideKey(activeBaseScheduleId, originalPeriodName);
+                    if (newVisualCue) {
+                        periodVisualOverrides[visualKey] = newVisualCue;
+                    } else {
+                        delete periodVisualOverrides[visualKey]; // User selected [None/Default]
+                    }
+                    saveVisualOverrides(); // Save to localStorage
+
+                    // Force an immediate re-render and clock update
+                    recalculateAndRenderAll();
                     
-                    // Success: Close modal
                     setTimeout(() => {
-                        renamePeriodModal.classList.add('hidden');
+                        editPeriodModal.classList.add('hidden');
+                        editPeriodForm.reset();
                         currentRenamingPeriod = null;
                     }, 1000);
 
                 } catch (error) {
-                    console.error("Error renaming period:", error);
-                    renamePeriodStatusMsg.textContent = `Error saving: ${error.message}`;
+                    console.error("Error saving period details:", error);
+                    editPeriodStatusMsg.textContent = `Error: ${error.message}`;
                 }
+            }
+    
+            // --- NEW in 4.44: Visual Cue Display Logic ---
+            
+            /**
+             * NEW: v4.44 - Generates default SVG visual cues.
+             * @param {string} periodName - The name of the period.
+             * @returns {string} An HTML string for an SVG or <img> tag.
+             */
+            function getDefaultVisualCue(periodName) {
+                const p = periodName.toLowerCase();
+                let svgContent = '';
+                
+                if (p.includes('lunch')) {
+                    // Fork and Knife for Lunch
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5V12.97c2.09-.13 3.75-1.85 3.75-3.97V2h-2v7zm5-3v8h2.5v10h2.5V2h-5z"/></svg>`;
+                } else if (p.includes('passing') || p.includes('between')) {
+                    // "Walk" sign for passing periods
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M14.5 4.5c0-1.38-1.12-2.5-2.5-2.5S9.5 3.12 9.5 4.5 10.62 7 12 7s2.5-1.12 2.5-2.5zM15 22v-6h1.5v-5.5c0-1.1-.9-2-2-2h-5c-1.1 0-2 .9-2 2V16H9v6h6z"/></svg>`;
+                } else {
+                    // Default: Number or Letter
+                    const match = p.match(/(\d+)(?:st|nd|rd|th)?|([a-z])/);
+                    let text = '?';
+                    if (match) {
+                        text = (match[1] || match[2]).toUpperCase();
+                    }
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor">${text}</text></svg>`;
+                }
+                
+                // Return as a full HTML string for injection
+                return `<div class="w-full h-full p-8 text-gray-400">${svgContent}</div>`;
+            }
+
+            /**
+             * NEW: v4.44 - Populates all visual cue dropdowns.
+             */
+            function updateVisualDropdowns() {
+                const selects = [ editPeriodImageSelect ]; // Add any future visual selects here
+                
+                // 1. Create options for default SVGs (dynamically)
+                const defaultVisuals = ['1st Period', '2nd Period', 'Lunch', 'Passing Period'];
+                const defaultHtml = defaultVisuals.map(name => {
+                    const key = `[DEFAULT] ${name}`;
+                    return `<option value="${key}">${name} (Default)</option>`;
+                }).join('');
+
+                // 2. Create options for shared files
+                const sharedHtml = sharedVisualFiles.map(file => {
+                    return `<option value="${file.url}">${file.name} (Shared)</option>`;
+                }).join('');
+                
+                // 3. Create options for user files
+                const userHtml = userVisualFiles.map(file => {
+                    return `<option value="${file.url}">${file.name} (My File)</option>`;
+                }).join('');
+                
+                // 4. Populate all select elements
+                selects.forEach(select => {
+                    if (!select) return;
+                    
+                    const currentValue = select.value; // Preserve current selection if possible
+                    select.innerHTML = `
+                        <option value="">[None / Period Default]</option>
+                        <optgroup label="Default SVGs">
+                            ${defaultHtml}
+                        </optgroup>
+                        <optgroup label="My Visuals">
+                            ${userHtml || '<option disabled>No visuals uploaded.</option>'}
+                        </optgroup>
+                        <optgroup label="Shared Visuals">
+                            ${sharedHtml || '<option disabled>No shared visuals.</option>'}
+                        </optgroup>
+                    `;
+                    select.value = currentValue; // Re-apply selection
+                });
+            }
+
+            /**
+             * NEW: v4.44 - Gets the HTML for a given visual cue value.
+             */
+            function getVisualHtml(value, periodName) {
+                if (!value) {
+                    // Case 1: Value is "" (None/Default)
+                    return getDefaultVisualCue(periodName);
+                }
+                if (value.startsWith('[DEFAULT]')) {
+                    // Case 2: It's a default SVG key
+                    return getDefaultVisualCue(value.replace('[DEFAULT] ', ''));
+                }
+                if (value.startsWith('http')) {
+                    // Case 3: It's an uploaded image URL
+                    return `<img src="${value}" alt="Visual Cue" class="w-full h-full object-contain">`;
+                }
+                // Fallback
+                return getDefaultVisualCue(periodName);
             }
     
             /**
@@ -5540,6 +6073,7 @@
                 }
                 // NEW: Re-render audio list to show/hide admin controls
                 renderAudioFileManager();
+                renderVisualFileManager(); // NEW in 4.44
                 renderCombinedList(); // NEW: Re-render list to show/hide admin buttons
                 // NEW: v3.03 - Re-check admin-related button states
                 setActiveSchedule(scheduleSelector.value);
@@ -6108,7 +6642,8 @@
                 // NEW V4.06: Initialize Relative Bell DOM elements inside init()
                 // MODIFIED: v4.14 - Declarations moved to global scope.
                 // We just do a check here to ensure they loaded.
-                if (!relativeBellModal || !editBellModal || !changeSoundModal || !confirmDeleteBellModal || !renamePeriodModal || !orphanHandlingModal) {
+                // MODIFIED in 4.44: Removed 'renamePeriodModal' which was deleted
+                if (!relativeBellModal || !editBellModal || !changeSoundModal || !confirmDeleteBellModal || !orphanHandlingModal) {
                     console.error("CRITICAL: Modal DOM elements not found on init. Aborting listener setup.");
                     return;
                 }
@@ -6425,16 +6960,50 @@
                 // DELETED in 4.40: This was for the old personal bell form
                 // previewPersonalSoundBtn.addEventListener('click', () => playBell(personalSoundInput.value)); 
                 previewSharedSoundBtn.addEventListener('click', () => playBell(sharedSoundInput.value));
+                
+                // NEW in 4.44: Visual Manager Listeners
+                visualUploadInput.addEventListener('change', handleVisualFileSelected);
+                visualUploadBtn.addEventListener('click', handleVisualUpload);
+                document.getElementById('visual-manager-panel').addEventListener('click', handleVisualListClick);
+                
+                // NEW in 4.44: Add click-to-refresh for Visual Manager header
+                document.querySelector('#visual-manager-panel h2').addEventListener('click', () => {
+                    visualUploadStatus.textContent = "Refreshing file lists...";
+                    visualUploadStatus.classList.remove('hidden');
+                    loadAllVisualFiles().then(() => {
+                        setTimeout(() => visualUploadStatus.classList.add('hidden'), 1500);
+                    });
+                });
+
+                deleteVisualConfirmBtn.addEventListener('click', confirmDeleteVisual);
+                deleteVisualCancelBtn.addEventListener('click', () => confirmDeleteVisualModal.classList.add('hidden'));
+
+                // NEW in 4.44: Edit Period Details Modal Listeners
+                editPeriodForm.addEventListener('submit', handleSubmitEditPeriodDetails);
+                // MODIFIED in 4.44: Also clear state on cancel
+                editPeriodCancelBtn.addEventListener('click', () => {
+                    editPeriodModal.classList.add('hidden');
+                    currentRenamingPeriod = null; // Clear stale state
+                });
+                editPeriodImageSelect.addEventListener('change', () => {
+                    // NEW in 4.44: Update the preview
+                    const selectedValue = editPeriodImageSelect.value;
+                    const periodName = currentRenamingPeriod ? currentRenamingPeriod.name : "";
+                    editPeriodImagePreview.innerHTML = getVisualHtml(selectedValue, periodName);
+                });
+
+                // DELETED in 4.44: Old Period Rename Listeners
+                // renamePeriodForm.addEventListener('submit', handleRenamePeriodSubmit);
+                // renamePeriodCancelBtn.addEventListener('click', ... );
     
                 // NEW: v4.03 - Period Rename Listeners
-                renamePeriodForm.addEventListener('submit', handleRenamePeriodSubmit);
-                // MODIFIED in 4.20: The variable 'renamePeriodCancelBtn' now correctly
-                // points to the button with the new ID 'rename-period-cancel-btn'
-                renamePeriodCancelBtn.addEventListener('click', () => {
-                    renamePeriodModal.classList.add('hidden');
-                    renamePeriodForm.reset();
-                    currentRenamingPeriod = null;
-                });
+                // DELETED in 4.44: Replaced by editPeriodForm listeners
+                // renamePeriodForm.addEventListener('submit', handleRenamePeriodSubmit);
+                // renamePeriodCancelBtn.addEventListener('click', () => {
+                //     renamePeriodModal.classList.add('hidden');
+                //     renamePeriodForm.reset();
+                //     currentRenamingPeriod = null;
+                // });
                 
                 // MODIFIED: v4.03 - Handles clicks for bells AND period management buttons
                 // MODIFIED in 4.19: Rewritten to be more robust and fix button non-responsiveness
@@ -6448,7 +7017,8 @@
                         const periodName = renameBtn.dataset.periodName;
                         const periodOrigin = renameBtn.dataset.periodOrigin || 'shared'; // NEW in 4.27.1
                         if (periodName) {
-                            handleRenamePeriodClick(periodName, periodOrigin); // MODIFIED in 4.27.1
+                            // MODIFIED in 4.44: Call the new modal function
+                            openEditPeriodModal(periodName, periodOrigin);
                             return; // Action handled
                         }
                     }
@@ -6737,4 +7307,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.43 -->
+<!-- Version 4.45 -->
