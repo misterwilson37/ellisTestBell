@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.39</title>
+    <title>Ellis Web Bell 4.40</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.39</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.40</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -759,57 +759,9 @@
 
         <!-- MODIFIED: Custom Bells (Local) -> Personal Bells (Cloud) v3.03 -->
         <div class="auth-required mt-12"> <!-- Hidden for anonymous users -->
-            <h2 class="text-2xl font-semibold mb-4">My Personal Bells (Cloud Synced)</h2>
-
-            <!-- Add Custom Bell Form -->
-            <form id="add-personal-bell-form" class="bg-white p-6 rounded-xl shadow-md mb-8">
-                <p id="personal-bell-status" class="text-sm text-gray-600 mb-4">Select a Personal Schedule from the dropdown above to add bells to it.</p>
-                <!-- NEW V4.02: Period Selector added to Personal Form -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                    <div>
-                        <label for="personal-bell-period" class="block text-sm font-medium text-gray-700 mb-1">Period</label>
-                        <!-- NEW: Period selector -->
-                        <select id="personal-bell-period" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
-                            <!-- Options populated by JS -->
-                            <option value="">Select Period...</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="personal-bell-time" class="block text-sm font-medium text-gray-700 mb-1">Time (HH:MM:SS)</label>
-                        <input type="time" id="personal-bell-time" step="1" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
-                    </div>
-                    <!-- NEW: Custom Bell Name -->
-                    <div>
-                        <label for="personal-bell-name" class="block text-sm font-medium text-gray-700 mb-1">Bell Name</label>
-                        <input type="text" id="personal-bell-name" placeholder="e.g. My Reminder" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
-                    </div>
-                </div>
-                <div class="flex flex-col sm:flex-row sm:items-end gap-4">
-                    <div class="flex-grow" style="min-width: 120px;">
-                        <label for="personal-bell-sound" class="block text-sm font-medium text-gray-700 mb-1">Sound</label>
-                        <!-- MODIFIED: Sound select now uses optgroups -->
-                        <select id="personal-bell-sound" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
-                            <optgroup label="Default Sounds">
-                                <option value="Bell">Bell</option>
-                                <option value="Chime">Chime</option>
-                                <option value="Beep">Beep</option>
-                                <option value="Alarm">Alarm</option>
-                                <!-- MODIFIED: Made Ellis Bell selected by default -->
-                                <option value="ellisBell.mp3" selected>Ellis Bell</option>
-                            </optgroup>
-                            <optgroup label="My Sounds" id="personal-my-sounds-optgroup"></optgroup>
-                            <optgroup label="Shared Sounds" id="personal-shared-sounds-optgroup"></optgroup>
-                        </select>
-                    </div>
-                    <!-- MODIFIED: Changed button text from "Play" to icon -->
-                    <button type="button" id="preview-personal-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview" disabled>
-                        &#9654;
-                    </button>
-                    <button type="submit" class="w-full sm:w-auto px-6 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2" disabled>
-                        Add Personal Bell
-                    </button>
-                </div>
-            </form>
+            <!-- DELETED in 4.40: Removed the old H2 and 'add-personal-bell-form'. -->
+            <!-- This functionality is replaced by the in-period '+ Bell' button -->
+            <!-- and the new 'Multi-Add' feature. -->
             
             <!-- NEW: v3.03 - Delete Personal Schedule Button -->
             <!-- MODIFIED: v3.05 - Moved into new Manager section -->
@@ -1342,13 +1294,14 @@
         const quickBellSoundSelect = document.getElementById('quickBellSoundSelect');
 
         // MODIFIED: Custom Bell Form -> Personal Bell Form (v3.03)
-        const addPersonalBellForm = document.getElementById('add-personal-bell-form');
-        const personalPeriodInput = document.getElementById('personal-bell-period'); // NEW in 4.16: For enabling/disabling
-        const personalTimeInput = document.getElementById('personal-bell-time');
-        const personalNameInput = document.getElementById('personal-bell-name'); 
-        const personalSoundInput = document.getElementById('personal-bell-sound');
-        const personalBellStatus = document.getElementById('personal-bell-status');
-        const previewPersonalSoundBtn = document.getElementById('preview-personal-sound');
+        // DELETED in 4.40: Variables for the old add-personal-bell-form
+        // const addPersonalBellForm = document.getElementById('add-personal-bell-form');
+        // const personalPeriodInput = document.getElementById('personal-bell-period');
+        // const personalTimeInput = document.getElementById('personal-bell-time');
+        // const personalNameInput = document.getElementById('personal-bell-name'); 
+        // const personalSoundInput = document.getElementById('personal-bell-sound');
+        // const personalBellStatus = document.getElementById('personal-bell-status');
+        // const previewPersonalSoundBtn = document.getElementById('preview-personal-sound');
         const deletePersonalScheduleBtn = document.getElementById('delete-personal-schedule-btn');
 
         // Combined List
@@ -3044,79 +2997,9 @@
     
             // --- End of NEW Helper Functions ---
             
-            // MODIFIED: v4.02 - handleAddPersonalBell now uses period structure
-            async function handleAddPersonalBell(e) {
-                e.preventDefault();
-                if (!activePersonalScheduleId) {
-                    console.warn("No active personal schedule.");
-                    return;
-                }
-    
-                // NEW V4.02: Get period name
-                const periodName = document.getElementById('personal-bell-period').value;
-                const time = personalTimeInput.value;
-                const name = personalNameInput.value;
-                const sound = personalSoundInput.value;
-                
-                if (!periodName || !time || !name) {
-                    console.warn("Please provide a period, time, and name for the personal bell.");
-                    return;
-                }
-                
-                // updated for v4.10 to add bellID
-                const newBell = { time, name, sound, bellId: generateBellId() };
-    
-                // REQ 1 CHECK (Still checks flat list of ALL bells)
-                const allBells = [...localSchedule, ...personalBells];
-                const nearbyBell = findNearbyBell(time, allBells);
-                
-                // MODIFIED in 4.38: Use the simpler, inline error from the new static bell modal
-                // instead of opening the 'nearby-bell-modal'.
-                if (nearbyBell) {
-                    // Show an error in the form's status area.
-                    personalBellStatus.textContent = `Error: This time is within 60s of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time, true)}).`;
-                    personalBellStatus.classList.remove('text-gray-600');
-                    personalBellStatus.classList.add('text-red-600');
-                    return; // Stop the submission
-                } else {
-                    // No conflict, add directly to Firestore using V4.0 logic
-                    personalBellStatus.textContent = `Adding bells to: ${personalSchedule.name}`; // Reset status
-                    personalBellStatus.classList.add('text-gray-600');
-                    personalBellStatus.classList.remove('text-red-600');
-                    
-                    const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-                    try {
-                        const docSnap = await getDoc(personalScheduleRef);
-                        if (!docSnap.exists()) {
-                            console.error("Personal schedule doc not found.");
-                            return;
-                        }
-                        
-                        // V4.0 LOGIC: Get existing periods (or empty array)
-                        const existingPeriods = docSnap.data().periods || [];
-                        
-                        // Use helper to insert the new bell into the correct period
-                        const updatedPeriods = updatePeriodsWithNewBell(existingPeriods, periodName, newBell);
-    
-                        // Save the entire updated periods array
-                        // NOTE: This will now write the 'periods' field if it didn't exist before,
-                        // moving this personal schedule to the V4.0 format.
-                        await updateDoc(personalScheduleRef, { periods: updatedPeriods });
-    
-                        addPersonalBellForm.reset();
-                        personalSoundInput.value = 'ellisBell.mp3';
-                        // Re-enable and reset inputs
-                        personalTimeInput.disabled = false;
-                        personalNameInput.disabled = false;
-                        personalSoundInput.disabled = false;
-                        previewPersonalSoundBtn.disabled = false;
-                        addPersonalBellForm.querySelector('button[type="submit"]').disabled = false;
-                        
-                    } catch (error) {
-                        console.error("Error adding personal bell:", error);
-                    }
-                }
-            }
+            // DELETED in 4.40: handleAddPersonalBell(e)
+            // This function powered the old form, which has been removed.
+            // The logic was consolidated into handleAddStaticBellSubmit.
     
             // --- Firebase Logic ---
             // 3.44?  That's going to be it, I tell you.
@@ -3603,13 +3486,8 @@
                     activeBaseScheduleId = personalSchedule.baseScheduleId;
                     scheduleTitle.textContent = personalSchedule.name;
                     
-                    // Enable personal bell form
-                    personalPeriodInput.disabled = false; // NEW in 4.16: Enable period selector
-                    personalTimeInput.disabled = false;
-                    personalNameInput.disabled = false;
-                    previewPersonalSoundBtn.disabled = false;
-                    addPersonalBellForm.querySelector('button[type="submit"]').disabled = false;
-                    personalBellStatus.textContent = `Adding bells to: ${personalSchedule.name}`;
+                    // DELETED in 4.40: Removed logic for old personal bell form
+                    
                     deletePersonalScheduleBtn.disabled = false;
                     deletePersonalScheduleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     
@@ -3939,10 +3817,11 @@
                 }
                 
                 // 6. Populate sound dropdowns
-                const personalSoundSelect = document.getElementById('personal-bell-sound');
-                if (relativeBellSoundSelect && personalSoundSelect) {
+                // MODIFIED in 4.40: Use sharedSoundInput as the template, not the deleted personalSoundInput
+                const sharedSoundSelect = document.getElementById('shared-bell-sound');
+                if (relativeBellSoundSelect && sharedSoundSelect) {
                     updateSoundDropdowns();
-                    relativeBellSoundSelect.innerHTML = personalSoundSelect.innerHTML;
+                    relativeBellSoundSelect.innerHTML = sharedSoundSelect.innerHTML;
                     relativeBellSoundSelect.value = rawBell.sound; // Select the bell's sound
                 }
 
@@ -4846,15 +4725,13 @@
                 addStaticBellForm.reset(); // Clear any previous inputs
                 addStaticBellStatus.classList.add('hidden');
     
-                // 2. Populate sound dropdowns
-                // We copy the HTML from the main personal sound dropdown
-                const staticSoundSelect = document.getElementById('add-static-bell-sound');
-                const personalSoundSelect = document.getElementById('personal-bell-sound');
-                if (staticSoundSelect && personalSoundSelect) {
-                    // MODIFIED in 4.29: Ensure sounds are populated first
+                // 6. Populate sound dropdowns
+                // MODIFIED in 4.40: Use sharedSoundInput as the template, not the deleted personalSoundInput
+                const sharedSoundSelect = document.getElementById('shared-bell-sound');
+                if (relativeBellSoundSelect && sharedSoundSelect) {
                     updateSoundDropdowns();
-                    staticSoundSelect.innerHTML = personalSoundSelect.innerHTML;
-                    staticSoundSelect.value = 'ellisBell.mp3';
+                    relativeBellSoundSelect.innerHTML = sharedSoundSelect.innerHTML;
+                    relativeBellSoundSelect.value = rawBell.sound; // Select the bell's sound
                 }
     
                 // 3. Show Modal
@@ -4895,10 +4772,11 @@
     
                 // Populate sound dropdowns
                 // MODIFIED in 4.29: Copy from personal select, which is guaranteed to be populated
-                const personalSoundSelect = document.getElementById('personal-bell-sound');
-                if (relativeBellSoundSelect && personalSoundSelect) {
-                    updateSoundDropdowns(); // Ensure personal select is populated
-                    relativeBellSoundSelect.innerHTML = personalSoundSelect.innerHTML;
+                // MODIFIED in 4.40: Use sharedSoundInput as the template
+                const sharedSoundSelect = document.getElementById('shared-bell-sound');
+                if (relativeBellSoundSelect && sharedSoundSelect) {
+                    updateSoundDropdowns(); // Ensure shared select is populated
+                    relativeBellSoundSelect.innerHTML = sharedSoundSelect.innerHTML;
                     relativeBellSoundSelect.value = 'ellisBell.mp3';
                 }
     
@@ -5708,7 +5586,8 @@
                 
                 const selects = [
                     // This is the full list of selects from v3.42
-                    { el: personalSoundInput, myGroup: 'personal-my-sounds-optgroup', sharedGroup: 'personal-shared-sounds-optgroup' },
+                    // DELETED in 4.40: personalSoundInput was removed
+                    // { el: personalSoundInput, myGroup: 'personal-my-sounds-optgroup', sharedGroup: 'personal-shared-sounds-optgroup' },
                     { el: sharedSoundInput, myGroup: 'shared-my-sounds-optgroup', sharedGroup: 'shared-shared-sounds-optgroup' },
                     { el: multiBellSoundInput, myGroup: 'multi-my-sounds-optgroup', sharedGroup: 'multi-shared-sounds-optgroup' },
                     { el: editBellSoundInput, myGroup: 'edit-my-sounds-optgroup', sharedGroup: 'edit-shared-sounds-optgroup' },
@@ -6023,7 +5902,7 @@
                 adminToggleBtn.addEventListener('click', toggleAdminMode);
     
                 // Forms
-                addPersonalBellForm.addEventListener('submit', handleAddPersonalBell); // MODIFIED: v3.03
+                // DELETED in 4.40: addPersonalBellForm.addEventListener('submit', handleAddPersonalBell);
                 addSharedBellForm.addEventListener('submit', handleAddSharedBell);
                 createScheduleForm.addEventListener('submit', handleCreateSchedule);
     
@@ -6294,7 +6173,8 @@
                 signOutBtn.addEventListener('click', signOutUser);
 
                 // Sound previews
-                previewPersonalSoundBtn.addEventListener('click', () => playBell(personalSoundInput.value)); // MODIFIED: v3.03
+                // DELETED in 4.40: This was for the old personal bell form
+                // previewPersonalSoundBtn.addEventListener('click', () => playBell(personalSoundInput.value)); 
                 previewSharedSoundBtn.addEventListener('click', () => playBell(sharedSoundInput.value));
     
                 // NEW: v4.03 - Period Rename Listeners
@@ -6608,4 +6488,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.39 -->
+<!-- Version 4.40 -->
