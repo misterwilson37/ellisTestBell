@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.41</title>
+    <title>Ellis Web Bell 4.42</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -529,7 +529,7 @@
     <div class="container mx-auto max-w-2xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.41</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.42</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -769,6 +769,12 @@
                 <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">My Personal Schedule Manager</h3>
                 
                 <div class="space-y-3">
+                    <!-- NEW in 4.42: Multi-Add Relative Bell Button -->
+                    <button type="button" id="multi-add-relative-btn" class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg shadow-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <span class="font-semibold">Add Multi-Period Bell</span>
+                        <span class="block text-sm opacity-90">Add one relative bell (e.g., "Clean up") to many periods.</span>
+                    </button>
+
                     <button type="button" id="rename-personal-schedule-btn" class="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                         Rename Selected Personal Schedule
                     </button>
@@ -982,6 +988,71 @@
             </div>
         </div>
 
+        <!-- **** NEW: v4.42 - Multi-Add Relative Bell Modal **** -->
+        <div id="multi-add-relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <form id="multi-add-relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
+                <h3 class="text-2xl font-medium mb-6">Add Multi-Period Relative Bell</h3>
+                
+                <!-- Bell Name and Sound -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="multi-add-relative-bell-name" class="block text-sm font-medium text-gray-700 mb-1">Bell Name</label>
+                        <input type="text" id="multi-add-relative-bell-name" placeholder="e.g. 3 Min Clean up" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="multi-add-relative-bell-sound" class="block text-sm font-medium text-gray-700 mb-1">Sound</label>
+                        <select id="multi-add-relative-bell-sound" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <!-- Options will be populated by JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Relative Time Config -->
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+                    <div class="sm:col-span-2">
+                        <label for="multi-add-relative-parent-anchor" class="block text-sm font-medium text-gray-700 mb-1">Parent Anchor</label>
+                        <select id="multi-add-relative-parent-anchor" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="period_end">Period End</option>
+                            <option value="period_start">Period Start</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="multi-add-relative-direction" class="block text-sm font-medium text-gray-700 mb-1">Direction</label>
+                        <select id="multi-add-relative-direction" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="before">Before Parent</option>
+                            <option value="after">After Parent</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label for="multi-add-relative-minutes" class="block text-sm font-medium text-gray-700 mb-1">Min</label>
+                            <input type="number" id="multi-add-relative-minutes" value="3" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="multi-add-relative-seconds" class="block text-sm font-medium text-gray-700 mb-1">Sec</label>
+                            <input type="number" id="multi-add-relative-seconds" value="0" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Period Checkboxes -->
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Periods to Add to:</label>
+                    <div id="multi-add-relative-period-list" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <!-- Checkboxes will be dynamically injected here -->
+                        <p class="text-gray-500">Loading periods...</p>
+                    </div>
+                </div>
+                
+                <p id="multi-add-relative-status" class="text-red-600 text-sm mt-4 hidden"></p>
+    
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="multi-add-relative-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Add Bells</button>
+                </div>
+            </form>
+        </div>
+
         <!-- NEW: Audio Manager Panel (Hidden for anonymous users) -->
         <div id="audio-manager-panel" class="auth-required mt-12">
             <!-- MODIFIED: v3.09 - Made H2 a cursor-pointer -->
@@ -1191,6 +1262,20 @@
         const userMessageTitle = document.getElementById('user-message-title');
         const userMessageText = document.getElementById('user-message-text');
         const userMessageOkBtn = document.getElementById('user-message-ok');
+        
+        // NEW in 4.42: Multi-Add Relative Bell Modal
+        const showMultiAddRelativeModalBtn = document.getElementById('multi-add-relative-btn');
+        const multiAddRelativeBellModal = document.getElementById('multi-add-relative-bell-modal');
+        const multiAddRelativeBellForm = document.getElementById('multi-add-relative-bell-form');
+        const multiAddRelativeParentAnchor = document.getElementById('multi-add-relative-parent-anchor');
+        const multiAddRelativeDirection = document.getElementById('multi-add-relative-direction');
+        const multiAddRelativeMinutes = document.getElementById('multi-add-relative-minutes');
+        const multiAddRelativeSeconds = document.getElementById('multi-add-relative-seconds');
+        const multiAddRelativeBellName = document.getElementById('multi-add-relative-bell-name');
+        const multiAddRelativeBellSound = document.getElementById('multi-add-relative-bell-sound');
+        const multiAddRelativePeriodList = document.getElementById('multi-add-relative-period-list');
+        const multiAddRelativeStatus = document.getElementById('multi-add-relative-status');
+        const multiAddRelativeCancelBtn = document.getElementById('multi-add-relative-cancel');
 
         // Orphan Modal (v4.12.2)
         const orphanHandlingModal = document.getElementById('orphan-handling-modal');
@@ -3403,7 +3488,8 @@
                 renamePersonalScheduleBtn.disabled = true;
                 backupPersonalScheduleBtn.disabled = true;
                 restorePersonalScheduleBtn.disabled = true;
-    
+                showMultiAddRelativeModalBtn.disabled = true; // NEW in 4.42: Reset button state
+                    
                 // v3.03: Disable personal schedule buttons
                 createPersonalScheduleBtn.disabled = true;
                 createPersonalScheduleBtn.textContent = 'Copy as Personal Schedule';
@@ -3507,6 +3593,7 @@
                     renamePersonalScheduleBtn.disabled = false;
                     backupPersonalScheduleBtn.disabled = false;
                     restorePersonalScheduleBtn.disabled = false;
+                    showMultiAddRelativeModalBtn.disabled = false; // NEW in 4.42
                     
                     /// 1. Listen to the BASE shared schedule
                     scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
@@ -4983,6 +5070,150 @@
             }
 
             /**
+             * NEW: v4.42 - Opens the Multi-Add Relative Bell Modal
+             */
+            function openMultiAddRelativeModal() {
+                if (!activePersonalScheduleId) {
+                    showUserMessage("This feature is only available for Personal Schedules.");
+                    return;
+                }
+                
+                // 1. Reset form and clear status
+                multiAddRelativeBellForm.reset();
+                multiAddRelativeStatus.classList.add('hidden');
+                
+                // 2. Populate sound dropdown
+                const sharedSoundSelect = document.getElementById('shared-bell-sound');
+                if (multiAddRelativeBellSound && sharedSoundSelect) {
+                    updateSoundDropdowns(); // Ensure sounds are up-to-date
+                    multiAddRelativeBellSound.innerHTML = sharedSoundSelect.innerHTML;
+                    multiAddRelativeBellSound.value = 'ellisBell.mp3';
+                }
+                
+                // 3. Populate period checkboxes
+                // We use the *calculated* periods list as it's sorted and merged
+                const periodsToRender = calculatedPeriodsList.filter(p => p.origin !== 'shared');
+                
+                if (periodsToRender.length === 0) {
+                     multiAddRelativePeriodList.innerHTML = `<p class="text-gray-500">No personal or merged periods found in this schedule.</p>`;
+                } else {
+                    multiAddRelativePeriodList.innerHTML = periodsToRender.map(period => {
+                        const safePeriodName = period.name.replace(/"/g, '&quot;');
+                        return `
+                        <div class="flex items-center">
+                            <input type="checkbox" id="multi-add-check-${period.name}" value="${safePeriodName}" class="multi-add-period-check h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                            <label for="multi-add-check-${period.name}" class="ml-2 block text-sm text-gray-900">${period.name}</label>
+                        </div>
+                        `;
+                    }).join('');
+                }
+                
+                // 4. Show the modal
+                multiAddRelativeBellModal.classList.remove('hidden');
+            }
+            
+            /**
+             * NEW: v4.42 - Finds the "Period Start" or "Period End" bell for a given period.
+             */
+            function findPeriodAnchorBell(periodName, anchorType) {
+                const period = calculatedPeriodsList.find(p => p.name === periodName);
+                if (!period || !period.bells || period.bells.length === 0) {
+                    return null; // Period not found or is empty
+                }
+                
+                // Bells are already sorted by time
+                if (anchorType === 'period_start') {
+                    return period.bells[0]; // First bell
+                } else {
+                    return period.bells[period.bells.length - 1]; // Last bell
+                }
+            }
+
+            /**
+             * NEW: v4.42 - Submits the multi-add relative bells
+             */
+            async function handleSubmitMultiAddRelativeBell(e) {
+                e.preventDefault();
+                multiAddRelativeStatus.classList.add('hidden');
+                
+                if (!activePersonalScheduleId) return;
+
+                // 1. Get all values from the form
+                const bellName = multiAddRelativeBellName.value.trim();
+                const bellSound = multiAddRelativeBellSound.value;
+                const parentAnchorType = multiAddRelativeParentAnchor.value; // 'period_start' or 'period_end'
+                const direction = multiAddRelativeDirection.value;
+                const minutes = parseInt(multiAddRelativeMinutes.value) || 0;
+                const seconds = parseInt(multiAddRelativeSeconds.value) || 0;
+                
+                // 2. Get all checked period names
+                const checkedPeriods = Array.from(document.querySelectorAll('.multi-add-period-check:checked'))
+                                             .map(cb => cb.value);
+                
+                if (!bellName) {
+                    multiAddRelativeStatus.textContent = "Bell Name is required.";
+                    multiAddRelativeStatus.classList.remove('hidden');
+                    return;
+                }
+                if (checkedPeriods.length === 0) {
+                    multiAddRelativeStatus.textContent = "Please select at least one period.";
+                    multiAddRelativeStatus.classList.remove('hidden');
+                    return;
+                }
+                
+                // 3. Calculate offset
+                let totalOffsetSeconds = (minutes * 60) + seconds;
+                if (direction === 'before') {
+                    totalOffsetSeconds = -totalOffsetSeconds;
+                }
+                
+                multiAddRelativeStatus.textContent = "Saving bells...";
+                multiAddRelativeStatus.classList.remove('hidden');
+                
+                // 4. Loop and build new bells
+                // We must operate on the RAW data, not the calculated list
+                let updatedPeriods = [...personalBellsPeriods]; // Get a copy of the current state
+                let bellsAdded = 0;
+                
+                for (const periodName of checkedPeriods) {
+                    const anchorBell = findPeriodAnchorBell(periodName, parentAnchorType);
+                    
+                    if (!anchorBell) {
+                        console.warn(`Could not find anchor bell for period "${periodName}". Skipping.`);
+                        continue;
+                    }
+                    
+                    // Create the new relative bell
+                    const newBell = {
+                        name: bellName,
+                        sound: bellSound,
+                        bellId: generateBellId(),
+                        relative: {
+                            parentBellId: anchorBell.bellId,
+                            offsetSeconds: totalOffsetSeconds
+                        }
+                    };
+                    
+                    // Add this bell to the correct period in our updatedPeriods array
+                    updatedPeriods = updatePeriodsWithNewBell(updatedPeriods, periodName, newBell);
+                    bellsAdded++;
+                }
+                
+                // 5. Save the updated periods array back to Firestore
+                const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                try {
+                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+                    
+                    showUserMessage(`Successfully added ${bellsAdded} bell(s)!`);
+                    multiAddRelativeBellModal.classList.add('hidden');
+                    
+                } catch (error) {
+                    console.error("Error saving multi-add bells:", error);
+                    multiAddRelativeStatus.textContent = "Error saving bells. Please try again.";
+                }
+            }
+
+            /**
              * NEW: v4.10.3 - Master function to recalculate all bells and update the UI.             
              * This is called by both shared and personal schedule listeners.
              */
@@ -6180,6 +6411,13 @@
                     playBell(addStaticBellSound.value);
                 });
                 
+                // NEW in 4.42: Multi-Add Relative Bell Modal Listeners
+                showMultiAddRelativeModalBtn.addEventListener('click', openMultiAddRelativeModal);
+                multiAddRelativeBellForm.addEventListener('submit', handleSubmitMultiAddRelativeBell);
+                multiAddRelativeCancelBtn.addEventListener('click', () => {
+                    multiAddRelativeBellModal.classList.add('hidden');
+                });
+                
                 signOutBtn.addEventListener('click', signOutUser);
 
                 // Sound previews
@@ -6498,4 +6736,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.41 -->
+<!-- Version 4.42 -->
