@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.60</title>
+    <title>Ellis Web Bell 4.61</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -531,7 +531,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.60</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.61</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -6323,6 +6323,11 @@
                     return `<option value="${file.url}">${file.name} (My File)</option>`;
                 }).join('');
                 
+                // NEW V4.61.5: Create options for shared files (Fixes missing 'sharedHtml' variable error)
+                const sharedHtml = sharedVisualFiles.map(file => {
+                    return `<option value="${file.url}">${file.name} (Shared)</option>`;
+                }).join('');
+
                 // 4. Populate all select elements
                 selects.forEach(select => {
                     if (!select) return;
@@ -6467,40 +6472,7 @@
                     userConfirmationCancelBtn.addEventListener('click', handleCancel);
                 });
             }
-    
-            /**
-         * NEW: v4.58 - Shows a confirmation modal, returning a promise that resolves on OK/CONFIRM.
-         * @param {string} message - The confirmation text.
-         * @param {string} title - The modal title.
-         * @param {string} confirmText - Text for the confirm button.
-         * @returns {Promise<boolean>} Resolves true on OK, false on Cancel.
-         */
-        function showConfirmationModal(message, title = "Confirm Action", confirmText = "Confirm") {
-            return new Promise(resolve => {
-                userConfirmationTitle.textContent = title;
-                userConfirmationText.textContent = message;
-                userConfirmationOkBtn.textContent = confirmText;
-                userConfirmationModal.classList.remove('hidden');
-
-                const handleConfirm = () => {
-                    userConfirmationOkBtn.removeEventListener('click', handleConfirm);
-                    userConfirmationCancelBtn.removeEventListener('click', handleCancel);
-                    userConfirmationModal.classList.add('hidden');
-                    resolve(true);
-                };
-
-                const handleCancel = () => {
-                    userConfirmationOkBtn.removeEventListener('click', handleConfirm);
-                    userConfirmationCancelBtn.removeEventListener('click', handleCancel);
-                    userConfirmationModal.classList.add('hidden');
-                    resolve(false);
-                };
-
-                userConfirmationOkBtn.addEventListener('click', handleConfirm);
-                userConfirmationCancelBtn.addEventListener('click', handleCancel);
-            });
-        }
-
+         
         /**
          * NEW: v4.03 - Simple message box
          * MODIFIED: v4.22 - Replaced alert() with a custom modal.
@@ -6593,9 +6565,11 @@
                     newPeriodEndStaticDiv.classList.add('hidden');
                     newPeriodStartRelativeDiv.classList.remove('hidden');
                     newPeriodEndRelativeDiv.classList.remove('hidden');
-                    // Remove required from static inputs
+                    // Remove required from static inputs and disable inputs
                     newPeriodStartTime.required = false;
+                    newPeriodStartTime.disabled = true;
                     newPeriodEndTime.required = false;
+                    newPeriodEndTime.disabled = true;
                 }
             }
 
@@ -7836,6 +7810,17 @@
                         }
                     }
                     
+                    // NEW V4.61: Handle Delete Period button click in list view (Integrated)
+                    const deleteBtn = target.closest('.delete-list-period-btn');
+                    if (deleteBtn) {
+                        const periodName = deleteBtn.dataset.periodName;
+                        if (periodName) {
+                            // Call the deletion handler (it includes confirmation)
+                            handleDeleteCustomPeriod(periodName);
+                            return; // Action handled
+                        }
+                    }
+
                     // --- 2. BELL (ITEM) CONTROLS ---
                     // If it wasn't a period button, check if it was a bell item control
                     
@@ -7896,22 +7881,10 @@
                 }
                 
                 // Event delegation
-                // Event delegation
                 combinedBellListElement.addEventListener('click', handleBellListClick);
                 
-                // NEW in 4.60: Handle Delete Period button click in list view
-                combinedBellListElement.addEventListener('click', (e) => {
-                    const target = e.target;
-                    const deleteBtn = target.closest('.delete-list-period-btn');
-                    if (deleteBtn) {
-                        const periodName = deleteBtn.dataset.periodName;
-                        if (periodName) {
-                            // Call the deletion handler (it includes confirmation)
-                            handleDeleteCustomPeriod(periodName);
-                            return; // Action handled
-                        }
-                    }
-                });
+                // REMOVED V4.61.2: Redundant click listener for .delete-list-period-btn.
+                // Logic has been moved into handleBellListClick to avoid conflict with the Edit button.
                 
                 // NEW in 4.49: Save period collapse state when a period is toggled
                 combinedBellListElement.addEventListener('toggle', (e) => {
@@ -8229,4 +8202,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.60 -->
+<!-- Version 4.61 -->
