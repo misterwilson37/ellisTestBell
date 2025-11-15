@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.64</title>
+    <title>Ellis Web Bell 4.65</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -531,7 +531,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.64</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.65</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -3116,7 +3116,7 @@
                     }
 
                     // 2c. Recursively find the parent's time
-                    // CRITICAL V4.64.9 FIX: Must pass the 'allPeriods' variable to the recursive call to avoid crashing recursion.
+                    // CRITICAL V4.65 FIX: Must pass the 'allPeriods' array to match the function definition, preventing circular dependency.
                     const parentTime = calculateRelativeBellTime(parentBell, bellMap, allPeriods, new Set(visited));
                     if (!parentTime) {
                         console.warn(`Could not calculate time for parent of "${bell.name}".`);
@@ -6461,14 +6461,13 @@
                 if (value.startsWith('[CUSTOM_TEXT]')) {
                     // NEW V4.60.4: If custom text is selected
                     const customText = value.replace('[CUSTOM_TEXT] ', '').toUpperCase();
-                    // MODIFIED V4.65: Use SVG text rendering for proper scaling within the 10x10 icon space.
+                    // MODIFIED V4.65.4: Use SVG text rendering and correct icon wrapper classes (sharedClasses)
                     const svgFontSize = customText.length > 2 ? 30 : 40; // Use larger font size for 1-2 chars
                     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
                         <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor">${customText}</text>
                     </svg>`;
-                    // Render text in the small circular container
-                    // CRITICAL V4.64.7 FIX: Use standard preview container classes (ReferenceError fix).
-                    return `<div class="w-full h-full p-8 text-blue-600 flex items-center justify-center">
+                    // Render text in the correct small circular container using sharedClasses.
+                    return `<div class="${sharedClasses} bg-indigo-600 text-white flex items-center justify-center">
                         ${svgContent}
                     </div>`;
                 }
@@ -8265,4 +8264,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.64 -->
+<!-- Version 4.65 apple -->
