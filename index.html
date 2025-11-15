@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.47</title>
+    <title>Ellis Web Bell 4.48</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -530,7 +530,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.47</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.48</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -545,26 +545,28 @@
 
         <!-- MODIFIED: This card now shows countdown AND current time -->
         <!-- NEW in 4.44: Converted to 2-column grid for Visual Cues -->
-        <div class="bg-white rounded-xl shadow-md mb-8 overflow-hidden">
-            <!-- MODIFIED in 4.45: Widened text column to 3/4 on desktop -->
-            <div class="grid grid-cols-1 md:grid-cols-4">
-                <!-- Column 1: Visual Cue -->
-                <div id="visual-cue-container" class="md:col-span-1 bg-gray-800 flex items-center justify-center p-6 min-h-[200px] md:min-h-0 overflow-hidden">
+        <div class="bg-white rounded-xl shadow-md mb-8 overflow-hidden p-4 md:p-6">
+            
+            <!-- NEW in 4.49: Full Width Header (Line 1 in user diagram) -->
+            <!-- This element is pulled out of the grid to span the full width -->
+            <div id="live-clock-sentence" class="text-2xl font-medium text-gray-600 tabular-nums text-center pb-4 mb-4 border-b border-gray-100">
+                Loading...
+            </div>
+
+            <!-- MODIFIED in 4.49: Grid for Visual Cue (25%) and Clock (75%) -->
+            <div class="grid grid-cols-1 md:grid-cols-4 items-center gap-4 md:gap-6">
+                <!-- Column 1: Visual Cue (md:col-span-1 = 25%) -->
+                <!-- The w-full max-w-xs and aspect-square ensure the image is square and responsive -->
+                <div id="visual-cue-container" class="md:col-span-1 bg-gray-800 flex items-center justify-center min-h-[150px] aspect-square rounded-lg overflow-hidden w-full max-w-xs mx-auto">
                     <!-- Default SVG or Image will be injected here by JS -->
                     <svg id="default-visual-cue" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-gray-500">
                         <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
                     </svg>
                 </div>
                 
-                <!-- Column 2: Countdown / Clock -->
-                <!-- MODIFIED in 4.45: Changed to col-span-3 -->
-                <div class="md:col-span-3 p-6 md:p-10">
+                <!-- Column 2: Countdown / Clock (md:col-span-3 = 75%) -->
+                <div class="md:col-span-3 text-center md:text-left p-2">
                     <!-- NEW: Restructured countdown/clock -->
-                    <div class="text-center">
-                        <!-- Line 1: "The time is HH:MM:SS. There are" -->
-                        <div id="live-clock-sentence" class="text-2xl font-medium text-gray-600 tabular-nums">
-                        Loading...
-                    </div>
                     <!-- Line 2: "HH:MM:SS" (countdown) -->
                     <div id="countdown-display" class="text-6xl md:text-8xl font-bold text-gray-800 tabular-nums my-2">
                         --:--
@@ -578,16 +580,14 @@
                         <!-- JS will populate this -->
                     </div>
                 </div>
-
-                <!-- Status messages remain -->
-                <div class="text-center text-gray-500 text-lg mt-6"> <!-- Added more margin -->
-                    Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
-                </div>
             
-            </div> <!-- NEW in 4.44: Close col-span-2 div -->
-        </div> <!-- NEW in 4.44: Close grid div -->
+            </div> <!-- End Grid (Graphic/Countdown) -->
 
-            <!-- DELETED: Old Mute Controls -->
+            <!-- NEW in 4.49: Full Width Status Footer -->
+            <!-- This element is pulled out of the grid to span the full width -->
+            <div class="text-center text-gray-500 text-lg mt-4 pt-4 border-t border-gray-100">
+                Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
+            </div>
 
         </div>
 
@@ -2370,8 +2370,11 @@
                 // --- NEW in 4.44: Update Visual Cue ---
                 try {
                     // Find the *current* period based on the countdown
-                    const currentPeriod = (activeTimerMillis < millisToScheduleBell) 
-                        ? null // It's a Quick Bell, no period
+                    // Check 1: Is it a Quick Bell? OR is it counting down to the next day (> 6 hours = 21600000ms)?
+                    const isNextDayBell = activeTimerMillis > (6 * 3600 * 1000); // More than 6 hours
+                    
+                    const currentPeriod = (activeTimerMillis < millisToScheduleBell || isNextDayBell) 
+                        ? null // It's a Quick Bell OR it's the next day (End of Day)
                         : (scheduleBellObject ? calculatedPeriodsList.find(p => p.name === scheduleBellObject.periodName) : null);
 
                     let visualHtml = '';
@@ -5082,10 +5085,10 @@
                 // 6. Populate sound dropdowns
                 // MODIFIED in 4.40: Use sharedSoundInput as the template, not the deleted personalSoundInput
                 const sharedSoundSelect = document.getElementById('shared-bell-sound');
-                if (relativeBellSoundSelect && sharedSoundSelect) {
+                if (addStaticBellSound && sharedSoundSelect) {
                     updateSoundDropdowns();
-                    relativeBellSoundSelect.innerHTML = sharedSoundSelect.innerHTML;
-                    relativeBellSoundSelect.value = rawBell.sound; // Select the bell's sound
+                    addStaticBellSound.innerHTML = sharedSoundSelect.innerHTML;
+                    addStaticBellSound.value = 'ellisBell.mp3'; // Reset to default
                 }
     
                 // 3. Show Modal
@@ -5241,33 +5244,10 @@
                             offsetSeconds: totalOffsetSeconds
                         };
                         console.log("Saving relative bell with stable 'period_end' anchor.");
-                    }
+                    };
                 }
                 
-                // DELETED in 4.48: This line was a duplicate and caused a SyntaxError.
-                // const periodName = currentRelativePeriod.name;
-                if (period && period.bells.length > 0) {
-                    const firstBell = period.bells[0];
-                    const lastBell = period.bells[period.bells.length - 1];
-
-                    if (parentBellId === firstBell.bellId) {
-                        // It's anchored to Period Start!
-                        finalBell.relative = {
-                            parentPeriodName: period.name,
-                            parentAnchorType: 'period_start',
-                            offsetSeconds: totalOffsetSeconds
-                        };
-                        console.log("Saving relative bell with stable 'period_start' anchor.");
-                    } else if (parentBellId === lastBell.bellId) {
-                        // It's anchored to Period End!
-                        finalBell.relative = {
-                            parentPeriodName: period.name,
-                            parentAnchorType: 'period_end',
-                            offsetSeconds: totalOffsetSeconds
-                        };
-                        console.log("Saving relative bell with stable 'period_end' anchor.");
-                    }
-                }
+                // NEW in 4.49: Removed duplicate stable anchor logic and redundant periodName declaration.
                 
                 const periodName = currentRelativePeriod.name;
 
@@ -7357,11 +7337,10 @@
                 const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 
                 try {
-                    const docSnap = await getDoc(personalScheduleRef);
-                    if (!docSnap.exists()) throw new Error("Personal schedule not found.");
+                    // Use the global state array which is maintained by the activePersonalScheduleListener
+                    const existingPeriods = personalBellsPeriods || []; 
+                    if (!existingPeriods.length) throw new Error("Personal schedule periods are empty or not loaded.");
 
-                    const existingPeriods = docSnap.data().periods || [];
-                    
                     // Create a map of children by their bellId for quick lookup
                     const childMap = new Map(children.map(c => [c.bellId, c]));
 
@@ -7478,4 +7457,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.47 -->
+<!-- Version 4.48 -->
