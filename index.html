@@ -3261,7 +3261,11 @@
                         const calculatedResult = calculateRelativeBellTime(bell, bellMap, allPeriods, new Set());
                         // MODIFIED in 4.31: Check the result
                         let calculatedTime = null;
-                        if (calculatedResult && typeof calculatedResult === 'object' && calculatedResult.isOrphan) {
+                        if (!calculatedResult) {
+                            // NEW V4.75: Calculation failed (e.g., circular dependency detected during recursion).
+                            console.warn(`Bell calculation failed for "${bell.name}". Skipping.`);
+                            calculatedTime = null;
+                        } else if (calculatedResult && typeof calculatedResult === 'object' && calculatedResult.isOrphan) {
                             orphans.push(calculatedResult); // Add to orphan list
                             calculatedTime = null; // Do not include in this period
                         } else {
