@@ -526,11 +526,11 @@
 
 
     <!-- Main Application -->
-    <!-- MODIFIED in 4.48: Widened main container from 2xl to 4xl -->
+    <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.49</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.48</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -626,10 +626,14 @@
 
         <!-- Combined Bell Schedule List -->
         <div>
-            <!-- NEW: Mute Controls added -->
+            <!-- NEW: Mute & Collapse Controls added -->
             <div class="flex justify-between items-center mb-4">
                  <h2 id="schedule-title" class="text-2xl font-semibold">Current Schedule</h2>
                  <div class="flex-shrink-0 flex gap-2">
+                     <!-- NEW in 4.49: Collapse/Expand Buttons -->
+                     <button id="collapse-all-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Collapse All</button>
+                     <button id="expand-all-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Expand All</button>
+                     <!-- End Collapse/Expand -->
                      <button id="mute-all-list-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Mute All</button>
                      <button id="unmute-all-list-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Unmute All</button>
                  </div>
@@ -1005,7 +1009,7 @@
                     </select>
                 </div>
                 
-                <!-- MODIFIED in 4.49: Removed max-h-48 and added h-48 to force a square using aspect-square -->
+                <<!-- MODIFIED in 4.49: Removed max-h-48 and added h-48 to force a consistent square preview -->
                 <div id="edit-period-image-preview" class="w-full aspect-square h-48 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 mb-4">
                     <span class="text-gray-400">Image Preview</span>
                 </div>
@@ -1589,6 +1593,8 @@
 
         let oscillatorAlertInterval = null; // NEW in 4.38: For pre-bell wake-up
         let isOscillatorAlert = false; // NEW in 4.38: Flag for pre-bell wake-up
+        
+        let periodCollapsePreference = {}; // NEW in 4.49: Store collapse state { periodName: bool }
 
         let lastClockCheckTimestamp = 0; // NEW in 4.35: For missed bell recovery
         let currentDay = new Date().getDay(); // NEW in 4.35: To clear missed bells
@@ -2496,9 +2502,12 @@
                 const visualValue = periodVisualOverrides[visualKey] || "";
                 // MODIFIED in 4.45: Use the new 'Icon' function
                 const visualIconHtml = getVisualIconHtml(visualValue, originalPeriodName);
+                
+                // NEW in 4.49: Check collapse preference state
+                const isPeriodOpen = periodCollapsePreference[originalPeriodName] !== false; // Default to true
 
                 let periodHtml = `
-                    <details class="group border-b border-gray-200" open>
+                    <details class="group border-b border-gray-200" ${isPeriodOpen ? 'open' : ''} data-period-name-raw="${safePeriodName}">
                         <summary class="flex items-start justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                             <!-- NEW in 4.44: Small Visual Cue Icon -->
                             <!-- MODIFIED in 4.47: Changed back to rounded-full -->
@@ -2605,52 +2614,35 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Right side controls (Audio + Admin) -->
-                                <div class="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:space-x-4 gap-2 sm:gap-0">
+                                <!-- Right side controls (CONSOLIDATED: Edit, Delete, Play, Mute) -->
+                                <div class="flex-shrink-0 flex items-center space-x-2">
                                 
-                                    <!-- Group 1: Audio Controls (Sound, Play, Mute) -->
-                                    <div class="flex items-center space-x-2">
-                                        <button class="sound-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                                                style="${isCustom ? 'display: none;' : ''}"
-                                                aria-label="Change sound for ${safeName}"
-                                                title="Change sound">Sound</button>
-                                        
-                                        <button class="preview-bell-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300" 
-                                                aria-label="Play sound for ${safeName}"
-                                                title="Play Sound">&#9654;</button>
+                                    <!-- 1. Edit Button (Consolidated for Custom or Shared/Admin) -->
+                                    <button class="${isCustom ? 'edit-custom-btn' : 'edit-btn'} px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                                            style="${!isCustom && !isAdmin ? 'display: none;' : ''}" <!-- Only show if custom OR admin -->
+                                            aria-label="Edit bell ${safeName}"
+                                            title="Edit bell">Edit</button>
+
+                                    <!-- 2. Delete Button (Consolidated for Custom or Shared/Admin) -->
+                                    <button class="${isCustom ? 'delete-custom-btn' : 'delete-btn'} px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                            style="${!isCustom && !isAdmin ? 'display: none;' : ''}" <!-- Only show if custom OR admin -->
+                                            aria-label="Delete bell ${safeName}"
+                                            title="Delete bell">Delete</button>
+
+                                    <!-- 3. Play/Preview Button -->
+                                    <button class="preview-bell-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300" 
+                                            aria-label="Play sound for ${safeName}"
+                                            title="Play Sound">&#9654;</button>
     
-                                        <label class="flex items-center space-x-2 cursor-pointer p-1"> 
-                                            <span class="text-sm font-medium text-gray-700">Mute</span>
-                                            <input type="checkbox" class="bell-mute-toggle h-5 w-5 text-blue-600 rounded focus:ring-blue-500" 
-                                                   data-bell-id="${bellId}" ${isMuted ? 'checked' : ''} 
-                                                   aria-label="Mute this bell">
-                                        </label>
-                                    </div>
-    
-                                    <!-- Group 2: Admin/Edit Controls -->
-                                    <div class="flex-shrink-0 space-x-2">
-                                        <!-- Admin-only Edit/Delete for SHARED bells -->
-                                        <button class="edit-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                                                style="${isCustom ? 'display: none;' : ''}"
-                                                aria-label="Edit shared bell ${safeName}"
-                                                title="Edit shared bell">Edit</button>
-                                        
-                                        <button class="delete-btn px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
-                                                style="${isCustom ? 'display: none;' : ''}"
-                                                aria-label="Delete shared bell ${safeName}"
-                                                title="Delete shared bell">Delete</button>
-                                        
-                                        <!-- Custom Bell Edit/Delete -->
-                                        <button class="edit-custom-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                                                style="${!isCustom ? 'display: none;' : ''}"
-                                                aria-label="Edit custom bell ${safeName}"
-                                                title="Edit custom bell">Edit</button>
-                                        
-                                        <button class="delete-custom-btn px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
-                                                style="${!isCustom ? 'display: none;' : ''}"
-                                                aria-label="Delete custom bell ${safeName}"
-                                                title="Delete custom bell">Delete</button>
-                                    </div>
+                                    <!-- 4. Mute Toggle -->
+                                    <label class="flex items-center space-x-2 cursor-pointer p-1"> 
+                                        <span class="text-sm font-medium text-gray-700 hidden sm:inline">Mute</span>
+                                        <input type="checkbox" class="bell-mute-toggle h-5 w-5 text-blue-600 rounded focus:ring-blue-500" 
+                                               data-bell-id="${bellId}" ${isMuted ? 'checked' : ''} 
+                                               aria-label="Mute this bell">
+                                    </label>
+                                    
+                                    <!-- The old "Sound" button is now redundant and removed here. -->
                                 </div>
                             </div>
                         `;
@@ -7131,20 +7123,19 @@
 
                 // NEW in 4.44: Edit Period Details Modal Listeners
                 editPeriodForm.addEventListener('submit', handleSubmitEditPeriodDetails);
-                / MODIFIED in 4.44: Also clear state on cancel
+                // MODIFIED in 4.44: Also clear state on cancel
                 editPeriodCancelBtn.addEventListener('click', () => {
                     editPeriodModal.classList.add('hidden');
                     currentRenamingPeriod = null; // Clear stale state
                 });
                 // FIX in 4.49: Ensure listener uses "Default" fallback for period name if state is missing
                 editPeriodImageSelect.addEventListener('change', () => {
+                    // NEW in 4.44: Update the preview
                     const selectedValue = editPeriodImageSelect.value;
-                    // FIX in 4.49: Ensure currentRenamingPeriod is available before using its name
+                    // FIX: Use 'Default' fallback
                     const periodName = currentRenamingPeriod ? currentRenamingPeriod.name : "Default"; 
                     editPeriodImagePreview.innerHTML = getVisualHtml(selectedValue, periodName);
                 });
-                
-                // DELETED in 4.44: Old Period Rename Listeners
 
                 // DELETED in 4.44: Old Period Rename Listeners
                 // renamePeriodForm.addEventListener('submit', handleRenamePeriodSubmit);
@@ -7247,6 +7238,30 @@
                 
                 // Event delegation
                 combinedBellListElement.addEventListener('click', handleBellListClick);
+                
+                // NEW in 4.49: Save period collapse state when a period is toggled
+                combinedBellListElement.addEventListener('toggle', (e) => {
+                    if (e.target.tagName === 'DETAILS') {
+                        const rawName = e.target.dataset.periodNameRaw;
+                        periodCollapsePreference[rawName] = e.target.open;
+                        // State is stored in session memory for now.
+                    }
+                });
+
+                // NEW in 4.49: Collapse/Expand All Buttons
+                document.getElementById('collapse-all-btn').addEventListener('click', () => {
+                    combinedBellListElement.querySelectorAll('details').forEach(d => {
+                        d.open = false;
+                        periodCollapsePreference[d.dataset.periodNameRaw] = false;
+                    });
+                });
+
+                document.getElementById('expand-all-btn').addEventListener('click', () => {
+                    combinedBellListElement.querySelectorAll('details').forEach(d => {
+                        d.open = true;
+                        periodCollapsePreference[d.dataset.periodNameRaw] = true;
+                    });
+                });
                 
                 // NEW: v4.22 - User Message Modal Listener
                 userMessageOkBtn.addEventListener('click', () => {
