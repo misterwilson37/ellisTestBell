@@ -3116,13 +3116,13 @@
                     }
 
                     // 2c. Recursively find the parent's time
-                    // CRITICAL V4.64 FIX: Pass the 'allPeriods' variable, not a new Set.
+                    // CRITICAL V4.64.9 FIX: Must pass the 'allPeriods' variable to the recursive call to avoid crashing recursion.
                     const parentTime = calculateRelativeBellTime(parentBell, bellMap, allPeriods, new Set(visited));
                     if (!parentTime) {
                         console.warn(`Could not calculate time for parent of "${bell.name}".`);
                         return null; // Parent calculation failed
                     }
-
+                    
                     // 2d. Calculate this bell's time
                     const parentSeconds = timeToSeconds(parentTime);
                     const myTimeSeconds = parentSeconds + bell.relative.offsetSeconds;
@@ -6388,17 +6388,15 @@
                     // Case 1: Value is "" (None/Default)
                     return getDefaultVisualCue(periodName);
                 }
-                // NEW V4.63.4: Render Custom Text Visual Cue in Full Size Preview
                 if (value.startsWith('[CUSTOM_TEXT]')) {
-                    // NEW V4.60.4: If custom text is selected
+                    // NEW V4.63.4: Render Custom Text Visual Cue in Full Size Preview
                     const customText = value.replace('[CUSTOM_TEXT] ', '').toUpperCase();
-                    // MODIFIED V4.63.8: Use SVG text rendering for proper scaling within the 10x10 icon space.
-                    const svgFontSize = customText.length > 2 ? 60 : 80; // Larger font size for FULL preview
+                    // MODIFIED V4.64.6: Use proper font size for the FULL preview window.
+                    const svgFontSize = customText.length > 2 ? 60 : 80;
                     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full">
                         <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor">${customText}</text>
                     </svg>`;
-                    // Render text in the small circular container
-                    // CRITICAL V4.64.1 FIX: Removed reference to 'sharedClasses' (which only exists in icon helper)
+                    // CRITICAL V4.64.6 FIX: Use standard preview container classes (ReferenceError fix).
                     return `<div class="w-full h-full p-8 text-blue-600 flex items-center justify-center">
                         ${svgContent}
                     </div>`;
@@ -6406,8 +6404,6 @@
                 if (value.startsWith('[DEFAULT]')) {
                     // Case 2: It's a default SVG key
                     return getDefaultVisualCue(value.replace('[DEFAULT] ', ''));
-                }
-                if (value.startsWith('http')) {
                 }
                 if (value.startsWith('http')) {
                     // Case 3: It's an uploaded image URL
@@ -6465,18 +6461,20 @@
                 if (value.startsWith('[CUSTOM_TEXT]')) {
                     // NEW V4.60.4: If custom text is selected
                     const customText = value.replace('[CUSTOM_TEXT] ', '').toUpperCase();
-                    const fontSize = customText.length > 2 ? 'xs' : 'sm'; // Adjust for small circle
+                    // MODIFIED V4.65: Use SVG text rendering for proper scaling within the 10x10 icon space.
+                    const svgFontSize = customText.length > 2 ? 30 : 40; // Use larger font size for 1-2 chars
+                    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor">${customText}</text>
+                    </svg>`;
                     // Render text in the small circular container
-                    // MODIFIED V4.60.4: Changed text size logic and background color
-                    return `<div class="${sharedClasses} bg-indigo-600 text-white text-${fontSize} font-extrabold flex items-center justify-center">
-                        ${customText}
+                    // CRITICAL V4.64.7 FIX: Use standard preview container classes (ReferenceError fix).
+                    return `<div class="w-full h-full p-8 text-blue-600 flex items-center justify-center">
+                        ${svgContent}
                     </div>`;
                 }
                 if (value.startsWith('[DEFAULT]')) {
-                    // If default SVG is selected, use the icon class set
-                    const defaultSvgHtml = getDefaultVisualCueIcon(value.replace('[DEFAULT] ', ''));
-                    // MODIFIED V4.60.3: Changed SVG color to blue for better contrast (fixes grey icon issue)
-                    return `<div class="${sharedClasses} bg-gray-200 text-blue-500 p-1">${defaultSvgHtml}</div>`;
+                    // Case 2: It's a default SVG key
+                    return getDefaultVisualCue(value.replace('[DEFAULT] ', ''));
                 }
                 if (value.startsWith('http')) {
                     // If uploaded image, use the URL and the shared classes (using object-cover for full circle fill)
