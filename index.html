@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.51</title>
+    <title>Ellis Web Bell 4.52</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -530,7 +530,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.51</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.52</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1009,13 +1009,25 @@
                     </select>
                 </div>
                 
-                <<!-- MODIFIED in 4.49: Removed max-h-48 and added h-48 to force a consistent square preview -->
-                <div id="edit-period-image-preview" class="w-full aspect-square h-48 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 mb-4">
-                    <span class="text-gray-400">Image Preview</span>
+                <!-- NEW in 4.51: Two-Column Preview Layout (Full Size + Icon Size) -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <!-- Column 1: Full Size Square Preview -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Full Size</label>
+                        <div id="edit-period-image-preview-full" class="w-full aspect-square h-32 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                            <span class="text-gray-400 text-xs">Preview</span>
+                        </div>
+                    </div>
+                    <!-- Column 2: Period Preview Size (Small Icon) -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Period Preview Size</label>
+                        <div id="edit-period-image-preview-icon" class="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                            <span class="text-gray-400 text-xs">Icon</span>
+                        </div>
+                    </div>
                 </div>
                 
                 <p id="edit-period-status-msg" class="text-blue-600 text-sm mt-4 hidden"></p>
-
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" id="edit-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
@@ -5855,8 +5867,9 @@
                 const savedVisual = periodVisualOverrides[visualKey] || "";
                 editPeriodImageSelect.value = savedVisual;
                 
-                // Show preview
-                editPeriodImagePreview.innerHTML = getVisualHtml(savedVisual, periodName);
+                // Show previews (MODIFIED in 4.51: Split into two columns)
+                document.getElementById('edit-period-image-preview-full').innerHTML = getVisualHtml(savedVisual, periodName);
+                document.getElementById('edit-period-image-preview-icon').innerHTML = getVisualIconHtml(savedVisual, periodName);
                 
                 editPeriodStatusMsg.classList.add('hidden');
                 editPeriodModal.classList.remove('hidden');
@@ -7141,13 +7154,15 @@
                     editPeriodModal.classList.add('hidden');
                     currentRenamingPeriod = null; // Clear stale state
                 });
-                // FIX in 4.49: Ensure listener uses "Default" fallback for period name if state is missing
+                // FIX in 4.53: Update listener to inject into both new two-column preview elements
                 editPeriodImageSelect.addEventListener('change', () => {
                     // NEW in 4.44: Update the preview
                     const selectedValue = editPeriodImageSelect.value;
                     // FIX: Use 'Default' fallback
                     const periodName = currentRenamingPeriod ? currentRenamingPeriod.name : "Default"; 
-                    editPeriodImagePreview.innerHTML = getVisualHtml(selectedValue, periodName);
+                    
+                    document.getElementById('edit-period-image-preview-full').innerHTML = getVisualHtml(selectedValue, periodName);
+                    document.getElementById('edit-period-image-preview-icon').innerHTML = getVisualIconHtml(selectedValue, periodName);
                 });
 
                 // DELETED in 4.44: Old Period Rename Listeners
@@ -7262,11 +7277,20 @@
                 });
 
                 // NEW in 4.49: Collapse/Expand All Buttons
+                document.getElementById('collapse-all-btn').addEventListener('click', () => {
+                    combinedBellListElement.querySelectorAll('details').forEach(d => {
+                        d.open = false;
+                        periodCollapsePreference[d.dataset.periodNameRaw] = false;
+                    });
+                    renderCombinedList(calculatedPeriodsList); // Force re-render after state change
+                });
+
                 document.getElementById('expand-all-btn').addEventListener('click', () => {
                     combinedBellListElement.querySelectorAll('details').forEach(d => {
                         d.open = true;
                         periodCollapsePreference[d.dataset.periodNameRaw] = true;
                     });
+                    renderCombinedList(calculatedPeriodsList); // Force re-render after state change
                 });
                 
                 // NEW: v4.22 - User Message Modal Listener
@@ -7482,4 +7506,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.51 -->
+<!-- Version 4.52 -->
