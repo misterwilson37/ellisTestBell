@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.50</title>
+    <title>Ellis Web Bell 4.51</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -530,7 +530,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.50</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.51</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1595,6 +1595,7 @@
         let isOscillatorAlert = false; // NEW in 4.38: Flag for pre-bell wake-up
         
         let periodCollapsePreference = {}; // NEW in 4.49: Store collapse state { periodName: bool }
+        let currentVisualPeriodName = null; // NEW in 4.50: Tracks the period currently displayed by the visual cue.
 
         let lastClockCheckTimestamp = 0; // NEW in 4.35: For missed bell recovery
         let currentDay = new Date().getDay(); // NEW in 4.35: To clear missed bells
@@ -2383,12 +2384,24 @@
                         ? null // It's a Quick Bell OR it's the next day (End of Day)
                         : (scheduleBellObject ? calculatedPeriodsList.find(p => p.name === scheduleBellObject.periodName) : null);
 
+                    // Determine the name of the period whose visual cue we SHOULD be displaying
+                    const nextPeriodName = currentPeriod ? currentPeriod.name : 
+                                           (millisToQuickBell < Infinity ? "Quick Bell" : "Passing Period");
+                                           
+                    // CRITICAL: Only proceed if the visual cue needs to change
+                    if (nextPeriodName === currentVisualPeriodName) {
+                        return; // Exit function early if the period hasn't changed
+                    }
+
+                    // Store the new period name
+                    currentVisualPeriodName = nextPeriodName; 
+
                     let visualHtml = '';
                     if (currentPeriod) {
                         const visualKey = getVisualOverrideKey(activeBaseScheduleId, currentPeriod.name);
                         const visualValue = periodVisualOverrides[visualKey] || "";
                         visualHtml = getVisualHtml(visualValue, currentPeriod.name);
-                    } else if (millisToQuickBell < Infinity) {
+                    } else if (nextPeriodName === "Quick Bell") {
                         // Special icon for Quick Bell
                         visualHtml = `<div class="w-full h-full p-8 text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg></div>`;
                     } else {
@@ -2396,10 +2409,9 @@
                         visualHtml = getDefaultVisualCue("Passing Period");
                     }
                     
-                    // Inject into main container
-                    if (visualCueContainer.innerHTML !== visualHtml) {
-                        visualCueContainer.innerHTML = visualHtml;
-                    }
+                    // Inject into main container (now only runs once per period change)
+                    visualCueContainer.innerHTML = visualHtml;
+                    
                 } catch (e) {
                     console.error("Error updating visual cue:", e);
                 }
@@ -7250,13 +7262,6 @@
                 });
 
                 // NEW in 4.49: Collapse/Expand All Buttons
-                document.getElementById('collapse-all-btn').addEventListener('click', () => {
-                    combinedBellListElement.querySelectorAll('details').forEach(d => {
-                        d.open = false;
-                        periodCollapsePreference[d.dataset.periodNameRaw] = false;
-                    });
-                });
-
                 document.getElementById('expand-all-btn').addEventListener('click', () => {
                     combinedBellListElement.querySelectorAll('details').forEach(d => {
                         d.open = true;
@@ -7273,20 +7278,21 @@
                 const muteAllListBtn = document.getElementById('mute-all-list-btn');
                 const unmuteAllListBtn = document.getElementById('unmute-all-list-btn');
                 muteAllListBtn.addEventListener('click', () => {
-                    // MODIFIED: v3.03
+                    // MODIFIED: v4.50 - Use master function to guarantee stability
                     const allBells = [...localSchedule, ...personalBells];
                     allBells.forEach(bell => {
                         const bellId = getBellId(bell);
                         if(bellId) mutedBellIds.add(bellId);
                     });
                     saveMutedBells();
-                    renderCombinedList();
+                    recalculateAndRenderAll(); // CALL MASTER FUNCTION
                     updateClock();
                 });
                 unmuteAllListBtn.addEventListener('click', () => {
+                    // MODIFIED: v4.50 - Use master function to guarantee stability
                     mutedBellIds.clear();
                     saveMutedBells();
-                    renderCombinedList();
+                    recalculateAndRenderAll(); // CALL MASTER FUNCTION
                     updateClock();
                 });
     
@@ -7476,4 +7482,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.50 -->
+<!-- Version 4.51 -->
