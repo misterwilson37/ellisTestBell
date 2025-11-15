@@ -70,7 +70,8 @@
         #internal-conflict-warning-modal { z-index: 50; }
         #external-conflict-modal { z-index: 50; }
         #create-personal-schedule-modal { z-index: 50; }
-        #confirm-delete-personal-modal { z-index: 50; }
+        /* MODIFIED V4.60: Increase delete modal z-index */
+        #confirm-delete-personal-modal { z-index: 70; }
         #confirm-restore-modal { z-index: 50; }
         /* NEW: v3.26 - Add rename modal to z-50 */
         #rename-personal-schedule-modal { z-index: 50; }
@@ -2769,8 +2770,17 @@
                                         data-period-origin="${isOnlyPersonal ? 'custom' : 'shared'}"
                                         class="rename-period-btn px-3 py-1 text-xs bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
                                         title="Edit period details for ${safePeriodName}"
+                                        title="Edit period details for ${safePeriodName}"
                                         ${isUserAnonymous ? 'style="display: none;"' : ''}>
                                     Edit Period
+                                </button>
+                                
+                                <!-- NEW V4.60: Delete Custom Period Button in List View -->
+                                <button data-period-name="${safePeriodName}" 
+                                        class="delete-list-period-btn px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                        title="Delete custom period ${safePeriodName}"
+                                        style="${isOnlyPersonal && activePersonalScheduleId ? '' : 'display: none;'}">
+                                    Delete Period
                                 </button>
     
                                 <span class="hidden sm:inline-block ml-2 text-gray-600">
@@ -7852,7 +7862,22 @@
                 }
                 
                 // Event delegation
+                // Event delegation
                 combinedBellListElement.addEventListener('click', handleBellListClick);
+                
+                // NEW in 4.60: Handle Delete Period button click in list view
+                combinedBellListElement.addEventListener('click', (e) => {
+                    const target = e.target;
+                    const deleteBtn = target.closest('.delete-list-period-btn');
+                    if (deleteBtn) {
+                        const periodName = deleteBtn.dataset.periodName;
+                        if (periodName) {
+                            // Call the deletion handler (it includes confirmation)
+                            handleDeleteCustomPeriod(periodName);
+                            return; // Action handled
+                        }
+                    }
+                });
                 
                 // NEW in 4.49: Save period collapse state when a period is toggled
                 combinedBellListElement.addEventListener('toggle', (e) => {
