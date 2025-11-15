@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.61</title>
+    <title>Ellis Web Bell 4.62</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -531,7 +531,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.61</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.62</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -2665,7 +2665,8 @@
                 // NEW in 4.41: Detailed logging for ring accuracy
                 const actualTime = new Date();
                 const actualTimeHHMMSS = `${String(actualTime.getHours()).padStart(2, '0')}:${String(actualTime.getMinutes()).padStart(2, '0')}:${String(actualTime.getSeconds()).padStart(2, '0')}`;
-                console.log(`Ringing bell: "${bell.name}" | Scheduled: ${bell.time} | Actual: ${actualTimeHHMMSS}`);
+                // MODIFIED V4.62.2: Log the sound being played
+                console.log(`Ringing bell: "${bell.name} (${soundName})" | Scheduled: ${bell.time} | Actual: ${actualTimeHHMMSS}`);
                 
                 await playBell(bell.sound); // Now awaits the async playBell
                 statusElement.textContent = `Ringing: ${bell.name}`;
@@ -2817,10 +2818,28 @@
                         const safeName = bell.name.replace(/"/g, '&quot;');
                         const bellId = getBellId(bell);
                         const isMuted = mutedBellIds.has(bellId);
-                        const originalSound = bell.originalSound || bell.sound;
-                        const isOverridden = bell.sound !== originalSound; 
-    
+                        // CRITICAL V4.62.9: Use the original sound from the base schedule if it exists, otherwise check if it's a shared bell.
+                        // This prevents shared bells from showing their sound path if the originalSound property wasn't populated.
+                        const originalSound = bell.originalSound || (bell.type === 'shared' ? bell.sound : null);
+                        
+                        // Determine if an override is active based on the *current* bell sound vs. the original shared sound
+                        const isOverridden = originalSound && (bell.sound !== originalSound); 
+                        
                         let soundDisplay = bell.sound;
+                        
+                        // NEW V4.62.3: If overridden, we display the name of the *original* shared sound (if it was shared),
+                        // but if it's a custom sound, we use the URL logic below.
+                        if (isOverridden) {
+                            // If overridden, we use the *custom* sound name for display
+                            soundDisplay = bell.sound;
+                        } else if (bell.type === 'shared' && originalSound) {
+                            // If not overridden and shared, we show the original sound name
+                            soundDisplay = originalSound;
+                        } else {
+                            // If custom bell, or shared but no original sound, use the current sound.
+                            soundDisplay = bell.sound;
+                        }
+                        
                         if (soundDisplay && soundDisplay.startsWith('http')) {
                             try {
                                 const url = new URL(soundDisplay);
@@ -2835,8 +2854,9 @@
                             soundDisplay = "No Sound";
                         }
                         
+                        // NEW V4.62.3: Reapply the override flag AFTER naming convention is resolved
                         if (isOverridden) {
-                            soundDisplay = `Custom: ${soundDisplay}`;
+                            soundDisplay = `Override: ${soundDisplay}`;
                         }
     
                         return `
@@ -7948,12 +7968,14 @@
                         option = document.createElement('option');
                         option.value = storedValue;
                         option.textContent = `Custom Text: ${customText}`;
-                        // Insert it near the Custom Text prompt
-                        const customTextPrompt = currentVisualSelectTarget.querySelector('option[value="[CUSTOM_TEXT]"]');
-                        if (customTextPrompt) {
-                            customTextPrompt.insertAdjacentElement('afterend', option);
+                        // NEW V4.62.11: Insert it near the Default SVGs optgroup for permanence
+                        const defaultGroup = currentVisualSelectTarget.querySelector('optgroup[label="Default SVGs"]');
+                        if (defaultGroup) {
+                            // Insert the dynamic option just *before* the Default SVGs group
+                            defaultGroup.insertAdjacentElement('beforebegin', option);
                         } else {
-                            currentVisualSelectTarget.querySelector('optgroup[label="My Visuals"]').insertAdjacentElement('beforebegin', option);
+                            // Fallback if the optgroup structure changes
+                            currentVisualSelectTarget.appendChild(option);
                         }
                     } else {
                         option.textContent = `Custom Text: ${customText}`; // Update existing option text
@@ -7969,17 +7991,35 @@
 
                 // Attach a general change listener to the visual selects to catch the [CUSTOM_TEXT] selection
                 const visualSelectChangeHandler = (e) => {
+                    
+                    // NEW V4.62.5: Handle [UPLOAD] option to open the visual manager
+                    if (e.target.value === '[UPLOAD]') {
+                        // Keep the current selection if it was a file URL, otherwise revert to empty
+                        const originalValue = Array.from(e.target.options).find(opt => opt.selected)?.value || '';
+                        e.target.value = originalValue !== '[UPLOAD]' ? originalValue : '';
+                        
+                        // Scroll to the visual manager section
+                        document.getElementById('visual-manager-panel').scrollIntoView({ behavior: 'smooth' });
+                        return;
+                    }
+                    
                     if (e.target.value === '[CUSTOM_TEXT]') {
                         // Store the target select element
                         currentVisualSelectTarget = e.target;
                         
-                        // Check if an existing custom text is active
-                        const currentVisualKey = currentVisualSelectTarget.value;
-                        if (currentVisualKey && currentVisualKey.startsWith('[CUSTOM_TEXT]')) {
-                            // Pre-fill the input with the existing text
-                            customTextInput.value = currentVisualKey.replace('[CUSTOM_TEXT] ', '');
+                        // MODIFIED V4.62.5: The dropdown repopulates, so we must find the currently 
+                        // selected option (which may be a dynamically created [CUSTOM_TEXT] value).
+                        const selectedOption = Array.from(e.target.options).find(opt => opt.selected);
+                        const originalValue = selectedOption ? selectedOption.value : '';
+
+                        // Logic to pre-fill the input
+                        if (originalValue.startsWith('[CUSTOM_TEXT]')) {
+                            customTextInput.value = originalValue.replace('[CUSTOM_TEXT] ', '');
+                            e.target.value = originalValue; // Keep the original custom value selected
                         } else {
-                            customTextInput.value = ''; // Clear it
+                            customTextInput.value = ''; 
+                            // CRITICAL: Revert value to "" if the user selected [CUSTOM_TEXT] but had no custom value saved
+                            e.target.value = ""; 
                         }
                         
                         // Show the modal
@@ -7989,7 +8029,6 @@
                         setTimeout(() => customTextInput.select(), 50);
                     }
                 };
-                
                 // NEW in 4.60.3: Attach the custom text handler to the main edit/new period selects
                 editPeriodImageSelect.addEventListener('change', visualSelectChangeHandler);
                 newPeriodImageSelect.addEventListener('change', visualSelectChangeHandler);
@@ -8202,4 +8241,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.61 -->
+<!-- Version 4.62 -->
