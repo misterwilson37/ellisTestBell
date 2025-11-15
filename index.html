@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.48</title>
+    <title>Ellis Web Bell 4.49</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -530,7 +530,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.48</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.49</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1005,8 +1005,8 @@
                     </select>
                 </div>
                 
-                <!-- MODIFIED in 4.46: Changed h-32 to aspect-square for a square preview -->
-                <div id="edit-period-image-preview" class="w-full aspect-square max-h-48 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 mb-4">
+                <!-- MODIFIED in 4.49: Removed max-h-48 and added h-48 to force a square using aspect-square -->
+                <div id="edit-period-image-preview" class="w-full aspect-square h-48 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 mb-4">
                     <span class="text-gray-400">Image Preview</span>
                 </div>
                 
@@ -7131,17 +7131,20 @@
 
                 // NEW in 4.44: Edit Period Details Modal Listeners
                 editPeriodForm.addEventListener('submit', handleSubmitEditPeriodDetails);
-                // MODIFIED in 4.44: Also clear state on cancel
+                / MODIFIED in 4.44: Also clear state on cancel
                 editPeriodCancelBtn.addEventListener('click', () => {
                     editPeriodModal.classList.add('hidden');
                     currentRenamingPeriod = null; // Clear stale state
                 });
+                // FIX in 4.49: Ensure listener uses "Default" fallback for period name if state is missing
                 editPeriodImageSelect.addEventListener('change', () => {
-                    // NEW in 4.44: Update the preview
                     const selectedValue = editPeriodImageSelect.value;
-                    const periodName = currentRenamingPeriod ? currentRenamingPeriod.name : "";
+                    // FIX in 4.49: Ensure currentRenamingPeriod is available before using its name
+                    const periodName = currentRenamingPeriod ? currentRenamingPeriod.name : "Default"; 
                     editPeriodImagePreview.innerHTML = getVisualHtml(selectedValue, periodName);
                 });
+                
+                // DELETED in 4.44: Old Period Rename Listeners
 
                 // DELETED in 4.44: Old Period Rename Listeners
                 // renamePeriodForm.addEventListener('submit', handleRenamePeriodSubmit);
@@ -7457,4 +7460,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.48 -->
+<!-- Version 4.49 -->
