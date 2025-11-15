@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.57</title>
+    <title>Ellis Web Bell 4.58</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -530,7 +530,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.57</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.58</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1041,9 +1041,15 @@
                 </div>
                 
                 <p id="edit-period-status-msg" class="text-blue-600 text-sm mt-4 hidden"></p>
-                <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="edit-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+                <!-- NEW in 4.58: Delete button for custom periods -->
+                <div class="mt-6 flex justify-between gap-3">
+                    <button type="button" id="delete-custom-period-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 hidden">
+                        Delete Period
+                    </button>
+                    <div class="flex gap-3 ml-auto">
+                        <button type="button" id="edit-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -1109,8 +1115,8 @@
                             <div>
                                 <label for="new-period-start-direction" class="block text-sm font-medium text-gray-700">Direction</label>
                                 <select id="new-period-start-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                    <option value="after">After</option>
                                     <option value="before">Before</option>
+                                    <option value="after">After</option>
                                 </select>
                             </div>
                             <div>
@@ -1156,8 +1162,8 @@
                             <div>
                                 <label for="new-period-end-direction" class="block text-sm font-medium text-gray-700">Direction</label>
                                 <select id="new-period-end-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                    <option value="after">After</option>
                                     <option value="before">Before</option>
+                                    <option value="after">After</option>
                                 </select>
                             </div>
                             <div>
@@ -1191,6 +1197,18 @@
             </div>
         </div>
 
+        <!-- **** NEW: v4.58 - General User Confirmation Modal (For Deletion/Irreversible Actions) **** -->
+        <div id="user-confirmation-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+                <h3 id="user-confirmation-title" class="text-xl font-semibold text-gray-900 mb-3">Confirm Action</h3>
+                <p id="user-confirmation-text" class="text-gray-700 mb-6">Are you sure you want to proceed?</p>
+                <div class="flex justify-end space-x-3">
+                    <button id="user-confirmation-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button id="user-confirmation-ok" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Confirm</button>
+                </div>
+            </div>
+        </div>
+
         <!-- **** NEW: v4.42 - Multi-Add Relative Bell Modal **** -->
         <div id="multi-add-relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <form id="multi-add-relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
@@ -1215,8 +1233,8 @@
                     <div class="sm:col-span-2">
                         <label for="multi-add-relative-parent-anchor" class="block text-sm font-medium text-gray-700 mb-1">Parent Anchor</label>
                         <select id="multi-add-relative-parent-anchor" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="period_end">Period End</option>
                             <option value="period_start">Period Start</option>
+                            <option value="period_end">Period End</option>
                         </select>
                     </div>
                     <div>
@@ -1507,7 +1525,15 @@
         const userMessageText = document.getElementById('user-message-text');
         const userMessageOkBtn = document.getElementById('user-message-ok');
         
-        // --- NEW in 4.57: New Period Modal Variables ---
+        // --- NEW in 4.58: User Confirmation Modal Variables ---
+        const userConfirmationModal = document.getElementById('user-confirmation-modal');
+        const userConfirmationTitle = document.getElementById('user-confirmation-title');
+        const userConfirmationText = document.getElementById('user-confirmation-text');
+        const userConfirmationOkBtn = document.getElementById('user-confirmation-ok');
+        const userConfirmationCancelBtn = document.getElementById('user-confirmation-cancel');
+        // --- End User Confirmation Modal Variables ---
+
+        // NEW in 4.57: New Period Modal Variables
         const newPeriodModal = document.getElementById('new-period-modal');
         const newPeriodForm = document.getElementById('new-period-form');
         const newPeriodNameInput = document.getElementById('new-period-name');
@@ -1571,6 +1597,8 @@
         const editPeriodImagePreview = document.getElementById('edit-period-image-preview');
         const editPeriodStatusMsg = document.getElementById('edit-period-status-msg');
         const editPeriodCancelBtn = document.getElementById('edit-period-cancel-btn');
+        // NEW in 4.58: Delete button for custom periods
+        const deleteCustomPeriodBtn = document.getElementById('delete-custom-period-btn');
 
         // Orphan Modal (v4.12.2)
         const orphanHandlingModal = document.getElementById('orphan-handling-modal');
@@ -6047,6 +6075,18 @@
                 const overrideKey = getPeriodOverrideKey(activeBaseScheduleId, periodName);
                 editPeriodNewNameInput.value = periodNameOverrides[overrideKey] || periodName;
 
+                // NEW in 4.58: Show/Hide Delete Button and set up listener
+                // NEW in 4.58: Corrected logic to use 'finalType', which reflects the period's editable origin.
+                if (finalType === 'personal') {
+                    deleteCustomPeriodBtn.classList.remove('hidden');
+                    deleteCustomPeriodBtn.onclick = () => handleDeleteCustomPeriod(periodName);
+                } else {
+                    deleteCustomPeriodBtn.classList.add('hidden');
+                    deleteCustomPeriodBtn.onclick = null;
+                }
+                
+                // NEW in 4.44: Populate Visual Cue dropdown
+                
                 // NEW in 4.44: Populate Visual Cue dropdown
                 updateVisualDropdowns(); // Ensure list is fresh
                 
@@ -6142,9 +6182,61 @@
                 } catch (error) {
                     console.error("Error saving period details:", error);
                     editPeriodStatusMsg.textContent = `Error: ${error.message}`;
+                }
+            }
+
+            /**
+             * NEW: v4.58 - Handles deletion of a custom period.
+             */
+            async function handleDeleteCustomPeriod(periodName) {
+                if (!activePersonalScheduleId || !periodName) return;
+
+                const confirmed = await showConfirmationModal(
+                    `Are you sure you want to permanently delete your custom period "${periodName}"? All associated bells will also be deleted. This action cannot be undone.`,
+                    "Confirm Period Deletion",
+                    "Delete Period"
+                );
+
+                if (!confirmed) {
+                    // If user cancels deletion, keep the edit modal open but clear any status message
+                    document.getElementById('edit-period-status-msg').classList.add('hidden'); 
+                    return;
+                }
+                
+                try {
+                    // 1. Find the period in the raw data state
+                    const periodIndex = personalBellsPeriods.findIndex(p => p.name === periodName);
+                    if (periodIndex === -1) {
+                        throw new Error(`Period "${periodName}" not found in local state.`);
+                    }
+
+                    // 2. Remove the period from the array
+                    const updatedPeriods = [...personalBellsPeriods];
+                    updatedPeriods.splice(periodIndex, 1);
+
+                    // 3. Delete any period visual overrides associated with this period
+                    const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
+                    if (periodVisualOverrides[visualKey]) {
+                        delete periodVisualOverrides[visualKey];
+                        saveVisualOverrides();
+                    }
+
+                    // 4. Update Firestore
+                    const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+
+                    // Success handling
+                    showUserMessage(`Custom period "${periodName}" deleted successfully.`);
+                    
+                } catch (error) {
+                    console.error("Error deleting custom period:", error);
+                    showUserMessage(`Error deleting period: ${error.message}`);
+                } finally {
+                    editPeriodModal.classList.add('hidden');
+                    // Recalculate/Re-render handled automatically by the onSnapshot listener
                 }
             }
-    
+
             // --- NEW in 4.44: Visual Cue Display Logic ---
             
             /**
@@ -6300,10 +6392,76 @@
             }
     
             /**
-             * NEW: v4.03 - Simple message box
-             * MODIFIED: v4.22 - Replaced alert() with a custom modal.
+             * NEW: v4.58 - Shows a confirmation modal, returning a promise that resolves on OK/CONFIRM.
+             * @param {string} message - The confirmation text.
+             * @param {string} title - The modal title.
+             * @param {string} confirmText - Text for the confirm button.
+             * @returns {Promise<boolean>} Resolves true on OK, false on Cancel.
              */
-            function showUserMessage(message, title = "Notification") {
+            function showConfirmationModal(message, title = "Confirm Action", confirmText = "Confirm") {
+                return new Promise(resolve => {
+                    userConfirmationTitle.textContent = title;
+                    userConfirmationText.textContent = message;
+                    userConfirmationOkBtn.textContent = confirmText;
+                    userConfirmationModal.classList.remove('hidden');
+    
+                    const handleConfirm = () => {
+                        userConfirmationOkBtn.removeEventListener('click', handleConfirm);
+                        userConfirmationCancelBtn.removeEventListener('click', handleCancel);
+                        userConfirmationModal.classList.add('hidden');
+                        resolve(true);
+                    };
+    
+                    const handleCancel = () => {
+                        userConfirmationOkBtn.removeEventListener('click', handleConfirm);
+                        userConfirmationCancelBtn.removeEventListener('click', handleCancel);
+                        userConfirmationModal.classList.add('hidden');
+                        resolve(false);
+                    };
+    
+                    userConfirmationOkBtn.addEventListener('click', handleConfirm);
+                    userConfirmationCancelBtn.addEventListener('click', handleCancel);
+                });
+            }
+    
+            /**
+         * NEW: v4.58 - Shows a confirmation modal, returning a promise that resolves on OK/CONFIRM.
+         * @param {string} message - The confirmation text.
+         * @param {string} title - The modal title.
+         * @param {string} confirmText - Text for the confirm button.
+         * @returns {Promise<boolean>} Resolves true on OK, false on Cancel.
+         */
+        function showConfirmationModal(message, title = "Confirm Action", confirmText = "Confirm") {
+            return new Promise(resolve => {
+                userConfirmationTitle.textContent = title;
+                userConfirmationText.textContent = message;
+                userConfirmationOkBtn.textContent = confirmText;
+                userConfirmationModal.classList.remove('hidden');
+
+                const handleConfirm = () => {
+                    userConfirmationOkBtn.removeEventListener('click', handleConfirm);
+                    userConfirmationCancelBtn.removeEventListener('click', handleCancel);
+                    userConfirmationModal.classList.add('hidden');
+                    resolve(true);
+                };
+
+                const handleCancel = () => {
+                    userConfirmationOkBtn.removeEventListener('click', handleConfirm);
+                    userConfirmationCancelBtn.removeEventListener('click', handleCancel);
+                    userConfirmationModal.classList.add('hidden');
+                    resolve(false);
+                };
+
+                userConfirmationOkBtn.addEventListener('click', handleConfirm);
+                userConfirmationCancelBtn.addEventListener('click', handleCancel);
+            });
+        }
+
+        /**
+         * NEW: v4.03 - Simple message box
+         * MODIFIED: v4.22 - Replaced alert() with a custom modal.
+         */
+        function showUserMessage(message, title = "Notification") {
                 if (!userMessageModal) {
                     // Fallback if modal isn't ready, but avoid alert()
                     console.warn(`showUserMessage: ${title} - ${message}`);
@@ -6338,6 +6496,14 @@
                 newPeriodStartParent.innerHTML = periodOptionsHtml;
                 newPeriodEndParent.innerHTML = periodOptionsHtml;
                 
+                // NEW in 4.58: Set relative start bell defaults
+                newPeriodStartDirection.value = 'after'; // Default start to AFTER
+                newPeriodStartAnchorType.value = 'period_end'; // Default start anchor to Period End
+                
+                // NEW in 4.58: Set relative end bell defaults
+                newPeriodEndDirection.value = 'before'; // Default end to BEFORE
+                newPeriodEndAnchorType.value = 'period_start'; // Default end anchor to Period Start
+
                 // Add an empty option if no periods exist
                 if (basePeriodNames.length === 0) {
                      newPeriodStartParent.innerHTML = '<option value="" disabled selected>No Base Periods Available</option>';
@@ -6418,6 +6584,16 @@
                         const time = document.getElementById(`${prefix}-time`).value;
                         if (!time) throw new Error(`${prefix.split('-')[1]} time is required for static mode.`);
                         
+                        // NEW in 4.58: Validate Start < End Times during static creation
+                        if (prefix === 'new-period-end') {
+                            const startTime = newPeriodStartTime.value;
+                            const endTime = time;
+                            
+                            if (startTime && endTime && startTime >= endTime) {
+                                throw new Error("End Time must be after the Start Time.");
+                            }
+                        }
+
                         // Check for conflicts with existing bells (shared and personal)
                         const allBells = [...localSchedule, ...personalBells];
                         const nearbyBell = findNearbyBell(time, allBells);
@@ -7917,4 +8093,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.57 -->
+<!-- Version 4.58 -->
