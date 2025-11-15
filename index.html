@@ -1552,6 +1552,13 @@
         const userConfirmationCancelBtn = document.getElementById('user-confirmation-cancel');
         // --- End User Confirmation Modal Variables ---
 
+        // NEW in 4.60.3: Custom Text Visual Modal Variables
+        const customTextVisualModal = document.getElementById('custom-text-visual-modal');
+        const customTextVisualForm = document.getElementById('custom-text-visual-form');
+        const customTextInput = document.getElementById('custom-text-input');
+        const customTextCancelBtn = document.getElementById('custom-text-cancel-btn');
+        let currentVisualSelectTarget = null; // Stores the <select> element that opened the modal
+
         // NEW in 4.57: New Period Modal Variables
         const newPeriodModal = document.getElementById('new-period-modal');
         const newPeriodForm = document.getElementById('new-period-form');
@@ -6355,6 +6362,8 @@
                     const currentValue = select.value; // Preserve current selection if possible
                     select.innerHTML = `
                         <option value="">[None / Period Default]</option>
+                        ${uploadHtml}
+                        ${customTextOption}
                         <optgroup label="Default SVGs">
                             ${defaultHtml}
                         </optgroup>
@@ -6370,8 +6379,6 @@
             }
 
             /**
-             /**
-             /**
              * NEW: v4.44 - Gets the HTML for a given visual cue value.
              */
             function getVisualHtml(value, periodName) {
@@ -6379,9 +6386,25 @@
                     // Case 1: Value is "" (None/Default)
                     return getDefaultVisualCue(periodName);
                 }
+                // NEW V4.63.4: Render Custom Text Visual Cue in Full Size Preview
+                if (value.startsWith('[CUSTOM_TEXT]')) {
+                    // NEW V4.60.4: If custom text is selected
+                    const customText = value.replace('[CUSTOM_TEXT] ', '').toUpperCase();
+                    // MODIFIED V4.62.15: Use SVG text rendering for proper scaling within the 10x10 icon space.
+                    const svgFontSize = customText.length > 2 ? 30 : 40; // Use larger font size for 1-2 chars
+                    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor">${customText}</text>
+                    </svg>`;
+                    // Render text in the small circular container
+                    return `<div class="${sharedClasses} bg-indigo-600 text-white flex items-center justify-center">
+                        ${svgContent}
+                    </div>`;
+                }
                 if (value.startsWith('[DEFAULT]')) {
                     // Case 2: It's a default SVG key
                     return getDefaultVisualCue(value.replace('[DEFAULT] ', ''));
+                }
+                if (value.startsWith('http')) {
                 }
                 if (value.startsWith('http')) {
                     // Case 3: It's an uploaded image URL
