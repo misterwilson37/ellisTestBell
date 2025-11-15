@@ -3098,7 +3098,8 @@
                 if (bell.relative && bell.relative.parentBellId) {
                     // 2a. Check for circular dependencies
                     if (visited.has(bell.bellId)) {
-                        console.error(`Circular dependency detected for bell "${bell.name}" (ID: ${bell.bellId}).`);
+                        // MODIFIED V4.67: Make error log more explicit about the DATA being the problem.
+                        console.error(`Circular dependency detected for bell "${bell.name}" (ID: ${bell.bellId}). This is a DATA error in your database, not a code bug. One of this bell's parents refers back to it, creating an infinite loop. The bell will be skipped.`);
                         return null; // Stop recursion
                     }
                     visited.add(bell.bellId);
