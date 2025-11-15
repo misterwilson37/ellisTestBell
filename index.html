@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.52</title>
+    <title>Ellis Web Bell 4.53</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -530,7 +530,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.52</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.53</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1012,17 +1012,22 @@
                 <!-- NEW in 4.51: Two-Column Preview Layout (Full Size + Icon Size) -->
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <!-- Column 1: Full Size Square Preview -->
-                    <div>
+                    <div class="flex flex-col items-center">
                         <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Full Size</label>
-                        <div id="edit-period-image-preview-full" class="w-full aspect-square h-32 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                        <!-- MODIFIED in 4.53: Use a fixed, larger square container -->
+                        <div id="edit-period-image-preview-full" class="w-40 h-40 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 overflow-hidden p-2">
                             <span class="text-gray-400 text-xs">Preview</span>
                         </div>
                     </div>
                     <!-- Column 2: Period Preview Size (Small Icon) -->
-                    <div>
+                    <div class="flex flex-col items-center">
                         <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Period Preview Size</label>
-                        <div id="edit-period-image-preview-icon" class="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                            <span class="text-gray-400 text-xs">Icon</span>
+                        <!-- MODIFIED in 4.53: Use a fixed, small container to hold the circle icon -->
+                        <div class="w-40 h-40 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                            <!-- This inner DIV is the actual target for the tiny icon -->
+                            <div id="edit-period-image-preview-icon" class="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden">
+                                <span class="text-gray-400 text-xs">Icon</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -6032,6 +6037,7 @@
             }
 
             /**
+             /**
              * NEW: v4.44 - Gets the HTML for a given visual cue value.
              */
             function getVisualHtml(value, periodName) {
@@ -6045,8 +6051,8 @@
                 }
                 if (value.startsWith('http')) {
                     // Case 3: It's an uploaded image URL
-                    // MODIFIED in 4.46: Force to a large square, not w-full h-full
-                    return `<img src="${value}" alt="Visual Cue" class="w-32 h-32 sm:w-48 sm:h-48 object-contain">`;
+                    // MODIFIED in 4.53: Force image to fill and be contained by its parent DIV.
+                    return `<img src="${value}" alt="Visual Cue" class="w-full h-full object-contain">`;
                 }
                 // Fallback
                 return getDefaultVisualCue(periodName);
@@ -6086,15 +6092,26 @@
              * NEW: v4.45 - Gets the HTML for a *small icon* visual cue.
              */
             function getVisualIconHtml(value, periodName) {
+                // MODIFIED in 4.53: Added classes for circular clipping (rounded-full) 
+                // and sizing (w-10 h-10) to mimic the size used in the main schedule list.
+                const sharedClasses = "w-10 h-10 rounded-full object-cover shadow-md"; 
+                
                 if (!value) {
-                    return getDefaultVisualCueIcon(periodName);
+                    // If no image, return the default SVG, styled for the icon size/shape
+                    const defaultSvgHtml = getDefaultVisualCueIcon(periodName);
+                    // The SVG is injected into a div in the HTML, so we just return the raw SVG content.
+                    return `<div class="${sharedClasses} bg-gray-200 text-gray-500">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('[DEFAULT]')) {
-                    return getDefaultVisualCueIcon(value.replace('[DEFAULT] ', ''));
+                    // If default SVG is selected, use the icon class set
+                    const defaultSvgHtml = getDefaultVisualCueIcon(value.replace('[DEFAULT] ', ''));
+                    return `<div class="${sharedClasses} bg-gray-200 text-gray-500">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('http')) {
-                    return `<img src="${value}" alt="Icon" class="w-full h-full object-cover">`;
+                    // If uploaded image, use the URL and the shared classes
+                    return `<img src="${value}" alt="Icon" class="${sharedClasses} bg-gray-200">`;
                 }
+                // Fallback
                 return getDefaultVisualCueIcon(periodName);
             }
     
@@ -7506,4 +7523,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.52 -->
+<!-- Version 4.53 -->
