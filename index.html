@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.53</title>
+    <title>Ellis Web Bell 4.54</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -530,7 +530,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.53</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.54</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -790,31 +790,39 @@
             <div class="bg-white p-6 rounded-xl shadow-md mb-8">
                 <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">My Personal Schedule Manager</h3>
                 
-                <div class="space-y-3">
-                    <!-- NEW in 4.42: Multi-Add Relative Bell Button -->
-                    <button type="button" id="multi-add-relative-btn" class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg shadow-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        <span class="font-semibold">Add Multi-Period Bell</span>
-                        <span class="block text-sm opacity-90">Add one relative bell (e.g., "Clean up") to many periods.</span>
-                    </button>
+                <!-- NEW in 4.54: Multi-Add Relative Bell Button (Full Width, Prominent) -->
+                <button type="button" id="multi-add-relative-btn" class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg shadow-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4" disabled>
+                    <span class="font-semibold">Add Multi-Period Bell</span>
+                    <span class="block text-sm opacity-90">Add one relative bell (e.g., "Clean up") to many periods.</span>
+                </button>
 
-                    <button type="button" id="rename-personal-schedule-btn" class="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        Rename Selected Personal Schedule
+                <!-- ROW 1: Creation / Renaming (2-Column Grid) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <!-- NEW in 4.54: Add New Period Button -->
+                    <button type="button" id="new-period-btn" class="px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        + New Period
                     </button>
-                    
-                    <button type="button" id="backup-personal-schedule-btn" class="w-full px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        Back up Selected Personal Schedule
+                    <button type="button" id="rename-personal-schedule-btn" class="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Rename Schedule
                     </button>
-                    
-                    <button type="button" id="restore-personal-schedule-btn" class="w-full px-4 py-2 bg-yellow-500 text-black font-medium rounded-lg shadow-md hover:bg-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        Load/Overwrite Selected from Backup
+                </div>
+                
+                <!-- ROW 2: Backup / Restore (2-Column Grid) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-4 mb-4">
+                    <button type="button" id="backup-personal-schedule-btn" class="px-4 py-2 bg-gray-600 text-white font-medium rounded-lg shadow-md hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Download Backup (JSON)
                     </button>
+                    <button type="button" id="restore-personal-schedule-btn" class="px-4 py-2 bg-yellow-500 text-black font-medium rounded-lg shadow-md hover:bg-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Load/Overwrite from Backup
+                    </button>
+                </div>
 
-                    <div class="border-t pt-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Delete Current Personal Schedule</label>
-                        <button type="button" id="delete-personal-schedule-btn" class="w-full px-4 py-2 bg-red-600 text-white font-medium rounded-lg shadow-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Delete Selected Personal Schedule
-                        </button>
-                    </div>
+                <!-- ROW 3: Delete -->
+                <div class="border-t pt-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Delete Current Personal Schedule</label>
+                    <button type="button" id="delete-personal-schedule-btn" class="w-full px-4 py-2 bg-red-600 text-white font-medium rounded-lg shadow-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Delete Selected Personal Schedule
+                    </button>
                 </div>
             </div>
         </div>
@@ -5948,6 +5956,7 @@
 
                     // Force an immediate re-render and clock update
                     recalculateAndRenderAll();
+                    updateClock(); // NEW in 4.54: Force immediate visual cue refresh by the clock
                     
                     setTimeout(() => {
                         editPeriodModal.classList.add('hidden');
@@ -6038,6 +6047,7 @@
 
             /**
              /**
+             /**
              * NEW: v4.44 - Gets the HTML for a given visual cue value.
              */
             function getVisualHtml(value, periodName) {
@@ -6051,7 +6061,7 @@
                 }
                 if (value.startsWith('http')) {
                     // Case 3: It's an uploaded image URL
-                    // MODIFIED in 4.53: Force image to fill and be contained by its parent DIV.
+                    // MODIFIED in 4.54: Force image to fill and be contained by its parent DIV (fixing overlap).
                     return `<img src="${value}" alt="Visual Cue" class="w-full h-full object-contain">`;
                 }
                 // Fallback
@@ -6092,24 +6102,23 @@
              * NEW: v4.45 - Gets the HTML for a *small icon* visual cue.
              */
             function getVisualIconHtml(value, periodName) {
-                // MODIFIED in 4.53: Added classes for circular clipping (rounded-full) 
-                // and sizing (w-10 h-10) to mimic the size used in the main schedule list.
-                const sharedClasses = "w-10 h-10 rounded-full object-cover shadow-md"; 
+                // MODIFIED in 4.54: Added classes for circular clipping, sizing, and proper SVG padding.
+                const sharedClasses = "w-10 h-10 rounded-full shadow-md flex items-center justify-center overflow-hidden"; 
                 
                 if (!value) {
                     // If no image, return the default SVG, styled for the icon size/shape
                     const defaultSvgHtml = getDefaultVisualCueIcon(periodName);
-                    // The SVG is injected into a div in the HTML, so we just return the raw SVG content.
-                    return `<div class="${sharedClasses} bg-gray-200 text-gray-500">${defaultSvgHtml}</div>`;
+                    // NEW in 4.54: Add padding to the SVG for proper display in the tiny circle.
+                    return `<div class="${sharedClasses} bg-gray-200 text-gray-500 p-1">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('[DEFAULT]')) {
                     // If default SVG is selected, use the icon class set
                     const defaultSvgHtml = getDefaultVisualCueIcon(value.replace('[DEFAULT] ', ''));
-                    return `<div class="${sharedClasses} bg-gray-200 text-gray-500">${defaultSvgHtml}</div>`;
+                    return `<div class="${sharedClasses} bg-gray-200 text-gray-500 p-1">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('http')) {
-                    // If uploaded image, use the URL and the shared classes
-                    return `<img src="${value}" alt="Icon" class="${sharedClasses} bg-gray-200">`;
+                    // If uploaded image, use the URL and the shared classes (using object-cover for full circle fill)
+                    return `<img src="${value}" alt="Icon" class="w-full h-full object-cover rounded-full bg-gray-200">`;
                 }
                 // Fallback
                 return getDefaultVisualCueIcon(periodName);
@@ -7523,4 +7532,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.53 -->
+<!-- Version 4.54 -->
