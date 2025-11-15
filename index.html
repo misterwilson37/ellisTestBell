@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.54</title>
+    <title>Ellis Web Bell 4.57</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -530,7 +530,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.54</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.57</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1048,6 +1048,138 @@
             </form>
         </div>
 
+        <!-- **** NEW: v4.57 - New Period Modal (Static/Relative) **** -->
+        <div id="new-period-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <form id="new-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl">
+                <h3 class="text-2xl font-medium mb-6">Create New Personal Period</h3>
+                
+                <!-- Period Name and Visual -->
+                <div class="mb-4">
+                    <label for="new-period-name" class="block text-sm font-medium text-gray-700">Period Name</label>
+                    <input type="text" id="new-period-name" placeholder="e.g. Morning Duty" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="mb-6">
+                    <label for="new-period-image-select" class="block text-sm font-medium text-gray-700">Visual Cue</label>
+                    <select id="new-period-image-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+
+                <!-- NEW: Static/Relative Toggle -->
+                <div class="mb-6 flex space-x-4">
+                    <label class="flex items-center">
+                        <input type="radio" name="new-period-type" value="static" id="new-period-type-static" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                        <span class="ml-2 text-sm font-medium text-gray-700">Static Time Period</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="new-period-type" value="relative" id="new-period-type-relative" class="h-4 w-4 text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm font-medium text-gray-700">Relative Time Period</span>
+                    </label>
+                </div>
+
+                <!-- START BELL CONFIGURATION -->
+                <div class="border-t pt-4 mb-4">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">Start Bell (Anchor)</h4>
+                    <!-- Static Inputs -->
+                    <div id="new-period-start-static" class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="new-period-start-time" class="block text-sm font-medium text-gray-700">Time (HH:MM:SS)</label>
+                            <input type="time" id="new-period-start-time" step="1" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <!-- Relative Inputs -->
+                    <div id="new-period-start-relative" class="hidden space-y-3">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="new-period-start-parent" class="block text-sm font-medium text-gray-700">Anchor Period</label>
+                                <select id="new-period-start-parent" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <!-- Base Periods populated by JS -->
+                                </select>
+                            </div>
+                            <div>
+                                <label for="new-period-start-anchor-type" class="block text-sm font-medium text-gray-700">Anchor Bell</label>
+                                <select id="new-period-start-anchor-type" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <option value="period_start">Period Start</option>
+                                    <option value="period_end">Period End</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label for="new-period-start-direction" class="block text-sm font-medium text-gray-700">Direction</label>
+                                <select id="new-period-start-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <option value="after">After</option>
+                                    <option value="before">Before</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="new-period-start-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
+                                <input type="number" id="new-period-start-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label for="new-period-start-seconds" class="block text-sm font-medium text-gray-700">Seconds</label>
+                                <input type="number" id="new-period-start-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- END BELL CONFIGURATION -->
+                <div class="border-t pt-4">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">End Bell (Anchor)</h4>
+                    <!-- Static Inputs -->
+                    <div id="new-period-end-static" class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="new-period-end-time" class="block text-sm font-medium text-gray-700">Time (HH:MM:SS)</label>
+                            <input type="time" id="new-period-end-time" step="1" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <!-- Relative Inputs -->
+                    <div id="new-period-end-relative" class="hidden space-y-3">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="new-period-end-parent" class="block text-sm font-medium text-gray-700">Anchor Period</label>
+                                <select id="new-period-end-parent" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <!-- Base Periods populated by JS -->
+                                </select>
+                            </div>
+                            <div>
+                                <label for="new-period-end-anchor-type" class="block text-sm font-medium text-gray-700">Anchor Bell</label>
+                                <select id="new-period-end-anchor-type" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <option value="period_start">Period Start</option>
+                                    <option value="period_end">Period End</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label for="new-period-end-direction" class="block text-sm font-medium text-gray-700">Direction</label>
+                                <select id="new-period-end-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <option value="after">After</option>
+                                    <option value="before">Before</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="new-period-end-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
+                                <input type="number" id="new-period-end-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label for="new-period-end-seconds" class="block text-sm font-medium text-gray-700">Seconds</label>
+                                <input type="number" id="new-period-end-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <p id="new-period-status" class="text-red-600 text-sm mt-4 hidden"></p>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="new-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" id="new-period-submit-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create Period</button>
+                </div>
+            </form>
+        </div>
         <!-- NEW: v4.22 - General User Message Modal -->
         <div id="user-message-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
@@ -1375,6 +1507,34 @@
         const userMessageText = document.getElementById('user-message-text');
         const userMessageOkBtn = document.getElementById('user-message-ok');
         
+        // --- NEW in 4.57: New Period Modal Variables ---
+        const newPeriodModal = document.getElementById('new-period-modal');
+        const newPeriodForm = document.getElementById('new-period-form');
+        const newPeriodNameInput = document.getElementById('new-period-name');
+        const newPeriodImageSelect = document.getElementById('new-period-image-select');
+        const newPeriodTypeStatic = document.getElementById('new-period-type-static');
+        const newPeriodTypeRelative = document.getElementById('new-period-type-relative');
+        const newPeriodStartStaticDiv = document.getElementById('new-period-start-static');
+        const newPeriodEndStaticDiv = document.getElementById('new-period-end-static');
+        const newPeriodStartRelativeDiv = document.getElementById('new-period-start-relative');
+        const newPeriodEndRelativeDiv = document.getElementById('new-period-end-relative');
+        const newPeriodStartParent = document.getElementById('new-period-start-parent');
+        const newPeriodEndParent = document.getElementById('new-period-end-parent');
+        const newPeriodStartAnchorType = document.getElementById('new-period-start-anchor-type');
+        const newPeriodEndAnchorType = document.getElementById('new-period-end-anchor-type');
+        const newPeriodStartDirection = document.getElementById('new-period-start-direction');
+        const newPeriodEndDirection = document.getElementById('new-period-end-direction');
+        const newPeriodStartMinutes = document.getElementById('new-period-start-minutes');
+        const newPeriodEndMinutes = document.getElementById('new-period-end-minutes');
+        const newPeriodStartSeconds = document.getElementById('new-period-start-seconds');
+        const newPeriodEndSeconds = document.getElementById('new-period-end-seconds');
+        const newPeriodStartTime = document.getElementById('new-period-start-time');
+        const newPeriodEndTime = document.getElementById('new-period-end-time');
+        const newPeriodStatus = document.getElementById('new-period-status');
+        const newPeriodCancelBtn = document.getElementById('new-period-cancel-btn');
+        const newPeriodSubmitBtn = document.getElementById('new-period-submit-btn');
+        // --- End New Period Modal Variables ---
+        
         // NEW in 4.42: Multi-Add Relative Bell Modal
         const showMultiAddRelativeModalBtn = document.getElementById('multi-add-relative-btn');
         const multiAddRelativeBellModal = document.getElementById('multi-add-relative-bell-modal');
@@ -1603,9 +1763,13 @@
         let bellSoundOverrides = {}; // NEW: Store local sound overrides
         let periodNameOverrides = {}; // NEW in 4.22: Store local period nicknames
         
+        // --- NEW in 4.57: New Period state ---
+        const newPeriodBtn = document.getElementById('new-period-btn');
+        let newPeriodMode = 'static'; // Track static vs relative mode
+
         let calculatedPeriodsList = []; // NEW in 4.18: Store the final, time-resolved periods
         
-        let appId; 
+        let appId;
         let isAudioReady = false;
 
         // NEW in 4.32: State flags to prevent race conditions on schedule load
@@ -3879,6 +4043,9 @@
                     restorePersonalScheduleBtn.disabled = false;
                     showMultiAddRelativeModalBtn.disabled = false; // NEW in 4.42
                     
+                    // NEW in 4.57: Enable new period button
+                    newPeriodBtn.disabled = false;
+                    
                     /// 1. Listen to the BASE shared schedule
                     scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
                     activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
@@ -5276,6 +5443,11 @@
                     };
                 }
                 
+                // NEW in 4.57: If a stable anchor was assigned above, remove the parentBellId to prevent conflicting logic.
+                if (finalBell.relative && finalBell.relative.parentPeriodName) {
+                    delete finalBell.relative.parentBellId;
+                }
+                
                 // NEW in 4.49: Removed duplicate stable anchor logic and redundant periodName declaration.
                 
                 const periodName = currentRelativePeriod.name;
@@ -5559,6 +5731,9 @@
                 
                 // 4. Pass the calculated data *directly* to the render function
                 renderCombinedList(calculatedPeriods);
+                
+                // NEW in 4.55: Force an immediate clock update to load the initial visual cue
+                if (isScheduleReady) updateClock();
 
                 // NEW in 4.33: The schedule is now loaded and calculated.
                 // This is the "key" that allows the clock to start.
@@ -6005,7 +6180,7 @@
              * NEW: v4.44 - Populates all visual cue dropdowns.
              */
             function updateVisualDropdowns() {
-                const selects = [ editPeriodImageSelect ]; // Add any future visual selects here
+                const selects = [ editPeriodImageSelect, newPeriodImageSelect ]; // Add any future visual selects here
                 
                 // 1. Create options for default SVGs (dynamically)
                 const defaultVisuals = ['1st Period', '2nd Period', 'Lunch', 'Passing Period'];
@@ -6137,6 +6312,203 @@
                 userMessageTitle.textContent = title;
                 userMessageText.textContent = message;
                 userMessageModal.classList.remove('hidden');
+            }
+                
+            // --- NEW in 4.57: New Period Modal Functions ---
+            
+            /**
+             * NEW: v4.57 - Populates and opens the New Period Modal.
+             */
+            function openNewPeriodModal() {
+                if (!activePersonalScheduleId) {
+                    showUserMessage("Please select a personal schedule to add a new period.");
+                    return;
+                }
+
+                // 1. Reset and populate visual cues
+                newPeriodForm.reset();
+                newPeriodStatus.classList.add('hidden');
+                updateVisualDropdowns();
+                
+                // 2. Populate relative anchor period dropdowns
+                // Only use the BASE shared periods for anchoring
+                const basePeriodNames = localSchedulePeriods.map(p => p.name);
+                const periodOptionsHtml = basePeriodNames.map(name => `<option value="${name}">${name}</option>`).join('');
+                
+                newPeriodStartParent.innerHTML = periodOptionsHtml;
+                newPeriodEndParent.innerHTML = periodOptionsHtml;
+                
+                // Add an empty option if no periods exist
+                if (basePeriodNames.length === 0) {
+                     newPeriodStartParent.innerHTML = '<option value="" disabled selected>No Base Periods Available</option>';
+                     newPeriodEndParent.innerHTML = '<option value="" disabled selected>No Base Periods Available</option>';
+                }
+
+
+                // 3. Set default mode to Static
+                newPeriodTypeStatic.checked = true;
+                newPeriodMode = 'static';
+                toggleNewPeriodMode('static');
+                
+                // 4. Set default times (Ensure full HH:MM:SS format is used for consistency)
+                newPeriodStartTime.value = '08:00:00';
+                newPeriodEndTime.value = '09:00:00';
+
+                newPeriodModal.classList.remove('hidden');
+            }
+            
+            /**
+             * NEW: v4.57 - Closes and resets the New Period Modal.
+             */
+            function closeNewPeriodModal() {
+                newPeriodModal.classList.add('hidden');
+                newPeriodForm.reset();
+                newPeriodStatus.classList.add('hidden');
+            }
+            
+            /**
+             * NEW: v4.57 - Toggles between Static and Relative inputs.
+             */
+            function toggleNewPeriodMode(mode) {
+                if (mode === 'static') {
+                    newPeriodStartStaticDiv.classList.remove('hidden');
+                    newPeriodEndStaticDiv.classList.remove('hidden');
+                    newPeriodStartRelativeDiv.classList.add('hidden');
+                    newPeriodEndRelativeDiv.classList.add('hidden');
+                    // Mark static inputs as required
+                    newPeriodStartTime.required = true;
+                    newPeriodEndTime.required = true;
+                } else {
+                    newPeriodStartStaticDiv.classList.add('hidden');
+                    newPeriodEndStaticDiv.classList.add('hidden');
+                    newPeriodStartRelativeDiv.classList.remove('hidden');
+                    newPeriodEndRelativeDiv.classList.remove('hidden');
+                    // Remove required from static inputs
+                    newPeriodStartTime.required = false;
+                    newPeriodEndTime.required = false;
+                }
+            }
+
+            /**
+             * NEW: v4.57 - Handles the submission of the new period form.
+             */
+            async function handleNewPeriodSubmit(e) {
+                e.preventDefault();
+                newPeriodStatus.classList.add('hidden');
+
+                if (!activePersonalScheduleId) return;
+
+                const periodName = newPeriodNameInput.value.trim();
+                const visualCue = newPeriodImageSelect.value;
+                const mode = newPeriodMode;
+                
+                if (!periodName) {
+                    newPeriodStatus.textContent = "Period name is required.";
+                    newPeriodStatus.classList.remove('hidden');
+                    return;
+                }
+                
+                // 1. Create the bells array and validate inputs
+                const newBells = [];
+                const basePeriodNames = localSchedulePeriods.map(p => p.name);
+                
+                // Helper to validate and build bell data
+                const buildBellData = (type, prefix) => {
+                    if (type === 'static') {
+                        const time = document.getElementById(`${prefix}-time`).value;
+                        if (!time) throw new Error(`${prefix.split('-')[1]} time is required for static mode.`);
+                        
+                        // Check for conflicts with existing bells (shared and personal)
+                        const allBells = [...localSchedule, ...personalBells];
+                        const nearbyBell = findNearbyBell(time, allBells);
+                        
+                        if (nearbyBell) {
+                            throw new Error(`Time conflict: Period start/end is too close to "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time, true)}).`);
+                        }
+                        return { time };
+                    } else { // relative
+                        const parentName = document.getElementById(`${prefix}-parent`).value;
+                        const anchorType = document.getElementById(`${prefix}-anchor-type`).value;
+                        const direction = document.getElementById(`${prefix}-direction`).value;
+                        const minutes = parseInt(document.getElementById(`${prefix}-minutes`).value) || 0;
+                        const seconds = parseInt(document.getElementById(`${prefix}-seconds`).value) || 0;
+                        
+                        if (!parentName || !basePeriodNames.includes(parentName)) throw new Error(`Invalid anchor period for ${prefix.split('-')[1]}.`);
+
+                        let offsetSeconds = (minutes * 60) + seconds;
+                        if (direction === 'before') offsetSeconds = -offsetSeconds;
+                        
+                        return {
+                            relative: {
+                                // NEW in 4.57: Store the stable anchor
+                                parentPeriodName: parentName,
+                                parentAnchorType: anchorType,
+                                offsetSeconds: offsetSeconds
+                            }
+                        };
+                    }
+                };
+
+                try {
+                    // --- Start Bell ---
+                    const startBellData = buildBellData(mode, 'new-period-start');
+                    newBells.push({
+                        ...startBellData,
+                        name: 'Period Start', // Critical for anchoring/fluke logic
+                        sound: 'ellisBell.mp3', // Default bell sound
+                        bellId: generateBellId()
+                    });
+
+                    // --- End Bell ---
+                    const endBellData = buildBellData(mode, 'new-period-end');
+                    newBells.push({
+                        ...endBellData,
+                        name: 'Period End', // Critical for anchoring/fluke logic
+                        sound: 'ellisBell.mp3',
+                        bellId: generateBellId()
+                    });
+
+                    // 2. Create the new period object
+                    const newPeriod = {
+                        name: periodName,
+                        isEnabled: true,
+                        // NEW in 4.57: Tag custom periods with origin
+                        origin: 'personal', 
+                        bells: newBells
+                    };
+
+                    // 3. Save to Firestore
+                    const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                    const docSnap = await getDoc(personalScheduleRef);
+                    
+                    // Note: This relies on the global personalBellsPeriods state, but we check the document first.
+                    const existingPeriods = docSnap.data().periods || [];
+
+                    // Check for duplicate period name (optional but good practice)
+                    if (existingPeriods.some(p => p.name === periodName)) {
+                        newPeriodStatus.textContent = `A period named "${periodName}" already exists.`;
+                        newPeriodStatus.classList.remove('hidden');
+                        return;
+                    }
+
+                    const updatedPeriods = [...existingPeriods, newPeriod];
+                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+
+                    // 4. Save visual cue override if selected
+                    if (visualCue) {
+                        const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
+                        periodVisualOverrides[visualKey] = visualCue;
+                        saveVisualOverrides();
+                    }
+
+                    showUserMessage(`New period "${periodName}" created successfully!`);
+                    closeNewPeriodModal();
+
+                } catch (error) {
+                    console.error("Error creating new period:", error);
+                    newPeriodStatus.textContent = `Error: ${error.message}`;
+                    newPeriodStatus.classList.remove('hidden');
+                }
             }
                 
             async function handleMultiAddSubmit(e) {
@@ -7149,8 +7521,21 @@
                     multiAddRelativeBellModal.classList.add('hidden');
                 });
                 
-                signOutBtn.addEventListener('click', signOutUser);
+                // --- NEW in 4.57: New Period Modal Listeners ---
+                newPeriodBtn.addEventListener('click', openNewPeriodModal);
+                newPeriodCancelBtn.addEventListener('click', closeNewPeriodModal);
+                newPeriodForm.addEventListener('submit', handleNewPeriodSubmit);
 
+                // Toggle logic
+                document.querySelectorAll('input[name="new-period-type"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        newPeriodMode = e.target.value;
+                        toggleNewPeriodMode(newPeriodMode);
+                    });
+                });
+                // --- End New Period Modal Listeners ---
+                
+                signOutBtn.addEventListener('click', signOutUser);
                 // Sound previews
                 // DELETED in 4.40: This was for the old personal bell form
                 // previewPersonalSoundBtn.addEventListener('click', () => playBell(personalSoundInput.value)); 
@@ -7532,4 +7917,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.54 -->
+<!-- Version 4.57 -->
