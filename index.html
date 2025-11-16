@@ -531,7 +531,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.72</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.73</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -3149,7 +3149,10 @@
                     // 2a. Check for circular dependencies
                     if (visited.has(bell.bellId)) {
                         console.error(`Circular dependency detected for bell "${bell.name}" (ID: ${bell.bellId}).`);
-                        return null;
+                        // MODIFIED V4.73: Return a "corrupt" object instead of null.
+                        // This was the bug. This block (for 'BY ANCHOR') was returning
+                        // null, while the 'BY ID' block correctly returned an object.
+                        return { ...bell, isCorrupt: true, fallbackTime: "00:00:01" };
                     }
                     visited.add(bell.bellId);
 
@@ -8337,4 +8340,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.72 -->
+<!-- Version 4.73 -->
