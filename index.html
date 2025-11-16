@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.69</title>
+    <title>Ellis Web Bell 4.70</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -531,7 +531,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.69</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.70</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -3100,7 +3100,9 @@
                     if (visited.has(bell.bellId)) {
                         // MODIFIED V4.67: Make error log more explicit about the DATA being the problem.
                         console.error(`Circular dependency detected for bell "${bell.name}" (ID: ${bell.bellId}). This is a DATA error in your database, not a code bug. One of this bell's parents refers back to it, creating an infinite loop. The bell will be skipped.`);
-                        return null; // Stop recursion
+                        // MODIFIED V4.70: Implement user's "Broken Bell" idea.
+                        // Instead of returning null, return a "corrupt" object.
+                        return { ...bell, isCorrupt: true, fallbackTime: "00:00:01" };
                     }
                     visited.add(bell.bellId);
 
@@ -3252,6 +3254,7 @@
 
                 // 2. Iterate through all periods and calculate times for their bells
                 let orphans = []; // NEW in 4.31: Array to store orphaned bells
+                let corruptBells = []; // NEW in 4.70: Array for "broken" bells
                 const calculatedPeriods = allPeriods.map(period => { // MODIFIED in 4.31: Restored this line
                     // NEW in 4.29: Pass the 'origin' tag through
                     const periodOrigin = period.origin || 'shared'; 
@@ -3263,9 +3266,13 @@
                         // MODIFIED in 4.31: Check the result
                         let calculatedTime = null;
                         if (!calculatedResult) {
-                            // NEW V4.75: Calculation failed (e.g., circular dependency detected during recursion).
+                            // Calculation failed (e.g., parent not found, but not circular)
                             console.warn(`Bell calculation failed for "${bell.name}". Skipping.`);
                             calculatedTime = null;
+                        } else if (calculatedResult && typeof calculatedResult === 'object' && calculatedResult.isCorrupt) {
+                            // NEW V4.70: Handle "broken" circular bells
+                            corruptBells.push(calculatedResult);
+                            calculatedTime = null; // Do not include in this period
                         } else if (calculatedResult && typeof calculatedResult === 'object' && calculatedResult.isOrphan) {
                             orphans.push(calculatedResult); // Add to orphan list
                             calculatedTime = null; // Do not include in this period
@@ -3306,6 +3313,24 @@
                         }))
                     });
                 }
+
+                // --- NEW V4.70: Add the "Corrupted Bells" period ---
+                // MODIFIED V4.71: Fixed syntax error by moving this block
+                // *after* the orphan block instead of inside it.
+                if (corruptBells.length > 0) {
+                    calculatedPeriods.push({
+                        name: "Corrupted V3 Bells (Fix or Delete)",
+                        origin: "personal", // Make them editable/deletable
+                        isEnabled: true,
+                        bells: corruptBells.map(corruptBell => ({
+                            ...corruptBell,
+                            time: corruptBell.fallbackTime || "00:00:01",
+                            type: "custom",
+                            name: `(Corrupt) ${corruptBell.name}`,
+                        }))
+                    });
+                }
+                // --- END V4.71 FIX ---
 
                 // 4. Create the final flat list for the clock
                 let flatBellList = [];
@@ -8296,4 +8321,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.69 -->
+<!-- Version 4.70 -->
