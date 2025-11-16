@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.71</title>
+    <title>Ellis Web Bell 2</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -531,7 +531,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.71</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.72</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -3121,6 +3121,15 @@
                     // 2c. Recursively find the parent's time
                     // CRITICAL V4.65 FIX: Must pass the 'allPeriods' array to match the function definition, preventing circular dependency.
                     const parentTime = calculateRelativeBellTime(parentBell, bellMap, allPeriods, new Set(visited));
+                    
+                    // --- NEW V4.72 FIX: Propagate error objects up ---
+                    // If the parentTime calculation failed (e.g., circular, orphan),
+                    // return that error object immediately.
+                    if (parentTime && typeof parentTime === 'object') {
+                        return parentTime; // This is the isCorrupt or isOrphan object
+                    }
+                    // --- END V4.72 FIX ---
+
                     if (!parentTime) {
                         console.warn(`Could not calculate time for parent of "${bell.name}".`);
                         return null; // Parent calculation failed
@@ -3163,6 +3172,13 @@
 
                     // 2d. Recursively find the anchor bell's time
                     const anchorTime = calculateRelativeBellTime(anchorBell, bellMap, allPeriods, new Set(visited));
+                    
+                    // --- NEW V4.72 FIX: Propagate error objects up ---
+                    if (anchorTime && typeof anchorTime === 'object') {
+                        return anchorTime; // This is the isCorrupt or isOrphan object
+                    }
+                    // --- END V4.72 FIX ---
+                    
                     if (!anchorTime) {
                         console.warn(`Could not calculate time for parent anchor of "${bell.name}".`);
                         return null; // Parent calculation failed
@@ -8321,4 +8337,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.71 -->
+<!-- Version 4.72 -->
