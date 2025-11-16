@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 2</title>
+    <title>Ellis Web Bell 4.74</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -531,7 +531,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.73</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.74</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -3733,6 +3733,14 @@
                         adminToggleBtn.textContent = 'Toggle Admin';
             
                         if (user) {
+                            // --- NEW V4.74: Load all local overrides *before* attaching listeners ---
+                            // This fixes the race condition where icons wouldn't load.
+                            loadMutedBells();
+                            loadSoundOverrides();
+                            loadPeriodNameOverrides();
+                            loadVisualOverrides();
+                            // --- END V4.74 FIX ---
+
                             console.log("User is signed in:", user.uid);
                             userId = user.uid;
                             isUserAnonymous = user.isAnonymous; // NEW: Track anonymous state
@@ -6495,7 +6503,9 @@
              * @param {string} periodName - The name of the period.
              * @returns {string} An HTML string for an SVG tag.
              */
-            function getDefaultVisualCueIcon(periodName) {
+            // MODIFIED V4.74: Renamed function to get *raw SVG* and return *only* the SVG string.
+            // This fixes the bug where a giant DIV was being returned.
+            function getRawDefaultVisualCueSvg(periodName) {
                 const p = periodName.toLowerCase();
                 let svgContent = '';
                 
@@ -6515,9 +6525,8 @@
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor">${text}</text></svg>`;
                 }
                 
-                // Return as a full HTML string for injection
-                // MODIFIED in 4.46: Force to a large square, not w-full h-full
-                return `<div class="w-32 h-32 sm:w-48 sm:h-48 p-4 text-gray-400">${svgContent}</div>`;
+                // MODIFIED V4.74: Return *only* the SVG content string.
+                return svgContent;
             }
 
             /**
@@ -6530,7 +6539,8 @@
                 
                 if (!value) {
                     // If no image, return the default SVG, styled for the icon size/shape
-                    const defaultSvgHtml = getDefaultVisualCueIcon(periodName);
+                    // MODIFIED V4.74: Call the new *raw* SVG function
+                    const defaultSvgHtml = getRawDefaultVisualCueSvg(periodName);
                     // MODIFIED V4.60.2: Changed SVG color to blue for better contrast
                     return `<div class="${sharedClasses} bg-gray-200 text-blue-500 p-1">${defaultSvgHtml}</div>`;
                 }
@@ -6549,14 +6559,18 @@
                 }
                 if (value.startsWith('[DEFAULT]')) {
                     // Case 2: It's a default SVG key
-                    return getDefaultVisualCue(value.replace('[DEFAULT] ', ''));
+                    // MODIFIED V4.74: Call the new *raw* SVG function
+                    const defaultSvgHtml = getRawDefaultVisualCueSvg(value.replace('[DEFAULT] ', ''));
+                    return `<div class="${sharedClasses} bg-gray-200 text-blue-500 p-1">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('http')) {
                     // If uploaded image, use the URL and the shared classes (using object-cover for full circle fill)
                     return `<img src="${value}" alt="Icon" class="w-full h-full object-cover rounded-full bg-gray-200">`;
                 }
                 // Fallback
-                return getDefaultVisualCueIcon(periodName);
+                // MODIFIED V4.74: Call the new *raw* SVG function
+                const defaultSvgHtml = getRawDefaultVisualCueSvg(periodName);
+                return `<div class="${sharedClasses} bg-gray-200 text-blue-500 p-1">${defaultSvgHtml}</div>`;
             }
     
             /**
@@ -7515,9 +7529,12 @@
             // --- Init and Event Listeners ---
             function init() {
                 initFirebase();
-                loadMutedBells(); 
-                loadSoundOverrides(); // NEW: Load sound overrides
-                loadPeriodNameOverrides(); // NEW in 4.22: Load period nicknames
+                // MODIFIED V4.74: All local storage loads
+                // are now handled inside onAuthStateChanged
+                // to prevent race conditions.
+                // DELETED: loadMutedBells();
+                // DELETED: loadSoundOverrides();
+                // DELETED: loadPeriodNameOverrides();
 
                 // NEW V4.06: Initialize Relative Bell DOM elements inside init()
                 // MODIFIED: v4.14 - Declarations moved to global scope.
@@ -8340,4 +8357,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.73 -->
+<!-- Version 4.74 -->
