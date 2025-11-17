@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.87</title>
+    <title>Ellis Web Bell 4.99</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -226,22 +226,30 @@
                     <input type="text" id="edit-bell-name" placeholder="e.g. 1st Period End" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
             </div>
-            <div>
-                <label for="edit-bell-sound" class="block text-sm font-medium text-gray-700">Sound</label>
-                <!-- MODIFIED: Sound select now uses optgroups -->
-                <select id="edit-bell-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <optgroup label="Default Sounds">
-                        <option value="Bell">Bell</option>
-                        <option value="Chime">Chime</option>
-                        <option value="Beep">Beep</option>
-                        <option value="Alarm">Alarm</option>
-                        <!-- MODIFIED: Made Ellis Bell selected by default -->
-                        <option value="ellisBell.mp3" selected>Ellis Bell</option>
-                    </optgroup>
-                    <optgroup label="My Sounds" id="edit-my-sounds-optgroup"></optgroup>
-                    <optgroup label="Shared Sounds" id="edit-shared-sounds-optgroup"></optgroup>
-                </select>
+            <!-- MODIFIED V4.95: Add play button and flex layout -->
+            <div class="flex items-end gap-2">
+                <div class="flex-grow">
+                    <label for="edit-bell-sound" class="block text-sm font-medium text-gray-700">Sound</label>
+                    <!-- MODIFIED: Sound select now uses optgroups -->
+                    <select id="edit-bell-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <optgroup label="Default Sounds">
+                            <option value="Bell">Bell</option>
+                            <option value="Chime">Chime</option>
+                            <option value="Beep">Beep</option>
+                            <option value="Alarm">Alarm</option>
+                            <!-- MODIFIED: Made Ellis Bell selected by default -->
+                            <option value="ellisBell.mp3" selected>Ellis Bell</option>
+                        </optgroup>
+                        <optgroup label="My Sounds" id="edit-my-sounds-optgroup"></optgroup>
+                        <optgroup label="Shared Sounds" id="edit-shared-sounds-optgroup"></optgroup>
+                    </select>
+                </div>
+                <!-- NEW V4.95: Preview button for edit modal -->
+                <button type="button" id="preview-edit-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                    &#9654;
+                </button>
             </div>
+            <!-- END V4.95 MODIFICATION -->
 
             <!-- NEW in 4.21: Override sound checkbox for shared bells -->
             <div id="edit-bell-override-container" class="mt-4 hidden">
@@ -354,6 +362,29 @@
         </div>
     </div>
 
+    <!-- **** NEW V4.91: Rename SHARED Schedule Modal (Admin) **** -->
+    <div id="rename-shared-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <form id="rename-shared-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-2xl font-medium mb-6">Rename Shared Schedule</h3>
+            
+            <p class="text-gray-700 mb-4">
+                Current Name: <strong id="rename-shared-old-name">...</strong>
+            </p>
+            
+            <div>
+                <label for="rename-shared-new-name" class="block text-sm font-medium text-gray-700">New Schedule Name</label>
+                <input type="text" id="rename-shared-new-name" placeholder="e.g. A-Day Schedule" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <p id="rename-shared-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="rename-shared-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Name</button>
+            </div>
+        </form>
+    </div>
+    
     <!-- **** NEW: Confirm Delete AUDIO Modal **** -->
     <div id="confirm-delete-audio-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
@@ -369,6 +400,26 @@
                 <button type="button" id="delete-audio-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete Anyway</button>
             </div>
         </div>
+    </div>
+
+    <!-- **** NEW V4.97: Rename AUDIO Modal **** -->
+    <div id="rename-audio-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <form id="rename-audio-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-2xl font-medium mb-6">Rename Audio File</h3>
+            <p class="text-gray-700 mb-2">
+                Original Filename: <strong id="rename-audio-old-name" class="block truncate text-sm bg-gray-100 p-2 rounded">...</strong>
+            </p>
+            <div class="mb-4">
+                <label for="rename-audio-new-name" class="block text-sm font-medium text-gray-700">New Nickname</label>
+                <input type="text" id="rename-audio-new-name" placeholder="e.g. My Favorite Bell" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">This nickname will be shown in all dropdown menus.</p>
+            </div>
+            <p id="rename-audio-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="rename-audio-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Nickname</button>
+            </div>
+        </form>
     </div>
 
     <!-- **** NEW: Nearby Bell Warning Modal (Req 1 - Custom Bells ONLY) **** -->
@@ -531,7 +582,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.87</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.99</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -546,19 +597,15 @@
 
         <!-- MODIFIED: This card now shows countdown AND current time -->
         <!-- NEW in 4.44: Converted to 2-column grid for Visual Cues -->
+        <!-- MODIFIED V4.98: Reorganized to a simpler 2-column layout -->
         <div class="bg-white rounded-xl shadow-md mb-8 overflow-hidden p-4 md:p-6">
             
-            <!-- NEW in 4.49: Full Width Header (Line 1 in user diagram) -->
-            <!-- This element is pulled out of the grid to span the full width -->
-            <div id="live-clock-sentence" class="text-2xl font-medium text-gray-600 tabular-nums text-center pb-4 mb-4 border-b border-gray-100">
-                Loading...
-            </div>
-
             <!-- MODIFIED in 4.49: Grid for Visual Cue (25%) and Clock (75%) -->
-            <div class="grid grid-cols-1 md:grid-cols-4 items-center gap-4 md:gap-6">
-                <!-- Column 1: Visual Cue (md:col-span-1 = 25%) -->
-                <!-- The w-full max-w-xs and aspect-square ensure the image is square and responsive -->
-                <div id="visual-cue-container" class="md:col-span-1 bg-gray-800 flex items-center justify-center min-h-[150px] aspect-square rounded-lg overflow-hidden w-full max-w-xs mx-auto">
+            <!-- MODIFIED V4.99: Changed to 5-col grid (2 cols / 40% for icon, 3 cols / 60% for text) -->
+            <div class="grid grid-cols-1 md:grid-cols-5 items-center gap-4 md:gap-6">
+                <!-- Column 1: Visual Cue (md:col-span-2 = 40%) -->
+                <!-- MODIFIED V4.99: Removed max-w-xs so it can fill the 40% width -->
+                <div id="visual-cue-container" class="md:col-span-2 bg-gray-800 flex items-center justify-center min-h-[150px] aspect-square rounded-lg overflow-hidden w-full mx-auto">
                     <!-- Default SVG or Image will be injected here by JS -->
                     <svg id="default-visual-cue" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-gray-500">
                         <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
@@ -566,60 +613,66 @@
                 </div>
                 
                 <!-- Column 2: Countdown / Clock (md:col-span-3 = 75%) -->
-                <div class="md:col-span-3 text-center md:text-left p-2">
-                    <!-- NEW: Restructured countdown/clock -->
+                <!-- MODIFIED V4.98: All text content moved into this column -->
+                <div class="md:col-span-3 p-2 flex flex-col justify-center">
+                    <!-- MOVED V4.98: Live Clock Sentence -->
+                    <div id="live-clock-sentence" class="text-2xl font-medium text-gray-600 tabular-nums text-center md:text-left">
+                        Loading...
+                    </div>
+                    
                     <!-- Line 2: "HH:MM:SS" (countdown) -->
-                    <div id="countdown-display" class="text-6xl md:text-8xl font-bold text-gray-800 tabular-nums my-2">
+                    <div id="countdown-display" class="text-6xl md:text-8xl font-bold text-gray-800 tabular-nums my-2 text-center md:text-left">
                         --:--
                     </div>
+                    
                     <!-- Line 3: "until XXBELLXX" -->
-                    <div id="next-bell-sentence" class="text-2xl font-medium text-gray-600">
+                    <div id="next-bell-sentence" class="text-2xl font-medium text-gray-600 text-center md:text-left">
                         until the next bell.
                     </div>
+                    
                     <!-- MODIFIED: v3.21 -> v3.22 - This line's content logic is updated -->
-                    <div id="next-bell-info" class="text-lg text-gray-500 mt-2">
+                    <div id="next-bell-info" class="text-lg text-gray-500 mt-2 text-center md:text-left">
                         <!-- JS will populate this -->
+                    </div>
+                    
+                    <!-- MOVED V4.98: Status Footer -->
+                    <div class="text-center md:text-left text-gray-500 text-lg mt-4 pt-4 border-t border-gray-100">
+                        Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
                     </div>
                 </div>
             
             </div> <!-- End Grid (Graphic/Countdown) -->
 
-            <!-- NEW in 4.49: Full Width Status Footer -->
-            <!-- This element is pulled out of the grid to span the full width -->
-            <div class="text-center text-gray-500 text-lg mt-4 pt-4 border-t border-gray-100">
-                Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
-            </div>
-
         </div>
 
         <!-- **** NEW: Quick Bell Section **** -->
-        <div id="quickBellControls" class="p-4 bg-white rounded-xl shadow-md mb-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <div class="flex items-center space-x-3 flex-shrink-0"> <!-- ADDED flex-shrink-0 -->
-                <span class="font-semibold text-gray-700">Quick Bell:</span>
-                <div class="flex flex-wrap gap-2">
-                    <!-- ADDED: The 'quick-bell-btn' class as a JS hook -->
-                    <button data-minutes="1" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">1</button>
-                    <button data-minutes="2" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">2</button>
-                    <button data-minutes="3" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">3</button>
-                    <button data-minutes="5" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">5</button>
-                    <button data-minutes="10" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">10</button>
-                    <button data-minutes="15" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95">15</button>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2 flex-shrink min-w-0 w-full sm:w-auto"> <!-- ADDED flex-shrink min-w-0 w-full sm:w-auto -->
-                <label for="quickBellSoundSelect" class="text-sm font-medium text-gray-700">Sound:</label>
+        <!-- MODIFIED V4.98: Reorganized layout -->
+        <div id="quickBellControls" class="p-4 bg-white rounded-xl shadow-md mb-8 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <!-- 1. Label -->
+            <span class="font-semibold text-gray-700 flex-shrink-0">Quick Bell:</span>
+            
+            <!-- 2. Sound Dropdown -->
+            <div class="flex-shrink-0 min-w-0 w-full sm:w-auto">
                 <!-- This select will be populated by JS to match the others -->
-                <select id="quickBellSoundSelect" class="w-full truncate px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"> <!-- REPLACED sm:w-auto WITH w-full and ADDED truncate -->
+                <select id="quickBellSoundSelect" class="w-full truncate px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-11"> <!-- h-11 to match button height -->
                     <optgroup label="Default Sounds">
                         <option value="Bell">Bell</option>
                         <option value="Chime">Chime</option>
                         <option value="Beep">Beep</option>
-                        <option value="Alarm">Alarm</option>
-                        <option value="ellisBell.mp3" selected>Ellis Bell</option>
-                    </optgroup>
-                    <optgroup label="My Sounds" id="quick-my-sounds-optgroup"></optgroup>
+                        <optgroup label="My Sounds" id="quick-my-sounds-optgroup"></optgroup>
                     <optgroup label="Shared Sounds" id="quick-shared-sounds-optgroup"></optgroup>
                 </select>
+            </div>
+
+            <!-- 3. Button Container -->
+            <div class="flex-grow flex flex-wrap gap-2">
+                <!-- ADDED: The 'quick-bell-btn' class as a JS hook -->
+                <button data-minutes="1" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">1</button>
+                <button data-minutes="2" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">2</button>
+                <button data-minutes="3" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">3</button>
+                <button data-minutes="5" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">5</button>
+                <button data-minutes="10" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">10</button>
+                <button data-minutes="15" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">15</button>
             </div>
         </div>
         <!-- **** END NEW: Quick Bell Section **** -->
@@ -746,39 +799,53 @@
             </div>
 
             <!-- MOVED: Delete Selected Schedule Button -->
-            <div class="border-t pt-6">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Delete Current Schedule</label>
-                <button type="button" id="delete-schedule-btn" class="w-full px-4 py-2 bg-red-600 text-white font-medium rounded-lg shadow-md hover:bg-red-700 transition-colors">
-                    Delete Selected Schedule
-                </button>
+            <!-- MODIFIED V4.91: Added Rename button, put in grid -->
+            <div class="border-t pt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Rename Current Schedule</label>
+                    <button type="button" id="rename-schedule-btn" class="w-full px-4 py-2 bg-yellow-500 text-white font-medium rounded-lg shadow-md hover:bg-yellow-600 transition-colors">
+                        Rename Selected Schedule
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Delete Current Schedule</label>
+                    <button type="button" id="delete-schedule-btn" class="w-full px-4 py-2 bg-red-600 text-white font-medium rounded-lg shadow-md hover:bg-red-700 transition-colors">
+                        Delete Selected Schedule
+                    </button>
+                </div>
             </div>
 
             <!-- NEW: Import/Export Section -->
             <div class="border-t pt-6 space-y-4">
                 <h4 class="text-lg font-medium text-gray-800">Backup & Restore</h4>
                 
-                <!-- Export -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Export All Schedules</label>
-                    <button type="button" id="export-schedules-btn" class="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                        Download Backup (JSON)
+                <!-- MODIFIED V4.90: 2x2 Grid for Backup/Restore -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Top Row: Current Schedule -->
+                    <button type="button" id="export-current-schedule-btn" class="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Export Current Schedule
+                    </button>
+                    <button type="button" id="import-current-schedule-btn" class="w-full px-4 py-2 bg-gray-600 text-white font-medium rounded-lg shadow-md hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Import & Overwrite Current
+                    </button>
+                    
+                    <!-- Bottom Row: All Schedules -->
+                    <button type="button" id="export-schedules-btn" class="w-full px-4 py-2 bg-blue-700 text-white font-medium rounded-lg shadow-md hover:bg-blue-800 transition-colors">
+                        Export ALL Shared Schedules
+                    </button>
+                    <button type="button" id="import-schedules-btn" class="w-full px-4 py-2 bg-gray-700 text-white font-medium rounded-lg shadow-md hover:bg-gray-800 transition-colors">
+                        Import & Overwrite ALL
                     </button>
                 </div>
-
-                <!-- Import -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Import & Overwrite Schedules</label>
-                    <!-- This input is hidden and triggered by the button -->
-                    <input type="file" id="import-file-input" accept="application/json">
-                    <button type="button" id="import-schedules-btn" class="w-full px-4 py-2 bg-gray-600 text-white font-medium rounded-lg shadow-md hover:bg-gray-700 transition-colors">
-                        Upload Backup (JSON)
-                    </button>
-                    <p id="import-status" class="text-blue-600 text-sm mt-2 hidden"></p>
-                </div>
+                
+                <!-- Hidden file inputs -->
+                <input type="file" id="import-file-input" accept="application/json">
+                <input type="file" id="import-current-file-input" accept="application/json" class="hidden"> <!-- NEW V4.90 -->
+                
+                <p id="import-status" class="text-blue-600 text-sm mt-2 hidden"></p>
             </div>
 
         </div>
-
 
         <!-- MODIFIED: Custom Bells (Local) -> Personal Bells (Cloud) v3.03 -->
         <div class="auth-required mt-12"> <!-- Hidden for anonymous users -->
@@ -1556,6 +1623,15 @@
         const renamePersonalScheduleStatus = document.getElementById('rename-personal-schedule-status');
         const renamePersonalCancelBtn = document.getElementById('rename-personal-cancel');
 
+        // NEW V4.91: Rename SHARED Schedule Modal
+        const renameSharedScheduleModal = document.getElementById('rename-shared-schedule-modal');
+        const renameSharedScheduleForm = document.getElementById('rename-shared-schedule-form');
+        const renameSharedOldName = document.getElementById('rename-shared-old-name');
+        const renameSharedNewNameInput = document.getElementById('rename-shared-new-name');
+        const renameSharedScheduleStatus = document.getElementById('rename-shared-schedule-status');
+        const renameSharedCancelBtn = document.getElementById('rename-shared-cancel');
+        const renameScheduleBtn = document.getElementById('rename-schedule-btn'); // The button in Admin Zone
+
         // Personal Schedule Manager Buttons (These were missing!)
         const renamePersonalScheduleBtn = document.getElementById('rename-personal-schedule-btn');
         const backupPersonalScheduleBtn = document.getElementById('backup-personal-schedule-btn');
@@ -1574,6 +1650,15 @@
         const confirmDeleteAudioList = document.getElementById('confirm-delete-audio-list');
         const deleteAudioCancelBtn = document.getElementById('delete-audio-cancel');
         const deleteAudioConfirmBtn = document.getElementById('delete-audio-confirm');
+
+        // NEW V4.97: Rename Audio Modal
+        const renameAudioModal = document.getElementById('rename-audio-modal');
+        const renameAudioForm = document.getElementById('rename-audio-form');
+        const renameAudioOldName = document.getElementById('rename-audio-old-name');
+        const renameAudioNewName = document.getElementById('rename-audio-new-name');
+        const renameAudioStatus = document.getElementById('rename-audio-status');
+        const renameAudioCancelBtn = document.getElementById('rename-audio-cancel');
+        let audioToRename = null; // NEW V4.97: State for renaming
         
         // Nearby Bell Modal (Custom)
         const nearbyBellModal = document.getElementById('nearby-bell-modal');
@@ -1811,6 +1896,10 @@
         const importSchedulesBtn = document.getElementById('import-schedules-btn');
         const importFileInput = document.getElementById('import-file-input');
         const importStatus = document.getElementById('import-status');
+        // NEW V4.90: Current Schedule Import/Export
+        const exportCurrentScheduleBtn = document.getElementById('export-current-schedule-btn');
+        const importCurrentScheduleBtn = document.getElementById('import-current-schedule-btn');
+        const importCurrentFileInput = document.getElementById('import-current-file-input');
         // --- END: v4.14d RESTORE ---
 
         // --- END: v4.14 Global Scope Fix ---
@@ -1988,9 +2077,16 @@
             if (!scheduleId || !bell) return null;
             // MODIFIED: v3.03 - We only override 'shared' bells
             if (bell.type !== 'shared') return null;
-            const bellId = getBellId(bell);
-            if (!bellId) return null;
-            return `${scheduleId}-${bellId}`;
+            
+            // MODIFIED V4.88: Use the bell's *unique* database ID, not the fragile composite key.
+            // This makes overrides persistent even if an admin renames the bell,
+            // and guarantees uniqueness across all schedules, fixing the bug.
+            const uniqueBellId = bell.bellId; 
+            if (!uniqueBellId) {
+                console.warn("getBellOverrideKey: Bell has no unique bellId.", bell);
+                return null;
+            }
+            return `${scheduleId}-${uniqueBellId}`;
         }
 
         function loadSoundOverrides() {
@@ -2924,8 +3020,9 @@
                     periodHtml += bellsToRender.map((bell, index) => {
                         const isCustom = bell.type === 'custom';
                         const safeName = bell.name.replace(/"/g, '&quot;');
-                        const bellId = getBellId(bell);
-                        const isMuted = mutedBellIds.has(bellId);
+                        // MODIFIED V4.88: Use the *unique* bellId for mutes
+                        const uniqueBellId = bell.bellId || getBellId(bell); // Fallback for any legacy
+                        const isMuted = mutedBellIds.has(uniqueBellId);
 
                         // --- MODIFIED V4.76: Simplified Sound Logic ---
                         // The bell object from calculatedPeriods now has the *correct* sound (with override)
@@ -2980,7 +3077,8 @@
                                 <!-- Bell Info (Time, Name, Sound) (left) -->
                                 <div class="flex items-center space-x-4 min-w-0 flex-grow">
                                     <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
-                                    <span class="text-xl font-medium text-gray-800 tabular-nums">${formatTime12Hour(bell.time, false)}</span>
+                                    <!-- MODIFIED V4.97: Hide ':00' seconds in bell rows -->
+                                    <span class="text-xl font-medium text-gray-800 tabular-nums">${formatTime12Hour(bell.time, true)}</span>
                                     <div class="min-w-0">
                                         <!-- NEW v4.04: Anchor Icon Logic -->
                                         <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
@@ -3034,7 +3132,7 @@
                                     <label class="flex items-center space-x-2 cursor-pointer p-1"> 
                                         <span class="text-sm font-medium text-gray-700 hidden sm:inline">Mute</span>
                                         <input type="checkbox" class="bell-mute-toggle h-5 w-5 text-blue-600 rounded focus:ring-blue-500" 
-                                               data-bell-id="${bellId}" ${isMuted ? 'checked' : ''} 
+                                               data-bell-id="${uniqueBellId}" ${isMuted ? 'checked' : ''} 
                                                aria-label="Mute this bell">
                                     </label>
                                     
@@ -4186,11 +4284,50 @@
                 console.log("Listening for real-time shared schedule updates...");
     
                 sharedSchedulesListenerUnsubscribe = onSnapshot(schedulesCollectionRef, (querySnapshot) => {
-                    allSchedules = querySnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        name: doc.data().name || "Unnamed Schedule",
-                        bells: doc.data().bells || []
-                    }));
+                    // MODIFIED V4.88: Read the 'periods' array, not the legacy 'bells' array.
+                    // This fixes the 'undefined.findIndex' error when editing shared bells.
+                    // MODIFIED V4.90: CRITICAL FIX for Admin functions.
+                    // This listener MUST run the same migration logic as setActiveSchedule.
+                    allSchedules = querySnapshot.docs.map(doc => {
+                        const scheduleData = doc.data();
+                        let periodsToUse = [];
+                        
+                        // 1. Check for 'periods' array first
+                        if (scheduleData.periods && scheduleData.periods.length > 0) {
+                            periodsToUse = scheduleData.periods;
+                        } 
+                        // 2. If no 'periods', migrate from 'bells'
+                        else if (scheduleData.bells && scheduleData.bells.length > 0) {
+                            periodsToUse = migrateLegacyBellsToPeriods(scheduleData.bells);
+                            console.log(`(Admin List) Migrating legacy schedule: ${scheduleData.name}`);
+                        }
+
+                        // 3. Assign unique bellIds if missing (for override/edit logic)
+                        let needsIdMigration = false;
+                        periodsToUse.forEach(period => {
+                            period.bells.forEach(bell => {
+                                if (!bell.bellId) {
+                                    bell.bellId = generateBellId();
+                                    needsIdMigration = true;
+                                }
+                            });
+                        });
+                        
+                        // 4. (Admin-only) Save back migrated IDs
+                        if (needsIdMigration && document.body.classList.contains('admin-mode')) {
+                            console.log(`(Admin List) Saving migrated bellIds for ${scheduleData.name}`);
+                            const scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', doc.id);
+                            // Fire-and-forget, do not await
+                            updateDoc(scheduleRef, { periods: periodsToUse }); 
+                        }
+
+                        return {
+                            id: doc.id,
+                            name: scheduleData.name || "Unnamed Schedule",
+                            periods: periodsToUse, // Use the migrated periods
+                            bells: scheduleData.bells || [] // Keep legacy for migrate check
+                        };
+                    });
                     allSchedules.sort((a, b) => a.name.localeCompare(b.name));
                     console.log("Shared schedules updated from snapshot:", allSchedules.length);
     
@@ -4279,7 +4416,14 @@
                 backupPersonalScheduleBtn.disabled = true;
                 restorePersonalScheduleBtn.disabled = true;
                 showMultiAddRelativeModalBtn.disabled = true; // NEW in 4.42: Reset button state
+                
+                // NEW V4.90: Disable admin import/export buttons
+                exportCurrentScheduleBtn.disabled = true;
+                importCurrentScheduleBtn.disabled = true;
 
+                // NEW V4.91: Disable admin rename button
+                renameScheduleBtn.disabled = true;
+                
                 // v3.03: Disable personal schedule buttons
                 createPersonalScheduleBtn.disabled = true;
                 createPersonalScheduleBtn.textContent = 'Copy as Personal Schedule';
@@ -4318,6 +4462,11 @@
                         // Enable admin add shared bell
                         if (document.body.classList.contains('admin-mode')) {
                             addSharedBellForm.querySelector('button[type="submit"]').disabled = false;
+                            // NEW V4.90: Enable current schedule buttons
+                            exportCurrentScheduleBtn.disabled = false;
+                            importCurrentScheduleBtn.disabled = false;
+                            // NEW V4.91: Enable shared rename button
+                            renameScheduleBtn.disabled = false;
                         }
                     }
     
@@ -4343,10 +4492,28 @@
                                 localSchedulePeriods = [];
                             }
                             
-                            // DELETED in v4.30: This logic is now handled by recalculateAndRenderAll
-                            
-                            console.log("Active shared schedule updated.");
+                            // --- NEW V4.90: One-Time Bell ID Migration for BASE shared bells ---
+                            // This must run for personal schedules too, so the base bells have IDs.
+                            let needsBaseMigration = false;
+                            localSchedulePeriods.forEach(period => {
+                                period.bells.forEach(bell => {
+                                    if (!bell.bellId) {
+                                        bell.bellId = generateBellId();
+                                        needsBaseMigration = true;
+                                        console.log(`Assigning new bellId to BASE bell: ${bell.name} in ${period.name}`);
+                                    }
+                                });
+                            });
 
+                            if (needsBaseMigration && document.body.classList.contains('admin-mode')) {
+                                console.log("Saving migrated bellId data back to BASE schedule...");
+                                updateDoc(scheduleRef, { periods: localSchedulePeriods }) 
+                                    .then(() => console.log("Base schedule bellId migration successful."))
+                                    .catch(err => console.error("Error saving base bellId migration:", err));
+                            }
+                            // --- END V4.90 Migration ---
+                            
+                            console.log("Base schedule for personal schedule updated.");
                         } else {
                             console.warn("Selected shared schedule does not exist.");
                             localSchedulePeriods = [];
@@ -4388,7 +4555,7 @@
                     // NEW in 4.57: Enable new period button
                     newPeriodBtn.disabled = false;
                     
-                    /// 1. Listen to the BASE shared schedule
+                    // 1. Listen to the BASE shared schedule
                     scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
                     activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
                         // NEW in 4.35: Set the base loaded flag
@@ -4406,10 +4573,33 @@
                             } else {
                                 localSchedulePeriods = [];
                             }
+
+                            // --- NEW V4.90: One-Time Bell ID Migration for SHARED bells ---
+                            // This fixes the bug where overrides wouldn't save on refresh.
+                            let needsSharedMigration = false;
+                            localSchedulePeriods.forEach(period => {
+                                period.bells.forEach(bell => {
+                                    if (!bell.bellId) {
+                                        bell.bellId = generateBellId();
+                                        needsSharedMigration = true;
+                                        console.log(`Assigning new bellId to SHARED bell: ${bell.name} in ${period.name}`);
+                                    }
+                                });
+                            });
+
+                            if (needsSharedMigration && document.body.classList.contains('admin-mode')) {
+                                console.log("Saving migrated bellId data back to SHARED schedule...");
+                                // Fire-and-forget update.
+                                // We only save if user is an admin to prevent write errors.
+                                // Non-admins will still have the IDs in-memory for this session.
+                                updateDoc(scheduleRef, { periods: localSchedulePeriods }) 
+                                    .then(() => console.log("Shared schedule bellId migration successful."))
+                                    .catch(err => console.error("Error saving shared bellId migration:", err));
+                            }
+                            // --- END V4.90 Migration ---
                             
-                            // DELETED in v4.30: This logic is now handled by recalculateAndRenderAll
-                            
-                            console.log("Base schedule for personal schedule updated.");
+                            console.log("Active shared schedule updated.");
+
                         } else {
                             console.warn("Base schedule does not exist.");
                             localSchedulePeriods = [];
@@ -4517,6 +4707,56 @@
                     console.error("Error creating schedule:", error);
                 }
             }
+
+            // --- NEW V4.91: Rename Shared Schedule Functions ---
+            function openRenameSharedScheduleModal() {
+                if (!activeBaseScheduleId || !document.body.classList.contains('admin-mode')) return;
+                
+                const schedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                if (!schedule) return;
+
+                // Populate modal with current name
+                renameSharedOldName.textContent = schedule.name;
+                renameSharedNewNameInput.value = schedule.name;
+                renameSharedScheduleStatus.classList.add('hidden'); // Clear status
+                
+                // Show the modal
+                renameSharedScheduleModal.classList.remove('hidden');
+            }
+
+            async function handleRenameSharedScheduleSubmit(e) {
+                e.preventDefault();
+                if (!activeBaseScheduleId || !scheduleRef || !document.body.classList.contains('admin-mode')) return;
+
+                const schedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                if (!schedule) return;
+
+                const newName = renameSharedNewNameInput.value.trim();
+                
+                if (newName && newName !== "" && newName !== schedule.name) {
+                    renameSharedScheduleStatus.textContent = "Saving...";
+                    renameSharedScheduleStatus.classList.remove('hidden');
+                    
+                    try {
+                        await updateDoc(scheduleRef, { name: newName });
+                        console.log("Shared schedule renamed.");
+                        // The onSnapshot listener will handle the UI update.
+                        
+                        renameSharedScheduleModal.classList.add('hidden'); // Close modal on success
+                    } catch (error) {
+                        console.error("Error renaming schedule:", error);
+                        renameSharedScheduleStatus.textContent = "Error saving name.";
+                    }
+                } else if (newName === schedule.name) {
+                    // No change, just close the modal
+                    renameSharedScheduleModal.classList.add('hidden');
+                } else {
+                    // Invalid name
+                    renameSharedScheduleStatus.textContent = "Please enter a valid name.";
+                    renameSharedScheduleStatus.classList.remove('hidden');
+                }
+            }
+            // --- END V4.91 ---
     
             /**
              * NEW: v3.02 (4.03?) - Opens the modal to confirm bell deletion.
@@ -4711,12 +4951,9 @@
                 `).join('');
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
 
-                // 5. Populate fields with the bell's saved data
-                // MODIFIED V4.86: Handle *both* new (V4.47) and old (V4.10) relative bell types
-                if (rawBell.relative.parentBellId) {
-                    // Old V4.10 logic: Anchor is a specific bell ID
-                    relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
-                } else if (rawBell.relative.parentPeriodName && resolvedBells.length > 0) {
+                // 5. Populate fields with the bell's saved data -->
+                // MODIFIED V4.96: Prioritize V4.47 (stable) anchors first
+                if (rawBell.relative.parentPeriodName && resolvedBells.length > 0) {
                     // New V4.47 logic: Anchor is 'period_start' or 'period_end'
                     if (rawBell.relative.parentAnchorType === 'period_start') {
                         relativeAnchorBellSelect.value = resolvedBells[0].bellId; // First bell
@@ -4724,8 +4961,11 @@
                         // Default to last bell if not 'period_start' (e.g., 'period_end')
                         relativeAnchorBellSelect.value = resolvedBells[resolvedBells.length - 1].bellId; // Last bell
                     }
+                } else if (rawBell.relative.parentBellId) {
+                    // Old V4.10 logic: Anchor is a specific bell ID
+                    relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
                 }
-                // END V4.86 FIX
+                // END V4.96 FIX
                 
                 relativeBellNameInput.value = rawBell.name;
                 relativeBellSoundSelect.value = rawBell.sound;
@@ -4788,16 +5028,16 @@
                     if (bell.type === 'shared') {
                         editBellOverrideContainer.classList.remove('hidden');
                         editBellOverrideCheckbox.checked = false;
+                        // NEW V4.95: Disable sound select by default for shared bells
+                        editBellSoundInput.disabled = true;
                     } else {
                         editBellOverrideContainer.classList.add('hidden');
                         editBellOverrideCheckbox.checked = false;
+                        // NEW V4.95: Enable sound select for custom bells
+                        editBellSoundInput.disabled = false;
                     }
                     editBellModal.classList.remove('hidden');
                 }
-            }
-
-            /**
-             editBellModal.classList.add('hidden');
             }
                 
             // DELETED in 4.31: Removed duplicate/old handleEditBellClick function.
@@ -4898,7 +5138,9 @@
     
                             if (externalConflicts.length > 0) {
                                 // Link edit modal handling (will continue the process)
-                                currentEditingBell = { ...oldBell, newBell, updatedPeriods }; // Store state including new periods
+                                // MODIFIED V4.93: Stored data with explicit 'oldBell' key
+                                // This fixes the 'undefined' error in handleLinkedEdit.
+                                linkedEditData = { oldBell: oldBell, newBell: newBell, updatedPeriods: updatedPeriods };
                                 showLinkedEditModal(externalConflicts);
                                 return; // Wait for modal resolution
                             }
@@ -4926,7 +5168,8 @@
     
                     // If execution reaches here, the update was successful (or linked edit modal opened)
                     editBellStatus.textContent = "Changes saved.";
-                    if (!currentEditingBell.newBell) { // If not waiting on linked edit modal
+                    // MODIFIED V4.92: Check the correct state variable
+                    if (!linkedEditData) { // If not waiting on linked edit modal
                         closeEditBellModal();
                     }
     
@@ -4956,7 +5199,10 @@
                 
                 linkedScheduleList.innerHTML = conflicts.map(c => `
                     <div class="flex items-center">
-                        <input type="checkbox" id="linked-schedule-${c.schedule.id}" name="schedule" value="${c.schedule.id}" checked class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 linked-schedule-check">
+                        <!-- NEW V4.96: Added data-conflict-bell-id -->
+                        <input type="checkbox" id="linked-schedule-${c.schedule.id}" name="schedule" value="${c.schedule.id}" 
+                               data-conflict-bell-id="${c.bell.bellId}" 
+                               checked class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 linked-schedule-check">
                         <label for="linked-schedule-${c.schedule.id}" class="ml-2 block text-sm text-gray-900">
                             <span class="font-medium">${c.schedule.name}:</span>
                             <span>${c.bell.name} at ${formatTime12Hour(c.bell.time, true)}</span>
@@ -4979,8 +5225,12 @@
                 linkedEditStatus.classList.remove('hidden');
                 
                 try {
-                    const checkedScheduleIds = Array.from(document.querySelectorAll('.linked-schedule-check:checked'))
-                                                     .map(cb => cb.value);
+                    // MODIFIED V4.96: Get both schedule ID and the conflicting bell ID
+                    const checkedSchedules = Array.from(document.querySelectorAll('.linked-schedule-check:checked'))
+                                                      .map(cb => ({
+                                                          scheduleId: cb.value,
+                                                          conflictBellId: cb.dataset.conflictBellId
+                                                      }));
                     
                     const batch = writeBatch(db);
                     
@@ -4993,15 +5243,39 @@
     
                     // 2. Update LINKED schedules (Only if applyToAll is true)
                     if (applyToAll) {
-                        for (const scheduleId of checkedScheduleIds) {
+                        // MODIFIED V4.96: Loop through the new checkedSchedules object
+                        for (const { scheduleId, conflictBellId } of checkedSchedules) {
                             if (scheduleId === activeBaseScheduleId) continue; // Skip current schedule
     
                             const schedule = allSchedules.find(s => s.id === scheduleId);
-                            if (!schedule || !schedule.bells) continue;
-    
+                            // MODIFIED V4.94: Check schedule.periods, which is guaranteed by the V4.90 listener
+                            if (!schedule || !schedule.periods) {
+                                console.warn(`handleLinkedEdit: Could not find periods for schedule ${scheduleId}. Skipping.`);
+                                continue;
+                            }
+                            
+                            // MODIFIED V4.96: Find the *actual* conflicting bell (oldBellToUpdate)
+                            let oldBellToUpdate = null;
+                            for (const period of schedule.periods) {
+                                oldBellToUpdate = period.bells.find(b => b.bellId === conflictBellId);
+                                if (oldBellToUpdate) break;
+                            }
+
+                            if (!oldBellToUpdate) {
+                                console.warn(`handleLinkedEdit: Could not find conflictBellId ${conflictBellId} in schedule ${scheduleId}. Skipping.`);
+                                continue;
+                            }
+                            
+                            // NEW V4.96: Create the updated bell object FOR THIS SCHEDULE
+                            // It keeps its original bellId, sound, etc. but gets the NEW TIME.
+                            const updatedExternalBell = { ...oldBellToUpdate, time: newBell.time };
+                            
+                            // NEW V4.96: Add requested log
+                            console.log(`LINKED EDIT: Updating schedule "${schedule.name}", bell "${oldBellToUpdate.name}" (ID: ${oldBellToUpdate.bellId}) to new time ${newBell.time}.`);
+
                             // V4.0 Logic: Find the period and update the bell
-                            const targetPeriods = schedule.periods || schedule.bells && migrateLegacyBellsToPeriods(schedule.bells) || [];
-                            const updatedLinkedPeriods = updatePeriodsOnEdit(targetPeriods, oldBell, newBell);
+                            const targetPeriods = schedule.periods; 
+                            const updatedLinkedPeriods = updatePeriodsOnEdit(targetPeriods, oldBellToUpdate, updatedExternalBell);
     
                             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', scheduleId);
                             batch.update(docRef, { periods: updatedLinkedPeriods });
@@ -5012,9 +5286,10 @@
     
                     linkedEditStatus.textContent = "Updates complete.";
                     setTimeout(() => {
-                        closeLinkedEditModal();
-                        closeEditBellModal(); // Close the parent edit modal
-                    }, 1000);
+                    closeLinkedEditModal();
+                    closeEditBellModal(); // Close the parent edit modal
+                    currentEditingBell = null; // NEW V4.92: Clear the parent modal's state
+                }, 1000);
     
                 } catch (error) {
                     console.error("Error applying linked edit:", error);
@@ -5030,9 +5305,9 @@
              * @param {object} newBell - The bell object after edit {time, name, sound}.
              * @returns {Array} The new, updated periods array.
              */
+            // MODIFIED V4.95: This function no longer assumes the period name is the same.
+            // It iterates all periods to find the bell by its ID.
             function updatePeriodsOnEdit(periods, oldBell, newBell) {
-                // MODIFIED in 4.27: Use bellId from oldBell state
-                const oldPeriodName = oldBell.periodName; 
                 const bellIdToFind = oldBell.bellId;
                 
                 if (!bellIdToFind) {
@@ -5040,43 +5315,32 @@
                     return periods; // Return original array to prevent data loss
                 }
                 
-                // If the bell name has changed, we need to check if the period name should change too
-                // Note: In V4.03, we rely on the EDIT MODAL to determine which period it belongs to (future refinement)
-                // For now, we assume the period name STAYS THE SAME unless we add a Period Selector to the Edit Modal.
-                const targetPeriodName = oldPeriodName; 
-    
-                // Find the period containing the old bell
-                const periodIndex = periods.findIndex(p => p.name === oldPeriodName);
-    
-                if (periodIndex === -1) {
-                    console.warn(`updatePeriodsOnEdit: Could not find period "${oldPeriodName}".`);
-                    return periods; // Period not found, return original array
-                }
-    
-                const period = periods[periodIndex];
-                let bellFound = false; // NEW in 4.27: Flag to see if we found the bell
-                const updatedBells = period.bells.map(bell => {
-                    // MODIFIED in 4.36: Find by bellId and replace
-                    if (bell.bellId === bellIdToFind) {
-                        bellFound = true; // Mark as found
+                // MODIFIED V4.95: Iterate through all periods to find the bell
+                let bellFound = false;
+                const updatedPeriods = periods.map(period => {
+                    // Check if this period contains the bell
+                    const bellIndex = period.bells.findIndex(bell => bell.bellId === bellIdToFind);
+
+                    if (bellIndex > -1) {
+                        bellFound = true;
                         
-                        // MODIFIED in 4.36: Return the newBell object *as-is*.
-                        // This works because both handleEditBellSubmit and
-                        // handleRelativeBellSubmit now pass a complete
-                        // bell object (including bellId) as 'newBell'.
-                        return newBell;
+                        // Create a new bells array for this period
+                        const updatedBells = [...period.bells];
+                        // Replace the old bell with the new bell
+                        updatedBells[bellIndex] = newBell;
+                        
+                        // Return the updated period object
+                        return { ...period, bells: updatedBells };
                     }
-                    return bell;
+                    
+                    // This period didn't contain the bell, return it unchanged
+                    return period;
                 });
 
                 if (!bellFound) {
-                    console.warn(`updatePeriodsOnEdit: Did not find bellId "${bellIdToFind}" in period "${oldPeriodName}".`);
+                    console.warn(`updatePeriodsOnEdit: Did not find bellId "${bellIdToFind}" in any period.`);
                 }
     
-                // Reconstruct the periods array
-                const updatedPeriods = [...periods];
-                updatedPeriods[periodIndex] = { ...period, bells: updatedBells };
-                
                 // DELETED in 4.36: This sort is invalid.
                 // It was trying to sort bells, but relative bells have no 'time' property,
                 // causing the 'a.time.localeCompare' error.
@@ -5155,19 +5419,20 @@
              * @param {string} name - The name of the bell to check
              * @returns {object} { internal: bell|null, external: [{schedule, bell}] }
              */
+            // MODIFIED V4.92: Rewritten to correctly find one conflict per external schedule.
             function findAllNearbySharedBells(time) {
                 const newTimeInSeconds = timeToSeconds(time);
                 if (isNaN(newTimeInSeconds)) return { internal: null, external: [] };
     
                 let internalConflict = null;
-                const externalConflicts = [];
+                const externalConflictsMap = new Map(); // Use a Map to store one conflict per *schedule*
     
                 // MODIFIED: v3.03 - Use activeBaseScheduleId
-                const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                const currentScheduleId = activeBaseScheduleId;
     
                 for (const schedule of allSchedules) {
                     // MODIFIED: v3.03 - Use activeBaseScheduleId
-                    const isCurrentSchedule = schedule.id === activeBaseScheduleId;
+                    const isCurrentSchedule = schedule.id === currentScheduleId;
                     
                     // Use findNearbyBell helper, but *only* check bells with the same name
                     // This is a modification from the spec, which said *any* bell.
@@ -5187,40 +5452,36 @@
                     // OK, re-reading the v3.02 code I provided, it was `findAllNearbySharedBells(time)`
                     // and it did NOT check for name. I will remove the `name` parameter again.
     
-                    const bellList = schedule.bells || [];
-                    for (const bell of bellList) {
-                        // DELETED: Name check removed to match spec
-                        // if (bell.name !== name) {
-                        //     continue;
-                        // }
-    
+                    // MODIFIED V4.89: Read from the 'periods' array, not the legacy 'bells' array.
+                    // This was the source of the "linked edit" bug.
+                    const bellList = (schedule.periods || []).flatMap(p => p.bells || []);
+                    if (bellList.length === 0) continue;
+
+                    // Find the *first* bell in this schedule that conflicts
+                    const conflictingBell = bellList.find(bell => {
                         const existingTimeInSeconds = timeToSeconds(bell.time);
-                        if (isNaN(existingTimeInSeconds)) continue;
+                        if (isNaN(existingTimeInSeconds)) return false;
+                        return Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 60;
+                    });
+
+                    if (!conflictingBell) continue; // No conflict in this schedule
     
-                        if (Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 60) {
-                            // Conflict found!
-                            if (isCurrentSchedule) {
-                                if (!internalConflict) { // Only grab the first one
-                                    internalConflict = bell;
-                                }
-                            } else {
-                                externalConflicts.push({ schedule, bell });
-                            }
+                    // Now, handle the conflict
+                    if (isCurrentSchedule) {
+                        // This is an internal conflict
+                        if (!internalConflict) {
+                            internalConflict = conflictingBell;
                         }
-                    }
-                }
-                
-                // De-duplicate external conflicts based on the bell itself (time and name)
-                const uniqueExternal = new Map();
-                for (const conflict of externalConflicts) {
-                    const key = `${conflict.bell.name}::${conflict.bell.time}`;
-                    if (!uniqueExternal.has(key)) {
-                        uniqueExternal.set(key, conflict);
+                    } else {
+                        // This is an external conflict. Store it if we haven't already.
+                        if (!externalConflictsMap.has(schedule.id)) {
+                            externalConflictsMap.set(schedule.id, { schedule, bell: conflictingBell });
+                        }
                     }
                 }
     
                 // ADDED: Missing return statement and closing brace
-                return { internal: internalConflict, external: Array.from(uniqueExternal.values()) };
+                return { internal: internalConflict, external: Array.from(externalConflictsMap.values()) };
             }
     
             // --- NEW: v3.05 Personal Schedule Manager Functions ---
@@ -6022,7 +6283,7 @@
 
                 // 1. Get all values from the form
                 const bellName = multiAddRelativeBellName.value.trim();
-                const bellSound = multiAddRelativeBellSound.value;
+                let bellSound = multiAddRelativeBellSound.value;
                 const parentAnchorType = multiAddRelativeParentAnchor.value; // 'period_start' or 'period_end'
                 const direction = multiAddRelativeDirection.value;
                 const minutes = parseInt(multiAddRelativeMinutes.value) || 0;
@@ -6041,6 +6302,12 @@
                     multiAddRelativeStatus.textContent = "Please select at least one period.";
                     multiAddRelativeStatus.classList.remove('hidden');
                     return;
+                }
+                
+                // NEW V4.95: Validate sound
+                if (!bellSound || bellSound === '[UPLOAD]') {
+                    console.warn("Multi-add bell sound was empty or [UPLOAD], defaulting to Ellis Bell.");
+                    bellSound = 'ellisBell.mp3';
                 }
                 
                 // 3. Calculate offset
@@ -6642,7 +6909,7 @@
                 if (p.includes('lunch')) {
                     // Fork and Knife for Lunch
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5V12.97c2.09-.13 3.75-1.85 3.75-3.97V2h-2v7zm5-3v8h2.5v10h2.5V2h-5z"/></svg>`;
-                } else if (p.includes('passing') || p.includes('between')) {
+               } else if (p.includes('passing') || p.includes('between')) {
                     // MODIFIED V4.87: Using user-provided optimized SVG
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 259.3 435.88" fill="currentColor" class="w-full h-full"><path d="M315.67 347.53c0 20.503-16.621 37.123-37.123 37.123-20.503 0-37.123-16.621-37.123-37.123 0-20.503 16.621-37.123 37.123-37.123 20.503 0 37.123 16.621 37.123 37.123" transform="translate(-132.24 -310.409)"/><path d="M516.35 490.41s-30.339 157.53-36.871 168.19c-5.586 9.115-49.18 80.642-49.18 80.642-9.306 15.26-.487 26.17 9.372 31.862 8.394 4.846 26.437 3.646 32.403-6.53 0 0 48.366-75.267 53.643-91.5 3.654-11.238 12.143-57.857 12.143-57.857s46.996 48.47 52.143 57.143c6.488 10.933 18.571 87.143 18.571 87.143 2.89 13.56 15.822 17.982 29.286 15.714 10.633-1.79 21.753-8.985 19.286-22.143 0 0-10.746-88.36-19.286-102.86-10.19-17.302-65-76.43-65-76.43l15.714-70s10.086 20.447 17.143 29.287c8.026 10.053 58.571 39.286 58.571 39.286 4.637 3.11 15.133 1.396 19.286-6.429 3.334-6.28 3.177-16.454-4.285-21.429 0 0-41.655-26.15-51.43-34.286-10.87-9.03-32.86-69.27-32.86-69.27-6.82-9.386-16.15-19.742-32.142-20-16.12-.26-24.187 8.62-31.43 13.571 0 0-61.746 45.105-67.856 54.286-6.147 9.236-17.143 78.571-17.143 78.571-1.724 7.9 1.362 14.253 10.714 16.43 11.443 2.661 19.645-4.464 20.714-10 0 0 7.05-54.766 12.143-62.858 5.929-9.421 26.346-20.52 26.346-20.52z" transform="translate(-426.35 -339.904)"/></svg>`;
                 } else {
@@ -6652,10 +6919,11 @@
                     if (match) {
                         text = (match[1] || match[2]).toUpperCase();
                     }
+                    // MODIFIED V4.98 (FIX): This was the bug. It should create the SVG, not wrap an empty var.
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text></svg>`;
                 }
                 
-                // Return as a full HTML string for injection
+                // Return as a full HTML string for injection (MODIFIED V4.74: Removed wrapper div)
                 return `<div class="w-full h-full p-8 text-gray-400">${svgContent}</div>`;
             }
 
@@ -6762,7 +7030,14 @@
                     // Case 3: It's an uploaded image URL
                     // MODIFIED in 4.54: Force image to fill and be contained by its parent DIV (fixing overlap).
                     return `<img src="${value}" alt="Visual Cue" class="w-full h-full object-contain">`;
+                
+                // NEW V4.89: Add default visual for standard Quick Bell
+                // MODIFIED V4.98: Moved from getDefaultVisualCue and changed icon
+                } else if (value === "[DEFAULT] Quick Bell") {
+                    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM11 15h2v2h-2v-2zm0-8h2v6h-2V7z"/></svg>`;
+                    return `<div class="w-full h-full p-8 text-gray-400">${svgContent}</div>`;
                 }
+                
                 // Fallback
                 return getDefaultVisualCue(periodName);
             }
@@ -7301,6 +7576,11 @@
             function handleImportSchedules() {
                 importFileInput.click();
             }
+
+            // NEW V4.90: Handler for Current Schedule Import button
+            function handleImportCurrentScheduleClick() {
+                importCurrentFileInput.click(); // Trigger the *new* hidden input
+            }
     
             async function handleFileInputChange(e) {
                 const file = e.target.files[0];
@@ -7317,6 +7597,22 @@
                         if (!data.schedules || !Array.isArray(data.schedules)) {
                             throw new Error("Invalid file: 'schedules' array not found.");
                         }
+                        
+                        // --- NEW V4.90: Add confirmation modal ---
+                        const confirmed = await showConfirmationModal(
+                            `This will OVERWRITE ALL ${data.schedules.length} shared schedules in the database with the data from this file. This action cannot be undone. Are you sure you want to proceed?`,
+                            "Confirm Overwrite ALL Schedules",
+                            "Overwrite ALL"
+                        );
+
+                        if (!confirmed) {
+                            importStatus.textContent = "Import cancelled by user.";
+                            setTimeout(() => importStatus.classList.add('hidden'), 3000);
+                            importFileInput.value = ''; // Clear input
+                            return; // Stop execution
+                        }
+                        // --- END V4.90 Confirmation ---
+                        
                         importStatus.textContent = `Found ${data.schedules.length} schedules. Importing...`;
                         const batch = writeBatch(db);
                         let newCount = 0;
@@ -7348,6 +7644,114 @@
                 };
                 reader.readAsText(file);
             }
+
+            // --- NEW V4.90: Import/Export for CURRENT schedule ---
+            function handleExportCurrentSchedule() {
+                if (!activeBaseScheduleId || !document.body.classList.contains('admin-mode')) {
+                    showUserMessage("No active shared schedule selected or insufficient permissions.");
+                    return;
+                }
+
+                const schedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                if (!schedule) {
+                    showUserMessage("Error: Could not find the active schedule data.");
+                    return;
+                }
+
+                // Create a clean backup object for a *single* schedule
+                const backupData = {
+                    type: "EllisWebBell_SingleSchedule_v1",
+                    schedule: {
+                        name: schedule.name,
+                        periods: schedule.periods || [] // Export the raw periods array
+                    }
+                };
+
+                try {
+                    const dataStr = JSON.stringify(backupData, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(dataBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const filename = (schedule.name || 'current_schedule').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                    a.download = `ellisbell_schedule_${filename}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (error) {
+                     console.error("Error backing up current schedule:", error);
+                     showUserMessage("Error exporting schedule: " + error.message);
+                }
+            }
+
+            async function handleImportCurrentFileChange(e) {
+                const file = e.target.files[0];
+                if (!file || !activeBaseScheduleId || !document.body.classList.contains('admin-mode')) {
+                    importCurrentFileInput.value = ''; // Clear input
+                    return;
+                }
+                
+                const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                if (!currentSchedule) {
+                    showUserMessage("Error: No active schedule to overwrite.");
+                    importCurrentFileInput.value = ''; // Clear input
+                    return;
+                }
+
+                importStatus.textContent = `Reading file ${file.name}...`;
+                importStatus.classList.remove('hidden');
+                
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        
+                        // 1. Validate file
+                        if (data.type !== "EllisWebBell_SingleSchedule_v1" || !data.schedule || !data.schedule.name || !Array.isArray(data.schedule.periods)) {
+                            throw new Error("Invalid or corrupt single schedule backup file.");
+                        }
+
+                        // 2. Show confirmation
+                        const confirmed = await showConfirmationModal(
+                            `This will OVERWRITE your current schedule "${currentSchedule.name}" with the data from "${data.schedule.name}" (from file: ${file.name}). This action cannot be undone.`,
+                            "Confirm Overwrite Current Schedule",
+                            "Overwrite Current"
+                        );
+
+                        if (!confirmed) {
+                            importStatus.textContent = "Import cancelled by user.";
+                            setTimeout(() => importStatus.classList.add('hidden'), 3000);
+                            importCurrentFileInput.value = ''; // Clear input
+                            return; // Stop execution
+                        }
+
+                        // 3. Proceed with overwrite
+                        importStatus.textContent = `Importing and overwriting "${currentSchedule.name}"...`;
+                        
+                        const scheduleData = data.schedule;
+                        const scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
+
+                        // We update the name AND the periods.
+                        await updateDoc(scheduleRef, { 
+                            name: scheduleData.name, 
+                            periods: scheduleData.periods 
+                        });
+
+                        importStatus.textContent = `Successfully overwrote "${currentSchedule.name}" with "${scheduleData.name}".`;
+                        // The onSnapshot listener will handle the UI refresh.
+
+                    } catch (error) {
+                        console.error("Current schedule import failed:", error);
+                        importStatus.textContent = `Error: ${error.message}`;
+                    } finally {
+                        importCurrentFileInput.value = ''; // Clear input
+                        setTimeout(() => importStatus.classList.add('hidden'), 4000);
+                    }
+                };
+                reader.readAsText(file);
+            }
+            // --- END V4.90 ---
     
             // --- NEW: Audio File Management ---
     
@@ -7409,8 +7813,11 @@
                     audioUploadStatus.textContent = "Upload successful! Refreshing list...";
                     
                     // 1. Manually add to local state and update all dropdowns
-                    userAudioFiles.push({ name: fileToUpload.name, url: downloadURL, path: storageRef.fullPath });
-                    addNewAudioOption(downloadURL, fileToUpload.name);
+                    // This is faster than waiting for loadAllAudioFiles()
+                    const newFile = { name: fileToUpload.name, url: downloadURL, path: storageRef.fullPath, nickname: '' }; // NEW V4.97
+                    userAudioFiles.push(newFile);
+                    userAudioFiles.sort((a, b) => (a.nickname || a.name).localeCompare(b.nickname || b.name)); // NEW V4.97
+                    addNewAudioOption(downloadURL, fileToUpload.name, ''); // MODIFIED V4.97
                     renderAudioFileManager(); // Re-render the manager list
 
                     // DELETED V4.79: This call caused the schedule to disappear
@@ -7451,7 +7858,62 @@
                     audioUploadBtn.disabled = false;
                 }
             }
-            
+
+            /**
+             * NEW: v4.97 - Opens the rename audio modal.
+             */
+            function openRenameAudioModal(path, name, nickname) {
+                audioToRename = { path, name, nickname }; // Store state
+                renameAudioOldName.textContent = name;
+                renameAudioNewName.value = nickname || '';
+                renameAudioStatus.classList.add('hidden');
+                renameAudioModal.classList.remove('hidden');
+            }
+
+            /**
+             * NEW: v4.97 - Submits the audio rename (nickname).
+             */
+            async function handleRenameAudioSubmit(e) {
+                e.preventDefault();
+                if (!audioToRename) return;
+
+                const newNickname = renameAudioNewName.value.trim();
+                const { path, name } = audioToRename;
+                
+                renameAudioStatus.textContent = "Saving...";
+                renameAudioStatus.classList.remove('hidden');
+
+                try {
+                    const storageRef = ref(storage, path);
+                    const metadata = await getMetadata(storageRef);
+                    
+                    // Create new metadata object, preserving existing custom metadata
+                    const newMetadata = {
+                        contentType: metadata.contentType,
+                        customMetadata: {
+                            ...(metadata.customMetadata || {}), // Preserve owner, etc.
+                            'nickname': newNickname // Add or update the nickname
+                        }
+                    };
+
+                    await updateMetadata(storageRef, newMetadata);
+                    
+                    renameAudioStatus.textContent = "Nickname saved! Refreshing lists...";
+
+                    // Reload all files to get updated nicknames and re-render
+                    await loadAllAudioFiles();
+
+                    setTimeout(() => {
+                        renameAudioModal.classList.add('hidden');
+                        audioToRename = null;
+                    }, 1000);
+
+                } catch (error) {
+                    console.error("Error saving audio nickname:", error);
+                    renameAudioStatus.textContent = `Error: ${error.message}`;
+                }
+            }
+    
             async function loadAllAudioFiles() {
                 // 1. Load User's Private Files
                 if (!isUserAnonymous && userId) {
@@ -7461,9 +7923,13 @@
                         const userFilesResult = await listAll(userFolderRef);
                         userAudioFiles = await Promise.all(userFilesResult.items.map(async (itemRef) => {
                             const url = await getDownloadURL(itemRef);
-                            return { name: itemRef.name, url: url, path: itemRef.fullPath };
+                            const meta = await getMetadata(itemRef); // NEW V4.97
+                            const nickname = meta.customMetadata?.nickname || ''; // NEW V4.97
+                            return { name: itemRef.name, url: url, path: itemRef.fullPath, nickname: nickname }; // MODIFIED V4.97
                         }));
-                    } catch (e) { 
+                        // NEW V4.97: Sort by nickname if it exists, otherwise by name
+                        userAudioFiles.sort((a, b) => (a.nickname || a.name).localeCompare(b.nickname || b.name));
+                    } catch (e) {
                         console.error("Error loading user files:", e); 
                         userAudioFiles = []; // Ensure it's an array
                     }
@@ -7481,8 +7947,11 @@
                         // Get metadata to see who the owner is
                         const meta = await getMetadata(itemRef);
                         const owner = meta.customMetadata?.ownerEmail || 'unknown';
-                        return { name: itemRef.name, url: url, path: itemRef.fullPath, owner: owner };
+                        const nickname = meta.customMetadata?.nickname || ''; // NEW V4.97
+                        return { name: itemRef.name, url: url, path: itemRef.fullPath, owner: owner, nickname: nickname }; // MODIFIED V4.97
                     }));
+                    // NEW V4.97: Sort by nickname if it exists, otherwise by name
+                    sharedAudioFiles.sort((a, b) => (a.nickname || a.name).localeCompare(b.nickname || b.name));
                 } catch (e) { 
                     console.error("Error loading shared files:", e); 
                     sharedAudioFiles = []; // Ensure it's an array
@@ -7534,9 +8003,12 @@
                     myAudioFilesList.innerHTML = userAudioFiles.map(file => {
                         // Check if this file has already been shared
                         const isShared = sharedAudioFiles.some(sharedFile => sharedFile.name === file.name);
+                        // NEW V4.97: Display nickname or name
+                        const displayName = file.nickname || file.name;
+                        const title = file.nickname ? `Nickname: ${file.nickname}\nFilename: ${file.name}` : file.name;
                         return `
                         <div class="flex flex-col sm:flex-row justify-between sm:items-center p-2 rounded-lg hover:bg-gray-100">
-                            <span class="text-gray-800 truncate" title="${file.name}">${file.name}</span>
+                            <span class="text-gray-800 truncate" title="${title}">${displayName}</span>
                             <div class="flex-shrink-0 flex items-center space-x-2 mt-2 sm:mt-0">
                                 <!-- MODIFIED: Replaced checkbox with button/span -->
                                 ${isShared ? 
@@ -7550,6 +8022,8 @@
                                 }
                                 <!-- MODIFIED: v3.27 - Adjusted padding and text size -->
                                 <button class="preview-audio-btn px-3 py-1 text-sm bg-gray-200 rounded-lg hover:bg-gray-300" data-url="${file.url}" aria-label="Play">&#9654;</button>
+                                <!-- NEW V4.97: Rename Button -->
+                                <button class="rename-audio-btn text-xs px-2 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600" data-path="${file.path}" data-name="${file.name}" data-nickname="${file.nickname || ''}">Rename</button>
                                 <button class="delete-audio-btn text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600" data-path="${file.path}" data-url="${file.url}">Delete</button>
                             </div>
                         </div>
@@ -7561,29 +8035,35 @@
                 if (sharedAudioFiles.length === 0) {
                     sharedAudioFilesList.innerHTML = '<p class="text-gray-500">No shared audio files are available.</p>';
                 } else {
-                    sharedAudioFilesList.innerHTML = sharedAudioFiles.map(file => `
+                    sharedAudioFilesList.innerHTML = sharedAudioFiles.map(file => {
+                        // NEW V4.97: Display nickname or name
+                        const displayName = file.nickname || file.name;
+                        const title = file.nickname ? `Nickname: ${file.nickname}\nFilename: ${file.name}` : file.name;
+                        return `
                         <div class="flex flex-col sm:flex-row justify-between sm:items-center p-2 rounded-lg hover:bg-gray-100">
                             <div>
-                                <span class="text-gray-800 truncate" title="${file.name}">${file.name}</span>
+                                <span class="text-gray-800 truncate" title="${title}">${displayName}</span>
                                 <span class="text-xs text-gray-500 ml-2">(by ${file.owner})</span>
                             </div>
                             <div class="flex-shrink-0 flex items-center space-x-2 mt-2 sm:mt-0">
                                 <!-- MODIFIED: v3.27 - Adjusted padding and text size -->
                                 <button class="preview-audio-btn px-3 py-1 text-sm bg-gray-200 rounded-lg hover:bg-gray-300" data-url="${file.url}" aria-label="Play">&#9654;</button>
+                                <!-- NEW V4.97: Rename Button (Admin only) -->
+                                <button class="rename-audio-btn admin-only text-xs px-2 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600" data-path="${file.path}" data-name="${file.name}" data-nickname="${file.nickname || ''}">Rename</button>
                                 <!-- Admins can delete public files -->
                                 <button class="delete-audio-btn admin-only text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600" data-path="${file.path}" data-url="${file.url}">Delete</button>
                             </div>
                         </div>
-                    `).join('');
+                    `}).join('');
                 }
             }
             
             /**
              * NEW V4.76: Helper to add a new option to all audio dropdowns
              */
-            function addNewAudioOption(url, name) {
+            function addNewAudioOption(url, name, nickname = '') { // MODIFIED V4.97
                 const selects = [
-                    sharedSoundInput, multiBellSoundInput, editBellSoundInput, 
+                    sharedSoundInput, multiBellSoundInput, editBellSoundInput,
                     changeSoundSelect, quickBellSoundSelect, addStaticBellSound, 
                     relativeBellSoundSelect
                 ];
@@ -7593,7 +8073,7 @@
                     if (optgroup) {
                         const option = document.createElement('option');
                         option.value = url;
-                        option.textContent = `${name}`;
+                        option.textContent = nickname || name; // MODIFIED V4.97
                         optgroup.appendChild(option);
                     }
                 });
@@ -7624,8 +8104,9 @@
                 // Create options HTML
                 // --- THIS IS THE FIX from v2.24 ---
                 // The value *must* be the full file.url, not the file.path.
-                const mySoundsHtml = userAudioFiles.map(file => `<option value="${file.url}">${file.name}</option>`).join('');
-                const sharedSoundsHtml = sharedAudioFiles.map(file => `<option value="${file.url}">${file.name}</option>`).join('');
+                // MODIFIED V4.97: Use nickname if available
+                const mySoundsHtml = userAudioFiles.map(file => `<option value="${file.url}">${file.nickname || file.name}</option>`).join('');
+                const sharedSoundsHtml = sharedAudioFiles.map(file => `<option value="${file.url}">${file.nickname || file.name}</option>`).join('');
             
                 // Update all dropdowns
                 selects.forEach(item => {
@@ -7751,6 +8232,18 @@
     
             async function handleAudioListClick(e) {
                 const target = e.target;
+            
+                // NEW V4.97: Handle Rename
+                const renameBtn = target.closest('.rename-audio-btn');
+                if (renameBtn) {
+                    const path = renameBtn.dataset.path;
+                    const name = renameBtn.dataset.name;
+                    const nickname = renameBtn.dataset.nickname;
+                    if (path && name) {
+                        openRenameAudioModal(path, name, nickname);
+                    }
+                    return;
+                }
             
                 // Handle Preview
                 if (target.classList.contains('preview-audio-btn')) {
@@ -7951,6 +8444,13 @@
                 deleteScheduleBtn.addEventListener('click', handleDeleteSchedule);
                 deleteConfirmBtn.addEventListener('click', confirmDeleteSchedule);
                 deleteCancelBtn.addEventListener('click', () => confirmDeleteModal.classList.add('hidden'));
+
+                // NEW V4.91: Modals (Rename Shared Schedule)
+                renameScheduleBtn.addEventListener('click', openRenameSharedScheduleModal);
+                renameSharedScheduleForm.addEventListener('submit', handleRenameSharedScheduleSubmit);
+                renameSharedCancelBtn.addEventListener('click', () => {
+                    renameSharedScheduleModal.classList.add('hidden');
+                });
     
                 // NEW: v3.03 - Modals (Create/Delete Personal Schedule)
                 createPersonalScheduleBtn.addEventListener('click', () => {
@@ -8163,6 +8663,14 @@
                 // Modals (Edit Bell)
                 editBellForm.addEventListener('submit', handleEditBellSubmit);
                 editBellCancelBtn.addEventListener('click', closeEditBellModal);
+                // NEW V4.95: Add listener for preview button
+                document.getElementById('preview-edit-sound').addEventListener('click', () => playBell(editBellSoundInput.value));
+                // NEW V4.95: Add listener for override checkbox to enable/disable sound select
+                editBellOverrideCheckbox.addEventListener('change', (e) => {
+                    if (currentEditingBell && currentEditingBell.type === 'shared') {
+                        editBellSoundInput.disabled = !e.target.checked;
+                    }
+                });
                 
                 // Modals (Linked Edit)
                 linkedEditCancel.addEventListener('click', closeLinkedEditModal);
@@ -8221,6 +8729,8 @@
                 multiAddRelativeCancelBtn.addEventListener('click', () => {
                     multiAddRelativeBellModal.classList.add('hidden');
                 });
+                // NEW V4.95: Wire up sound select for [UPLOAD]
+                multiAddRelativeBellSound.addEventListener('change', changeSoundSelectHandler);
                 
                 // --- NEW in 4.57: New Period Modal Listeners ---
                 newPeriodBtn.addEventListener('click', openNewPeriodModal);
@@ -8287,9 +8797,16 @@
                     currentRenamingPeriod = null; // Clear stale state
                 });
                 // FIX in 4.53: Update listener to inject into both new two-column preview elements
-                editPeriodImageSelect.addEventListener('change', () => {
+                editPeriodImageSelect.addEventListener('change', (e) => {
                     // NEW in 4.44: Update the preview
-                    const selectedValue = editPeriodImageSelect.value;
+                    const selectedValue = e.target.value; // Use e.target.value
+                    
+                    // MODIFIED V4.96: This listener must *not* fire if the 'visualSelectChangeHandler'
+                    // is handling an [UPLOAD] or [CUSTOM_TEXT] action.
+                    if (selectedValue === '[UPLOAD]' || selectedValue === '[CUSTOM_TEXT]') {
+                        return;
+                    }
+
                     // FIX: Use 'Default' fallback
                     const periodName = currentRenamingPeriod ? currentRenamingPeriod.name : "Default"; 
                     
@@ -8369,13 +8886,14 @@
  
                     // Check which specific button *within* the bell item was clicked
                     if (target.classList.contains('bell-mute-toggle')) {
-                        const bellId = getBellId(bell);
-                        if (!bellId) return;
+                        // MODIFIED V4.88: Use the *unique* bellId from the 'bell' object
+                        const uniqueBellId = bell.bellId;
+                        if (!uniqueBellId) return;
                         
                         if (target.checked) {
-                            mutedBellIds.add(bellId);
+                            mutedBellIds.add(uniqueBellId);
                         } else {
-                            mutedBellIds.delete(bellId);
+                            mutedBellIds.delete(uniqueBellId);
                         }
                         saveMutedBells();
                         // MODIFIED in 4.19: Call the master recalculate function
@@ -8602,9 +9120,10 @@
                 }
                 
                 // Attach handler to all sound selects
+                // MODIFIED V4.95: Added multiAddRelativeBellSound
                 [sharedSoundInput, multiBellSoundInput, editBellSoundInput, 
                  changeSoundSelect, quickBellSoundSelect, addStaticBellSound, 
-                 relativeBellSoundSelect].forEach(select => {
+                 relativeBellSoundSelect, multiAddRelativeBellSound].forEach(select => {
                     if (select) {
                         select.addEventListener('change', changeSoundSelectHandler);
                     }
@@ -8637,6 +9156,10 @@
                 exportSchedulesBtn.addEventListener('click', handleExportSchedules);
                 importSchedulesBtn.addEventListener('click', handleImportSchedules);
                 importFileInput.addEventListener('change', handleFileInputChange);
+                // NEW V4.90: Current Schedule Listeners
+                exportCurrentScheduleBtn.addEventListener('click', handleExportCurrentSchedule);
+                importCurrentScheduleBtn.addEventListener('click', handleImportCurrentScheduleClick);
+                importCurrentFileInput.addEventListener('change', handleImportCurrentFileChange);
     
                 // NEW: Audio Manager Listeners
                 // MODIFIED V4.76: Listeners for the new reusable modal
@@ -8663,6 +9186,13 @@
                 
                 // Use event delegation for the dynamic audio lists
                 document.getElementById('audio-manager-panel').addEventListener('click', handleAudioListClick);
+
+                // NEW V4.97: Rename Audio Modal Listeners
+                renameAudioForm.addEventListener('submit', handleRenameAudioSubmit);
+                renameAudioCancelBtn.addEventListener('click', () => {
+                    renameAudioModal.classList.add('hidden');
+                    audioToRename = null;
+                });
     
                 // DELETED: v3.03 - loadCustomBells()
                 // loadCustomBells();
@@ -8839,4 +9369,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.87 -->
+<!-- Version 4.99 -->
