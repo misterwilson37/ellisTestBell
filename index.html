@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.75</title>
+    <title>Ellis Web Bell 4.87</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -531,7 +531,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.75</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.87</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -1089,15 +1089,24 @@
                 <div class="border-t pt-4 mb-4">
                     <h4 class="text-lg font-semibold text-gray-800 mb-2">Start Bell (Anchor)</h4>
                     <!-- Static Inputs -->
-                    <div id="new-period-start-static" class="grid grid-cols-2 gap-4">
-                        <div>
+                    <!-- MODIFIED V4.81: Added sound dropdown, changed to 3 cols -->
+                    <div id="new-period-start-static" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="sm:col-span-1">
                             <label for="new-period-start-time" class="block text-sm font-medium text-gray-700">Time (HH:MM:SS)</label>
                             <input type="time" id="new-period-start-time" step="1" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="new-period-start-sound" class="block text-sm font-medium text-gray-700">Sound</label>
+                            <select id="new-period-start-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <!-- Populated by JS -->
+                            </select>
                         </div>
                     </div>
                     <!-- Relative Inputs -->
                     <div id="new-period-start-relative" class="hidden space-y-3">
-                        <div class="grid grid-cols-2 gap-4">
+                        <!-- DELETED V4.83: Removing stray input tag and extra div -->
+                        <!-- This was breaking the modal layout -->
+                        <div class="grid grid-cols-2 gap-4"> 
                             <div>
                                 <label for="new-period-start-parent" class="block text-sm font-medium text-gray-700">Anchor Period</label>
                                 <select id="new-period-start-parent" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
@@ -1120,6 +1129,7 @@
                                     <option value="after">After</option>
                                 </select>
                             </div>
+                            <!-- MODIFIED V4.83: Corrected layout and fixed duplicate/wrong inputs -->
                             <div>
                                 <label for="new-period-start-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
                                 <input type="number" id="new-period-start-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
@@ -1129,6 +1139,13 @@
                                 <input type="number" id="new-period-start-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                             </div>
                         </div>
+                        <!-- NEW V4.81: Sound dropdown for relative start bell -->
+                        <div>
+                            <label for="new-period-start-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
+                            <select id="new-period-start-sound-relative" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -1136,10 +1153,17 @@
                 <div class="border-t pt-4">
                     <h4 class="text-lg font-semibold text-gray-800 mb-2">End Bell (Anchor)</h4>
                     <!-- Static Inputs -->
-                    <div id="new-period-end-static" class="grid grid-cols-2 gap-4">
-                        <div>
+                    <!-- MODIFIED V4.81: Added sound dropdown, changed to 3 cols -->
+                    <div id="new-period-end-static" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="sm:col-span-1">
                             <label for="new-period-end-time" class="block text-sm font-medium text-gray-700">Time (HH:MM:SS)</label>
                             <input type="time" id="new-period-end-time" step="1" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="new-period-end-sound" class="block text-sm font-medium text-gray-700">Sound</label>
+                            <select id="new-period-end-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <!-- Populated by JS -->
+                            </select>
                         </div>
                     </div>
                     <!-- Relative Inputs -->
@@ -1175,6 +1199,13 @@
                                 <label for="new-period-end-seconds" class="block text-sm font-medium text-gray-700">Seconds</label>
                                 <input type="number" id="new-period-end-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                             </div>
+                        </div>
+                        <!-- NEW V4.81: Sound dropdown for relative end bell -->
+                        <div>
+                            <label for="new-period-end-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
+                            <select id="new-period-end-sound-relative" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <!-- Populated by JS -->
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -1269,6 +1300,37 @@
         </div>
         <!-- **** END: v4.75 Modal **** -->
 
+        <!-- **** NEW: v4.76 - Reusable Audio Upload Modal **** -->
+        <div id="upload-audio-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+                <h3 class="text-2xl font-medium mb-6">Upload New Audio</h3>
+                
+                <div>
+                    <p class="text-sm text-gray-600 mb-4">Files must be under 1MB. (Supports .mp3, .wav, .m4a, .ogg)</p>
+                    <!-- This input uses the *existing* ID from the audio manager -->
+                    <input type="file" id="audio-upload-input" accept=".mp3,.wav,.m4a,.ogg">
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <label for="audio-upload-input" class="w-full sm:w-auto cursor-pointer px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors text-center">
+                            Choose File...
+                        </label>
+                        <!-- This span uses the *existing* ID -->
+                        <span id="audio-file-name" class="text-gray-700 sm:mt-2">No file chosen.</span>
+                    </div>
+                    <!-- This button uses the *existing* ID -->
+                    <button type="button" id="audio-upload-btn" class="mt-3 w-full sm:w-auto px-6 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50" disabled>
+                        Upload Audio
+                    </button>
+                    <!-- This status uses the *existing* ID -->
+                    <p id="audio-upload-status" class="text-blue-600 text-sm mt-3 hidden"></p>
+                </div>
+                
+                <div class="mt-6 flex justify-end">
+                    <button type="button" id="upload-audio-close-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
+                </div>
+            </div>
+        </div>
+        <!-- **** END: v4.76 Modal **** -->
+
         <!-- **** NEW: v4.44 - Multi-Add Relative Bell Modal **** -->
         <div id="multi-add-relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <form id="multi-add-relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
@@ -1340,21 +1402,12 @@
             <h2 class="text-2xl font-semibold mb-4 cursor-pointer" title="Click to refresh file lists">My Audio Manager</h2>
             <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
                 
-                <!-- Audio Upload Form -->
+                <!-- MODIFIED V4.76: Audio Upload Form replaced with a simple button -->
                 <div>
                     <h3 class="text-lg font-medium text-gray-800 mb-2">Upload New Audio File</h3>
-                    <p class="text-sm text-gray-600 mb-4">Files must be under 1MB. (Supports .mp3, .wav, .m4a, .ogg)</p>
-                    <input type="file" id="audio-upload-input" accept=".mp3,.wav,.m4a,.ogg">
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <label for="audio-upload-input" class="w-full sm:w-auto cursor-pointer px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors text-center">
-                            Choose File...
-                        </label>
-                        <span id="audio-file-name" class="text-gray-700 sm:mt-2">No file chosen.</span>
-                    </div>
-                    <button type="button" id="audio-upload-btn" class="mt-3 w-full sm:w-auto px-6 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50" disabled>
-                        Upload Audio
+                    <button type="button" id="show-audio-upload-modal-btn" class="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors">
+                        Upload New Audio...
                     </button>
-                    <p id="audio-upload-status" class="text-blue-600 text-sm mt-3 hidden"></p>
                 </div>
 
                 <!-- My Audio Files List -->
@@ -1785,6 +1838,10 @@
         // These were all declared earlier (starting at line 964).
 
         // NEW: Audio Manager Elements
+        // MODIFIED V4.76: Audio Manager Elements (now for the modal)
+        const uploadAudioModal = document.getElementById('upload-audio-modal');
+        const showAudioUploadModalBtn = document.getElementById('show-audio-upload-modal-btn');
+        const uploadAudioCloseBtn = document.getElementById('upload-audio-close-btn');
         const audioUploadInput = document.getElementById('audio-upload-input');
         const audioFileName = document.getElementById('audio-file-name');
         const audioUploadBtn = document.getElementById('audio-upload-btn');
@@ -1893,6 +1950,8 @@
         let visualFileToUpload = null; // Holds the Image File object
         let visualToDelete = null; // State for visual deletion
         let periodVisualOverrides = {}; // Store local visual cue choices
+
+        let currentSoundSelectTarget = null; // NEW V4.76: Stores <select> for audio modal
 
         const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
@@ -2774,11 +2833,13 @@
                     const isCustom = bellType === 'custom';
                     
                     // Look up the bell in the flat list to get sound overrides
-                    const flatBellData = localSchedule.find(b => b.time === bell.time && b.name === bell.name) ||
-                                         personalBells.find(b => b.time === bell.time && b.name === bell.name) ||
-                                         bell; // Fallback to original bell data
+                    // DELETED V4.76: This lookup is no longer needed, render data is correct
+                    // const flatBellData = localSchedule.find(b => b.time === bell.time && b.name === bell.name) ||
+                    //                     personalBells.find(b => b.time === bell.time && b.name === bell.name) ||
+                    //                     bell; // Fallback to original bell data
 
-                    return { ...flatBellData, ...bell, type: bellType };
+                    // MODIFIED V4.76: We can just return the bell, it's already correct
+                    return { ...bell, type: bellType };
                 });
 
                 const firstBellTime = formatTime12Hour(bellsToRender[0].time, true);
@@ -2865,14 +2926,15 @@
                         const safeName = bell.name.replace(/"/g, '&quot;');
                         const bellId = getBellId(bell);
                         const isMuted = mutedBellIds.has(bellId);
-                        // CRITICAL V4.62.9: Use the original sound from the base schedule if it exists, otherwise check if it's a shared bell.
-                        // This prevents shared bells from showing their sound path if the originalSound property wasn't populated.
-                        const originalSound = bell.originalSound || (bell.type === 'shared' ? bell.sound : null);
-                        
-                        // Determine if an override is active based on the *current* bell sound vs. the original shared sound
-                        const isOverridden = originalSound && (bell.sound !== originalSound); 
-                        
-                        let soundDisplay = bell.sound;
+
+                        // --- MODIFIED V4.76: Simplified Sound Logic ---
+                        // The bell object from calculatedPeriods now has the *correct* sound (with override)
+                        // and 'originalSound' is populated by the calculation engine.
+                        const finalSound = bell.sound;
+                        const originalSound = bell.originalSound; // This is now reliable
+                        const isOverridden = originalSound && (finalSound !== originalSound);
+                        let soundDisplay = finalSound;
+                        // --- END V4.76 MODIFICATION ---
                         
                         // NEW V4.62.3: If overridden, we display the name of the *original* shared sound (if it was shared),
                         // but if it's a custom sound, we use the URL logic below.
@@ -2902,23 +2964,26 @@
                         }
                         
                         // NEW V4.62.3: Reapply the override flag AFTER naming convention is resolved
-                        if (isOverridden) {
+                        // MODIFIED V4.86: Only show "Override" for SHARED bells
+                        if (isOverridden && bell.type === 'shared') {
                             soundDisplay = `Override: ${soundDisplay}`;
                         }
     
                         return `
                             <div class="bell-item flex items-center justify-between p-4 border-t border-gray-100 hover:bg-gray-50 transition-colors"
                                 data-time="${bell.time}" data-name="${safeName}" 
-                                data-sound="${bell.sound}" data-type="${bell.type}"
+                                data-sound="${finalSound}" data-type="${bell.type}"
                                 data-bell-id="${bell.bellId || getBellId(bell)}"
                                 data-original-sound="${originalSound}" data-period-name="${period.name}"
                                 data-is-relative="${!!bell.relative}"> <!-- NEW in 4.31 -->
                                 
                                 <!-- Bell Info (Time, Name, Sound) (left) -->
                                 <div class="flex items-center space-x-4 min-w-0 flex-grow">
-                                    <span class="text-xl font-medium text-blue-600 tabular-nums">${formatTime12Hour(bell.time, false)}</span>
+                                    <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
+                                    <span class="text-xl font-medium text-gray-800 tabular-nums">${formatTime12Hour(bell.time, false)}</span>
                                     <div class="min-w-0">
                                         <!-- NEW v4.04: Anchor Icon Logic -->
+                                        <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
                                         <span class="font-medium text-gray-800 truncate block flex items-center" title="${safeName}">
                                             ${safeName}
                                             <!-- MODIFIED in 4.32: Anchor icon now indicates a 'shared' (admin-controlled) bell, not first/last in period -->
@@ -2934,7 +2999,8 @@
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/></svg>
                                                 </span>` : ''}
                                         </span>
-                                        <span class="text-sm ${isOverridden ? 'text-blue-600' : 'text-gray-500'} truncate block" title="${bell.sound}">(${soundDisplay})</span>
+                                        <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
+                                        <span class="text-sm text-gray-500 truncate block" title="${bell.sound}">(${soundDisplay})</span>
                                     </div>
                                 </div>
                                 
@@ -2953,8 +3019,14 @@
                                             aria-label="Delete bell ${safeName}"
                                             title="Delete bell">Delete</button>
 
+                                    <!-- MODIFIED V4.81: Show Sound button for ALL bells -->
+                                    <!-- For custom bells, it will open the Edit modal -->
+                                    <button class="${isCustom ? 'edit-custom-btn' : 'sound-btn'} px-3 py-1 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                                            aria-label="Change sound for ${safeName}"
+                                            title="Change Sound">Sound</button>
+
                                     <!-- 3. Play/Preview Button -->
-                                    <button class="preview-bell-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300" 
+                                    <button class="preview-bell-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                                             aria-label="Play sound for ${safeName}"
                                             title="Play Sound">&#9654;</button>
     
@@ -3205,12 +3277,24 @@
                     // 2c. Find the anchor bell (start or end) within that period.
                     // Note: We MUST recursively find the time for these, as they could also be relative.
                     let anchorBell;
+                    // --- MODIFIED V4.78: Multi-Add Circular Dependency FIX ---
+                    // We must find the first/last *STATIC* (non-relative) bell.
+                    // This prevents a new relative bell from anchoring to itself,
+                    // which was the source of the circular dependency errors.
+                    const staticBellsInPeriod = parentPeriod.bells.filter(b => !b.relative);
+                    
+                    if (staticBellsInPeriod.length === 0) {
+                         console.warn(`Could not find a STATIC anchor bell in period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
+                         return { ...bell, isOrphan: true, fallbackTime: "00:00:00" };
+                    }
+                    
                     if (parentAnchorType === 'period_start') {
-                        anchorBell = parentPeriod.bells[0];
+                        anchorBell = staticBellsInPeriod[0];
                     } else {
                         // 'period_end'
-                        anchorBell = parentPeriod.bells[parentPeriod.bells.length - 1];
+                        anchorBell = staticBellsInPeriod[staticBellsInPeriod.length - 1];
                     }
+                    // --- END V4.78 FIX ---
 
                     // 2d. Recursively find the anchor bell's time
                     const anchorTime = calculateRelativeBellTime(anchorBell, bellMap, allPeriods, new Set(visited));
@@ -3339,16 +3423,14 @@
                         }
                         
                         // Create a new bell object with the calculated time
-                        return {
-                            ...bell,
-                            time: calculatedTime, // This will be null if calculation failed
-                            // MODIFIED in 4.37: Use the bell's origin, not the period's.
-                            // If _originType isn't set, default to shared (legacy).
-                            type: bell._originType === 'custom' ? 'custom' : 'shared'
-                        };
-                    }).filter(bell => bell.time !== null); // Filter out any bells that failed (orphans, circular)
-                    // 3. Re-sort bells within the period by their new calculated time
-                    calculatedBells.sort((a, b) => a.time.localeCompare(b.time));
+                        // MODIFIED V4.75 (FIX): Use the bell's _originType to set its type
+                        // bellType was not defined in this scope.
+                        const bellType = bell._originType || 'shared';
+                        return { ...bell, time: calculatedTime, type: bellType };
+                }).filter(bell => bell.time !== null); // Filter out any bells that failed (orphans, circular)
+                
+                // 3. Re-sort bells within the period by their new calculated time
+                calculatedBells.sort((a, b) => a.time.localeCompare(b.time));
 
                     return { ...period, bells: calculatedBells }; // This now includes the 'origin' tag
                 })
@@ -3393,18 +3475,48 @@
                 // 4. Create the final flat list for the clock
                 let flatBellList = [];
                 calculatedPeriods.forEach(period => {
+                    // MODIFIED V4.76: Apply overrides *inside* calculatedPeriods
+                    // This fixes the bug where overrides were only applied to the flat list
+                    // MODIFIED V4.86: This logic was completely wrong. This is the fix.
+                    period.bells.forEach(bell => {
+                        const bellType = bell.type;
+                        if (bellType === 'shared') {
+                            // 1. Store the *original* sound from the database.
+                            // 'bell.sound' *is* the original sound at this point.
+                            bell.originalSound = bell.sound; 
+                            
+                            // 2. Check for an override.
+                            const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
+                            const overrideSound = bellSoundOverrides[overrideKey];
+                            
+                            // 3. Apply the override *if it exists*.
+                            if (overrideSound) {
+                                bell.sound = overrideSound;
+                            }
+                            // If no override, 'bell.sound' remains the original sound.
+                        }
+                        // For custom bells, bell.sound is just bell.sound.
+                        // We set originalSound to null (or it's undefined)
+                        // so isOverridden will be false.
+                    });
+                    // END V4.86 FIX
+
                     period.bells.forEach(bell => {
                         // Apply sound overrides logic (from old flatten function)
                         const bellType = bell.type; // 'shared' or 'custom'
                         let finalBell = { ...bell, periodName: period.name };
                         
+                        // DELETED V4.76: This logic is now done *before* this loop
+                        /*
                         if (bellType === 'shared') {
                             const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
                             const overrideSound = bellSoundOverrides[overrideKey];
                             finalBell.sound = overrideSound || bell.sound;
                             finalBell.originalSound = bell.sound;
                         }
-
+                        */
+                        // --- DELETED V4.75 (FIX): Removed stray/broken code block ---
+                        
                         flatBellList.push(finalBell);
                     });
                 });
@@ -3456,11 +3568,23 @@
             function findBellChildren(parentBellId) {
                 if (!parentBellId) return [];
 
-                const allPeriods = [...localSchedulePeriods, ...personalBellsPeriods];
-                let children = [];
-                // NEW in 4.48: Find the *period* this parent bell is in.
-                const parentPeriod = allPeriods.find(p => p.bells.some(b => b.bellId === parentBellId));
+                // --- MODIFIED V4.80: CRITICAL BUG FIX ---
+                // We must use the time-resolved, sorted *calculatedPeriodsList* to find
+                // the true anchors. Using the raw 'allPeriods' list was causing
+                // new bells (at the end of the raw array) to be misidentified as anchors.
+                const allPeriods = [...localSchedulePeriods, ...personalBellsPeriods]; // Raw data for iteration
+                const calculatedParentPeriod = calculatedPeriodsList.find(p => p.bells.some(b => b.bellId === parentBellId));
+                
+                let trueFirstBell, trueLastBell;
+                if (calculatedParentPeriod && calculatedParentPeriod.bells.length > 0) {
+                    // This list IS sorted by time.
+                    trueFirstBell = calculatedParentPeriod.bells[0];
+                    trueLastBell = calculatedParentPeriod.bells[calculatedParentPeriod.bells.length - 1];
+                }
+                // --- END V4.80 FIX ---
 
+                let children = [];
+                
                 allPeriods.forEach(period => {
                     period.bells.forEach(bell => {
                         if (!bell.relative) return; // Skip non-relative bells
@@ -3470,14 +3594,17 @@
 
                         // Check for new-style anchor link
                         let isAnchorMatch = false;
-                        if (bell.relative.parentPeriodName && parentPeriod) {
-                            const isSamePeriod = bell.relative.parentPeriodName === parentPeriod.name;
+                        // MODIFIED V4.80: Use the calculated anchor bells (trueFirstBell, trueLastBell)
+                        if (bell.relative.parentPeriodName && calculatedParentPeriod && trueFirstBell && trueLastBell) {
+                            const isSamePeriod = bell.relative.parentPeriodName === calculatedParentPeriod.name;
                             const anchorType = bell.relative.parentAnchorType; // 'period_start' or 'period_end'
                             
-                            if (isSamePeriod && anchorType === 'period_start' && parentPeriod.bells[0].bellId === parentBellId) {
-                                isAnchorMatch = true; // It's linked to 'period_start' and this IS the start bell
-                            } else if (isSamePeriod && anchorType === 'period_end' && parentPeriod.bells[parentPeriod.bells.length - 1].bellId === parentBellId) {
-                                isAnchorMatch = true; // It's linked to 'period_end' and this IS the end bell
+                            // Check if this bell is anchored to 'period_start' AND the bell being deleted *is* the true start bell
+                            if (isSamePeriod && anchorType === 'period_start' && trueFirstBell.bellId === parentBellId) {
+                                isAnchorMatch = true;
+                            // Check if this bell is anchored to 'period_end' AND the bell being deleted *is* the true end bell
+                            } else if (isSamePeriod && anchorType === 'period_end' && trueLastBell.bellId === parentBellId) {
+                                isAnchorMatch = true;
                             }
                         }
 
@@ -3664,42 +3791,76 @@
     
             /**
              * NEW: v3.19 (4.03?) - Handles saving the new sound URL as a local override.
+             * MODIFIED: v4.85 - Now handles BOTH shared bell overrides (localStorage)
+             * AND custom bell sound edits (Firestore).
              */
             async function handleChangeSoundSubmit(e) {
                 e.preventDefault();
-                if (!currentChangingSoundBell || !activeBaseScheduleId) return;
+                // MODIFIED V4.85: We need either a base ID (shared) or personal ID (custom).
+                if (!currentChangingSoundBell || (!activeBaseScheduleId && !activePersonalScheduleId)) return;
     
                 const newSound = changeSoundSelect.value;
                 const oldBell = currentChangingSoundBell;
     
-                // 1. Store the override locally
-                const overrideKey = getBellOverrideKey(activeBaseScheduleId, oldBell);
-                if (!overrideKey) {
-                    console.error("Cannot create override key for current bell.");
-                    closeChangeSoundModal();
-                    return;
+                // --- CASE 1: SHARED BELL (Save override to localStorage) ---
+                if (oldBell.type === 'shared') {
+                    if (!activeBaseScheduleId) {
+                        console.error("No activeBaseScheduleId to save shared override.");
+                        return;
+                    }
+                    
+                    const overrideKey = getBellOverrideKey(activeBaseScheduleId, oldBell);
+                    if (!overrideKey) {
+                        console.error("Cannot create override key for shared bell.");
+                        closeChangeSoundModal();
+                        return;
+                    }
+        
+                    if (newSound === oldBell.originalSound) {
+                        // If the user selected the original shared sound, delete the override
+                        delete bellSoundOverrides[overrideKey];
+                        console.log("Deleted sound override.");
+                    } else {
+                        // Store the new sound override
+                        bellSoundOverrides[overrideKey] = newSound;
+                        console.log(`Saved sound override: ${newSound}`);
+                    }
+        
+                    saveSoundOverrides();
+                    
+                // --- CASE 2: CUSTOM BELL (Save directly to Firestore) ---
+                } else if (oldBell.type === 'custom') {
+                    if (!activePersonalScheduleId) {
+                        console.error("No activePersonalScheduleId to save custom bell edit.");
+                        return;
+                    }
+
+                    // Create the 'newBell' object with *only* the sound changed
+                    const newBell = { ...oldBell, sound: newSound };
+
+                    try {
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        
+                        // Use the global state, not a fresh DB read, to prevent race conditions
+                        const existingPeriods = personalBellsPeriods || [];
+                        
+                        // Use the update helper to find the old bell and replace it
+                        const updatedPeriods = updatePeriodsOnEdit(existingPeriods, oldBell, newBell);
+        
+                        await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+                        console.log(`Custom bell sound edited: ${oldBell.name}.`);
+                        
+                    } catch (error) {
+                        console.error("Error editing custom bell sound:", error);
+                        showUserMessage(`Error saving sound: ${error.message}`);
+                        // Don't close modal, let user see the error
+                        return;
+                    }
                 }
-    
-                if (newSound === oldBell.originalSound) {
-                    // If the user selected the original shared sound, delete the override
-                    delete bellSoundOverrides[overrideKey];
-                    console.log("Deleted sound override.");
-                } else {
-                    // Store the new sound override
-                    bellSoundOverrides[overrideKey] = newSound;
-                    console.log(`Saved sound override: ${newSound}`);
-                }
-    
-                saveSoundOverrides();
                 
-                // 2. Refresh the active schedule data
-                // Since we updated bellSoundOverrides, the activeScheduleListener
-                // will pick up the change on the next load. We manually trigger a 
-                // re-render of the list and update the clock.
-                
-                // MODIFIED: This is safe because the listeners have already pulled the data.
-                renderCombinedList();
-                updateClock();
+                // MODIFIED V4.79: Call the master recalculate function.
+                // This ensures the list re-renders with the new sound.
+                recalculateAndRenderAll();
     
                 closeChangeSoundModal();
             }
@@ -4540,6 +4701,10 @@
                 relativeBellForm.reset();
                 relativeBellStatus.classList.add('hidden');
 
+                // NEW: Change modal title for editing
+                const modalTitle = relativeBellModal.querySelector('h3');
+                if (modalTitle) modalTitle.textContent = "Edit Relative Bell";
+
                 // 4. Populate Parent Bell dropdown
                 const anchorOptionsHtml = resolvedBells.map(b => `
                     <option value="${b.bellId}">${b.name} (${formatTime12Hour(b.time, true)})</option>
@@ -4547,7 +4712,21 @@
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
 
                 // 5. Populate fields with the bell's saved data
-                relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
+                // MODIFIED V4.86: Handle *both* new (V4.47) and old (V4.10) relative bell types
+                if (rawBell.relative.parentBellId) {
+                    // Old V4.10 logic: Anchor is a specific bell ID
+                    relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
+                } else if (rawBell.relative.parentPeriodName && resolvedBells.length > 0) {
+                    // New V4.47 logic: Anchor is 'period_start' or 'period_end'
+                    if (rawBell.relative.parentAnchorType === 'period_start') {
+                        relativeAnchorBellSelect.value = resolvedBells[0].bellId; // First bell
+                    } else {
+                        // Default to last bell if not 'period_start' (e.g., 'period_end')
+                        relativeAnchorBellSelect.value = resolvedBells[resolvedBells.length - 1].bellId; // Last bell
+                    }
+                }
+                // END V4.86 FIX
+                
                 relativeBellNameInput.value = rawBell.name;
                 relativeBellSoundSelect.value = rawBell.sound;
 
@@ -5694,6 +5873,10 @@
                     currentRelativePeriod = null;
                     currentEditingBell = null; // NEW in 4.31: Clear edit state
                     
+                    // NEW: Reset modal title
+                    const modalTitle = relativeBellModal.querySelector('h3');
+                    if (modalTitle) modalTitle.textContent = "Add Relative Bell";
+                    
                 } catch (error) {
                     console.error("Error adding relative bell:", error);
                     relativeBellStatus.textContent = "Error saving bell.";
@@ -6019,6 +6202,10 @@
                     addNewVisualOption(downloadURL, visualFileToUpload.name);
                     renderVisualFileManager(); // Re-render the manager list
                     
+                    // DELETED V4.79: This call caused the schedule to disappear
+                    // because the override had not been saved yet.
+                    // recalculateAndRenderAll();
+
                     // 2. If this was triggered from a period edit, select the new file
                     if (currentVisualSelectTarget) {
                         currentVisualSelectTarget.value = downloadURL;
@@ -6456,8 +6643,8 @@
                     // Fork and Knife for Lunch
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5V12.97c2.09-.13 3.75-1.85 3.75-3.97V2h-2v7zm5-3v8h2.5v10h2.5V2h-5z"/></svg>`;
                 } else if (p.includes('passing') || p.includes('between')) {
-                    // MODIFIED V4.60.4: Changed to a walking figure icon path.
-                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8l2.1 2v6h2v-8.4l-2.1-2.1.6-3.4c1.1 1.2 2.7 2 4.5 2V12c-1.4 0-2.6-.7-3.4-1.8L9.8 8.9z"/></svg>`;
+                    // MODIFIED V4.87: Using user-provided optimized SVG
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 259.3 435.88" fill="currentColor" class="w-full h-full"><path d="M315.67 347.53c0 20.503-16.621 37.123-37.123 37.123-20.503 0-37.123-16.621-37.123-37.123 0-20.503 16.621-37.123 37.123-37.123 20.503 0 37.123 16.621 37.123 37.123" transform="translate(-132.24 -310.409)"/><path d="M516.35 490.41s-30.339 157.53-36.871 168.19c-5.586 9.115-49.18 80.642-49.18 80.642-9.306 15.26-.487 26.17 9.372 31.862 8.394 4.846 26.437 3.646 32.403-6.53 0 0 48.366-75.267 53.643-91.5 3.654-11.238 12.143-57.857 12.143-57.857s46.996 48.47 52.143 57.143c6.488 10.933 18.571 87.143 18.571 87.143 2.89 13.56 15.822 17.982 29.286 15.714 10.633-1.79 21.753-8.985 19.286-22.143 0 0-10.746-88.36-19.286-102.86-10.19-17.302-65-76.43-65-76.43l15.714-70s10.086 20.447 17.143 29.287c8.026 10.053 58.571 39.286 58.571 39.286 4.637 3.11 15.133 1.396 19.286-6.429 3.334-6.28 3.177-16.454-4.285-21.429 0 0-41.655-26.15-51.43-34.286-10.87-9.03-32.86-69.27-32.86-69.27-6.82-9.386-16.15-19.742-32.142-20-16.12-.26-24.187 8.62-31.43 13.571 0 0-61.746 45.105-67.856 54.286-6.147 9.236-17.143 78.571-17.143 78.571-1.724 7.9 1.362 14.253 10.714 16.43 11.443 2.661 19.645-4.464 20.714-10 0 0 7.05-54.766 12.143-62.858 5.929-9.421 26.346-20.52 26.346-20.52z" transform="translate(-426.35 -339.904)"/></svg>`;
                 } else {
                     // Default: Number or Letter
                     const match = p.match(/(\d+)(?:st|nd|rd|th)?|([a-z])/);
@@ -6465,7 +6652,7 @@
                     if (match) {
                         text = (match[1] || match[2]).toUpperCase();
                     }
-                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor">${text}</text></svg>`;
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text></svg>`;
                 }
                 
                 // Return as a full HTML string for injection
@@ -6557,9 +6744,10 @@
                     const bgColor = parts[1] || '#4338CA'; // Default bg
                     const fgColor = parts[2] || '#FFFFFF'; // Default fg
                     
-                    const svgFontSize = customText.length > 2 ? 60 : 80;
+                    // MODIFIED V4.78: Reduced 3-char font size & added font-family
+                    const svgFontSize = customText.length > 2 ? 55 : 80;
                     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full">
-                        <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor">${customText}</text>
+                        <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${customText}</text>
                     </svg>`;
                     // MODIFIED V4.75: Use inline styles for custom colors
                     return `<div class="w-full h-full p-8 flex items-center justify-center" style="background-color:${bgColor}; color:${fgColor};">
@@ -6594,8 +6782,8 @@
                     // Fork and Knife for Lunch
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5V12.97c2.09-.13 3.75-1.85 3.75-3.97V2h-2v7zm5-3v8h2.5v10h2.5V2h-5z"/></svg>`;
                 } else if (p.includes('passing') || p.includes('between')) {
-                    // MODIFIED V4.60.5: Changed to a walking figure icon path (matches full size).
-                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8l2.1 2v6h2v-8.4l-2.1-2.1.6-3.4c1.1 1.2 2.7 2 4.5 2V12c-1.4 0-2.6-.7-3.4-1.8L9.8 8.9z"/></svg>`;
+                    // MODIFIED V4.87: Using user-provided optimized SVG
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 259.3 435.88" fill="currentColor" class="w-full h-full"><path d="M315.67 347.53c0 20.503-16.621 37.123-37.123 37.123-20.503 0-37.123-16.621-37.123-37.123 0-20.503 16.621-37.123 37.123-37.123 20.503 0 37.123 16.621 37.123 37.123" transform="translate(-132.24 -310.409)"/><path d="M516.35 490.41s-30.339 157.53-36.871 168.19c-5.586 9.115-49.18 80.642-49.18 80.642-9.306 15.26-.487 26.17 9.372 31.862 8.394 4.846 26.437 3.646 32.403-6.53 0 0 48.366-75.267 53.643-91.5 3.654-11.238 12.143-57.857 12.143-57.857s46.996 48.47 52.143 57.143c6.488 10.933 18.571 87.143 18.571 87.143 2.89 13.56 15.822 17.982 29.286 15.714 10.633-1.79 21.753-8.985 19.286-22.143 0 0-10.746-88.36-19.286-102.86-10.19-17.302-65-76.43-65-76.43l15.714-70s10.086 20.447 17.143 29.287c8.026 10.053 58.571 39.286 58.571 39.286 4.637 3.11 15.133 1.396 19.286-6.429 3.334-6.28 3.177-16.454-4.285-21.429 0 0-41.655-26.15-51.43-34.286-10.87-9.03-32.86-69.27-32.86-69.27-6.82-9.386-16.15-19.742-32.142-20-16.12-.26-24.187 8.62-31.43 13.571 0 0-61.746 45.105-67.856 54.286-6.147 9.236-17.143 78.571-17.143 78.571-1.724 7.9 1.362 14.253 10.714 16.43 11.443 2.661 19.645-4.464 20.714-10 0 0 7.05-54.766 12.143-62.858 5.929-9.421 26.346-20.52 26.346-20.52z" transform="translate(-426.35 -339.904)"/></svg>`;
                 } else {
                     // Default: Number or Letter
                     const match = p.match(/(\d+)(?:st|nd|rd|th)?|([a-z])/);
@@ -6603,7 +6791,7 @@
                     if (match) {
                         text = (match[1] || match[2]).toUpperCase();
                     }
-                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor">${text}</text></svg>`;
+                    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text></svg>`;
                 }
                 
                 // MODIFIED V4.74: Return *only* the SVG content string.
@@ -6632,9 +6820,10 @@
                     const bgColor = parts[1] || '#4338CA'; // Default bg
                     const fgColor = parts[2] || '#FFFFFF'; // Default fg
                     
-                    const svgFontSize = customText.length > 2 ? 30 : 40; // Use larger font size for 1-2 chars
+                    // MODIFIED V4.78: Reduced 3-char font size & added font-family
+                    const svgFontSize = customText.length > 2 ? 28 : 40; // Use larger font size for 1-2 chars
                     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-                        <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor">${customText}</text>
+                        <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${customText}</text>
                     </svg>`;
                     // MODIFIED V4.75: Use inline styles for custom colors
                     return `<div class="${sharedClasses} flex items-center justify-center" style="background-color:${bgColor}; color:${fgColor};">
@@ -6720,6 +6909,24 @@
                 newPeriodForm.reset();
                 newPeriodStatus.classList.add('hidden');
                 updateVisualDropdowns();
+                
+                // NEW V4.81: Populate all sound dropdowns
+                const soundSelects = [
+                    document.getElementById('new-period-start-sound'),
+                    document.getElementById('new-period-start-sound-relative'),
+                    document.getElementById('new-period-end-sound'),
+                    document.getElementById('new-period-end-sound-relative')
+                ];
+                const sharedSoundSelect = document.getElementById('shared-bell-sound');
+                if (sharedSoundSelect) {
+                    updateSoundDropdowns(); // Ensure sounds are populated
+                    soundSelects.forEach(select => {
+                        if(select) {
+                            select.innerHTML = sharedSoundSelect.innerHTML;
+                            select.value = 'ellisBell.mp3'; // Default to Ellis Bell
+                        }
+                    });
+                }
                 
                 // 2. Populate relative anchor period dropdowns
                 // Only use the BASE shared periods for anchoring
@@ -6815,6 +7022,11 @@
                 
                 // Helper to validate and build bell data
                 const buildBellData = (type, prefix) => {
+                    // NEW V4.81: Get sound based on type
+                    const sound = (type === 'static')
+                        ? document.getElementById(`${prefix}-sound`).value
+                        : document.getElementById(`${prefix}-sound-relative`).value;
+
                     if (type === 'static') {
                         const time = document.getElementById(`${prefix}-time`).value;
                         if (!time) throw new Error(`${prefix.split('-')[1]} time is required for static mode.`);
@@ -6836,7 +7048,8 @@
                         if (nearbyBell) {
                             throw new Error(`Time conflict: Period start/end is too close to "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time, true)}).`);
                         }
-                        return { time };
+                        // MODIFIED V4.81: Return sound
+                        return { time, sound };
                     } else { // relative
                         const parentName = document.getElementById(`${prefix}-parent`).value;
                         const anchorType = document.getElementById(`${prefix}-anchor-type`).value;
@@ -6855,7 +7068,8 @@
                                 parentPeriodName: parentName,
                                 parentAnchorType: anchorType,
                                 offsetSeconds: offsetSeconds
-                            }
+                            },
+                            sound // MODIFIED V4.81: Return sound
                         };
                     }
                 };
@@ -6866,7 +7080,7 @@
                     newBells.push({
                         ...startBellData,
                         name: 'Period Start', // Critical for anchoring/fluke logic
-                        sound: 'ellisBell.mp3', // Default bell sound
+                        // sound: 'ellisBell.mp3', // DELETED V4.81: Sound is now in startBellData
                         bellId: generateBellId()
                     });
 
@@ -6875,7 +7089,7 @@
                     newBells.push({
                         ...endBellData,
                         name: 'Period End', // Critical for anchoring/fluke logic
-                        sound: 'ellisBell.mp3',
+                        // sound: 'ellisBell.mp3', // DELETED V4.81: Sound is now in endBellData
                         bellId: generateBellId()
                     });
 
@@ -7188,15 +7402,47 @@
                     };
                     
                     // Upload the file with the new, complete metadata
-                    await uploadBytes(storageRef, fileToUpload, metadata);
+                    const snapshot = await uploadBytes(storageRef, fileToUpload, metadata);
+                    // NEW V4.76: Get URL for modal workflow
+                    const downloadURL = await getDownloadURL(snapshot.ref);
     
                     audioUploadStatus.textContent = "Upload successful! Refreshing list...";
+                    
+                    // 1. Manually add to local state and update all dropdowns
+                    userAudioFiles.push({ name: fileToUpload.name, url: downloadURL, path: storageRef.fullPath });
+                    addNewAudioOption(downloadURL, fileToUpload.name);
+                    renderAudioFileManager(); // Re-render the manager list
+
+                    // DELETED V4.79: This call caused the schedule to disappear
+                    // because the override had not been saved yet.
+                    // recalculateAndRenderAll();
+
+                    // 2. If this was triggered from a sound select, select the new file
+                    if (currentSoundSelectTarget) {
+                        currentSoundSelectTarget.value = downloadURL;
+                        // Trigger change to update sound preview buttons, etc.
+                        currentSoundSelectTarget.dispatchEvent(new Event('change')); 
+                        currentSoundSelectTarget = null; // Clear state
+                        uploadAudioModal.classList.add('hidden'); // Close modal
+                    } else {
+                        // If triggered from manager, just show success
+                        setTimeout(() => audioUploadStatus.classList.add('hidden'), 3000);
+                    }
+                    
+                    // 3. Clear file inputs
                     fileToUpload = null;
                     audioUploadInput.value = ''; // Clear file input
                     audioFileName.textContent = "No file chosen.";
     
-                    await loadAllAudioFiles(); // Refresh lists
-                    setTimeout(() => audioUploadStatus.classList.add('hidden'), 3000);
+                    // DELETED V4.77: This call was redundant and caused the schedule
+                    // to disappear. The functions called *before* this
+                    // (addNewAudioOption, renderAudioFileManager) already
+                    // manually updated the UI, just like the (working) visual uploader.
+                    // await loadAllAudioFiles(); 
+                    
+                    // MODIFIED V4.77: Removed timeout to match visual manager logic.
+                    // The modal will close immediately if opened from a dropdown.
+                    // setTimeout(() => audioUploadStatus.classList.add('hidden'), 3000);
     
                 } catch (error) {
                     console.error("Audio upload failed:", error);
@@ -7332,9 +7578,29 @@
                 }
             }
             
+            /**
+             * NEW V4.76: Helper to add a new option to all audio dropdowns
+             */
+            function addNewAudioOption(url, name) {
+                const selects = [
+                    sharedSoundInput, multiBellSoundInput, editBellSoundInput, 
+                    changeSoundSelect, quickBellSoundSelect, addStaticBellSound, 
+                    relativeBellSoundSelect
+                ];
+                selects.forEach(select => {
+                    if (!select) return;
+                    const optgroup = select.querySelector('optgroup[label="My Sounds"]');
+                    if (optgroup) {
+                        const option = document.createElement('option');
+                        option.value = url;
+                        option.textContent = `${name}`;
+                        optgroup.appendChild(option);
+                    }
+                });
+            }
+
             function updateSoundDropdowns() {
                 // --- MODIFIED: v3.43 ---
-                // This function combines the v3.42 list of all dropdowns
                 // with the v2.24 (working) logic of using `file.url` as the
                 // value for the options. This is the other half of the fix.
                 
@@ -7352,6 +7618,9 @@
                     { el: relativeBellSoundSelect, myGroup: 'relative-my-sounds-optgroup', sharedGroup: 'relative-shared-sounds-optgroup' }
                 ];
             
+                // NEW V4.76: Add [UPLOAD] option
+                const uploadHtml = `<option value="[UPLOAD]">Upload Audio...</option>`;
+                
                 // Create options HTML
                 // --- THIS IS THE FIX from v2.24 ---
                 // The value *must* be the full file.url, not the file.path.
@@ -7361,6 +7630,20 @@
                 // Update all dropdowns
                 selects.forEach(item => {
                     if (!item.el) return; // Guard clause
+                    
+                    // NEW V4.76: Inject [UPLOAD] option
+                    // Ensure it's not already there
+                    if (!item.el.querySelector('option[value="[UPLOAD]"]')) {
+                        const defaultGroup = item.el.querySelector('optgroup[label="Default Sounds"]');
+                        if (defaultGroup) {
+                            // Insert upload option right before the default sounds
+                            defaultGroup.insertAdjacentHTML('beforebegin', uploadHtml);
+                        } else {
+                            // Fallback
+                            item.el.insertAdjacentHTML('afterbegin', uploadHtml);
+                        }
+                    }
+                    
                     // MODIFIED in 4.29: Find optgroups by class, not ID, since IDs aren't unique for new modals
                     const myGroup = item.el.querySelector('optgroup[label="My Sounds"]');
                     const sharedGroup = item.el.querySelector('optgroup[label="Shared Sounds"]');
@@ -7894,6 +8177,10 @@
                     currentRelativePeriod = null;
                     currentEditingBell = null; // NEW in 4.31
                     document.getElementById('convert-to-static-container').classList.add('hidden'); // NEW in 4.31
+                    
+                    // NEW: Reset modal title
+                    const modalTitle = relativeBellModal.querySelector('h3');
+                    if (modalTitle) modalTitle.textContent = "Add Relative Bell";
                 });
  
                 // Update calculated time whenever an input changes
@@ -8102,23 +8389,42 @@
                     if (target.classList.contains('delete-btn') || target.classList.contains('delete-custom-btn')) {
                         handleDeleteBellClick(bell);
                         return; // Action handled
-                    } else if (target.classList.contains('edit-btn') || target.classList.contains('edit-custom-btn')) {
+                    
+                    // MODIFIED V4.81 (FIX): Corrected button logic.
+                    // Use 'title' to distinguish Edit from Sound on custom bells.
+                    } else if (target.classList.contains('edit-btn') || 
+                               (target.classList.contains('edit-custom-btn') && target.title === 'Edit bell')) {
+                        // This handles:
+                        // 1. "Edit" on a Shared bell
+                        // 2. "Edit" on a Custom bell
+                        
                         // MODIFIED in 4.19: Pass periodName to edit function
-                        // MODIFIED in 4.20: Pass periodName AND originalSound to edit function
                         // MODIFIED in 4.27: Pass bellId to edit function
                         // MODIFIED in 4.31: Pass the full bell object
                         handleEditBellClick(bell);
                         return; // Action handled
-                    } else if (target.classList.contains('sound-btn')) {
+                    
+                    // MODIFIED V4.81 (FIX): Corrected button logic.
+                    } else if (target.classList.contains('sound-btn') || 
+                               (target.classList.contains('edit-custom-btn') && target.title === 'Change Sound')) {
+                        // This handles:
+                        // 1. "Sound" on a Shared bell (opens Change Sound modal)
+                        // 2. "Sound" on a Custom bell (opens Change Sound modal)
+                        
+                        // MODIFIED V4.85: User wants both buttons to open the *same* sound modal.
+                        // We will add logic to handleChangeSoundSubmit to handle both cases.
                         openChangeSoundModal(bell);
                         return; // Action handled
-                    } else if (target.classList.contains('preview-bell-btn')) { // NEW in 4.16: Handle Play button
+                    
+                    // NEW V4.82: Add missing Preview button handler
+                    } else if (target.classList.contains('preview-bell-btn')) {
                         playBell(bell.sound);
                         return; // Action handled
                     }
-                    
+                    // END V4.82 FIX
+
                     // If no specific button was clicked (e.g., just the bell row), do nothing.
-                }
+                } // MODIFIED V4.83: Restored the missing closing brace for 'if (bellElement)'
                 
                 // Event delegation
                 combinedBellListElement.addEventListener('click', handleBellListClick);
@@ -8275,6 +8581,35 @@
                 // NEW in 4.60.3: Attach the custom text handler to the main edit/new period selects
                 editPeriodImageSelect.addEventListener('change', visualSelectChangeHandler);
                 newPeriodImageSelect.addEventListener('change', visualSelectChangeHandler);
+                
+                // --- NEW V4.76: Sound Select Change Handler (for [UPLOAD]) ---
+                function changeSoundSelectHandler(e) {
+                    if (e.target.value === '[UPLOAD]') {
+                        // Store the select element that triggered this
+                        currentSoundSelectTarget = e.target;
+                        
+                        // Find the *previously* selected option to revert to
+                        const selectedOption = Array.from(e.target.options).find(opt => opt.selected);
+                        const originalValue = selectedOption ? selectedOption.value : '';
+                        
+                        // Revert selection so it doesn't get stuck on "[UPLOAD]"
+                        e.target.value = originalValue !== '[UPLOAD]' ? originalValue : 'ellisBell.mp3';
+                        
+                        // Open the modal
+                        uploadAudioModal.classList.remove('hidden');
+                        audioUploadStatus.classList.add('hidden'); // Clear status
+                    }
+                }
+                
+                // Attach handler to all sound selects
+                [sharedSoundInput, multiBellSoundInput, editBellSoundInput, 
+                 changeSoundSelect, quickBellSoundSelect, addStaticBellSound, 
+                 relativeBellSoundSelect].forEach(select => {
+                    if (select) {
+                        select.addEventListener('change', changeSoundSelectHandler);
+                    }
+                });
+                // --- END V4.76 ---
 
                 // Mute All / Unmute All
                 const muteAllListBtn = document.getElementById('mute-all-list-btn');
@@ -8304,8 +8639,28 @@
                 importFileInput.addEventListener('change', handleFileInputChange);
     
                 // NEW: Audio Manager Listeners
-                audioUploadInput.addEventListener('change', handleFileSelected);
-                audioUploadBtn.addEventListener('click', handleAudioUpload);
+                // MODIFIED V4.76: Listeners for the new reusable modal
+                uploadAudioModal.addEventListener('change', (e) => {
+                    if (e.target.id === 'audio-upload-input') {
+                        handleFileSelected(e);
+                    }
+                });
+                uploadAudioModal.addEventListener('click', (e) => {
+                    if (e.target.id === 'audio-upload-btn') {
+                        handleAudioUpload();
+                    }
+                });
+                showAudioUploadModalBtn.addEventListener('click', () => {
+                    uploadAudioModal.classList.remove('hidden');
+                    audioUploadStatus.classList.add('hidden');
+                    currentSoundSelectTarget = null; // Ensure state is clear
+                });
+                uploadAudioCloseBtn.addEventListener('click', () => {
+                    uploadAudioModal.classList.add('hidden');
+                    currentSoundSelectTarget = null; // Ensure state is clear
+                });
+                // END V4.76 Listeners
+                
                 // Use event delegation for the dynamic audio lists
                 document.getElementById('audio-manager-panel').addEventListener('click', handleAudioListClick);
     
@@ -8484,4 +8839,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.75 -->
+<!-- Version 4.87 -->
