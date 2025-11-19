@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 4.99.1</title>
+    <title>Ellis Web Bell 4.99.2</title>
     <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     
@@ -235,7 +235,7 @@
 
     <!-- NEW: Edit Bell Modal (Admin) -->
     <div id="edit-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="edit-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <form id="edit-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-6">Edit Bell</h3>
             
             <!-- Bell Details -->
@@ -605,7 +605,7 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
             <!-- MODIFIED: Version Bump -->
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.99.1</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 4.99.2</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             
             <!-- MODIFIED: User info and signout button grouped -->
@@ -754,7 +754,7 @@
             <h3 class="text-xl font-semibold text-gray-800 border-b pb-2">Admin Zone</h3>
             
             <!-- Create New Schedule Form -->
-            <form id="create-schedule-form">
+            <form id="create-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <label for="new-schedule-name" class="block text-sm font-medium text-gray-700 mb-1">Create New Schedule</label>
                 <div class="flex flex-col sm:flex-row gap-3">
                     <input type="text" id="new-schedule-name" placeholder="New Schedule Name" required class="flex-grow w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -920,7 +920,7 @@
         
         <!-- NEW: v4.04 - Relative Bell Modal -->
         <div id="relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl">
+            <form id="relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-4">Add Relative Bell</h3>
                 <p class="text-gray-700 mb-6">Create a bell relative to the start or end of the period <strong id="relative-period-name">...</strong>.</p>
                 
@@ -1010,7 +1010,7 @@
 
         <!-- **** NEW: v4.28 - Add Static Bell Modal **** -->
         <div id="add-static-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="add-static-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <form id="add-static-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-4">Add Static Bell</h3>
                 <p class="text-gray-700 mb-6">Adding a new bell to the period <strong id="add-static-period-name">...</strong>.</p>
                 
@@ -1423,7 +1423,7 @@
 
         <!-- **** NEW: v4.44 - Multi-Add Relative Bell Modal **** -->
         <div id="multi-add-relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="multi-add-relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
+            <form id="multi-add-relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-6">Add Multi-Period Relative Bell</h3>
                 
                 <!-- Bell Name and Sound -->
@@ -9392,4 +9392,4 @@ The new admin will have admin privileges (including the "Make Public" button) th
 -->
 
 <!-- MODIFIED: Version Bump -->
-<!-- Version 4.99.1 -->
+<!-- Version 4.99.2 -->
