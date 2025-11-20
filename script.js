@@ -1,5 +1,5 @@
-        const APP_VERSION = "5.28.1"
-        // The goal of 5.28 is to fix the anchor bell confusion.
+        const APP_VERSION = "5.29"
+        // The goal of 5.29 is to fix the countdown grammar & punctuation duplicates.
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -1161,8 +1161,9 @@
                     // The "next bell" info should be the next *schedule* bell
                     if (scheduleBellObject) {
                         // Use (true) to omit seconds if they are 00
-                        // MODIFICATION: Added period at the end
-                        nextBellInfoString = `Next bell is ${scheduleBellObject.name} at ${formatTime12Hour(scheduleBellObject.time, true)}.`;
+                        // MODIFICATION in 5.29: Added period at the end
+                        const namePunctuation = /[.!?]$/.test(scheduleBellObject.name) ? '' : '.';
+                        nextBellInfoString = `Next bell is ${scheduleBellObject.name} at ${formatTime12Hour(scheduleBellObject.time, true)}${namePunctuation}`;
                     } else {
                         nextBellInfoString = "No more bells today."; // Already has period
                     }
@@ -1190,17 +1191,24 @@
                     
                     // Updated 5.26.1 - Add Period context to the label
                     let bellLabel = activeTimerLabel;
-                    if (scheduleBellObject && scheduleBellObject.periodName && activeTimerLabel !== "Quick Bell" && millisToQuickBell >= Infinity) {
+
+                    // Added in 5.29: Don't add period name if bell name already starts with period name
+                    const shouldAddPeriod = scheduleBellObject && 
+                                            scheduleBellObject.periodName && 
+                                            activeTimerLabel !== "Quick Bell" && 
+                                            millisToQuickBell >= Infinity &&
+                                            !activeTimerLabel.startsWith(scheduleBellObject.periodName);
+                    
+                    if (shouldAddPeriod) {
                         bellLabel = `${scheduleBellObject.periodName}: ${activeTimerLabel}`;
                     }
-
-                    if (isMuting) {
-                        // MODIFICATION: Added period
-                        nextBellElement.textContent = `until ${bellLabel} (MUTED).`;
-                    } else {
-                        // MODIFICATION: Added period
-                        nextBellElement.textContent = `until ${bellLabel}.`;
-                    }
+                    
+                    // Smart punctuation: don't add period if label already ends with punctuation
+                    const hasPunctuation = /[.!?]$/.test(bellLabel);
+                    const muteText = isMuting ? ' (MUTED)' : '';
+                    const finalPunctuation = hasPunctuation ? '' : '.';
+                      
+                    nextBellElement.textContent = `until ${bellLabel}${muteText}${finalPunctuation}`;
                 } else {
                     // --- C. No active timer ---
                     countdownElement.textContent = "--:--";
