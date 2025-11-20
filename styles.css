@@ -1,0 +1,91 @@
+ body {
+            /* Apply the new font stack */
+            font-family: 'Century Gothic', 'Questrial', 'sans-serif';
+        }
+        /* Styles for Admin Controls */
+        /* Hide admin controls and shared delete/edit buttons by default */
+        .admin-control, #combined-bell-list .delete-btn, #combined-bell-list .edit-btn {
+            display: none;
+        }
+        /* When body has .admin-mode, show them */
+        body.admin-mode .admin-control {
+            display: block; 
+        }
+        /* Show shared delete/edit buttons in admin mode */
+        body.admin-mode #combined-bell-list .delete-btn,
+        body.admin-mode #combined-bell-list .edit-btn {
+            display: inline-block;
+        }
+        /* Always show custom delete/edit buttons */
+        #combined-bell-list .delete-custom-btn,
+        #combined-bell-list .edit-custom-btn {
+            display: inline-block;
+        }
+
+        /* NEW: Sound override button is always visible for shared bells */
+        #combined-bell-list .sound-btn {
+            display: inline-block;
+        }
+        /* Hide sound override button for custom bells (they use 'Edit') */
+        #combined-bell-list .sound-custom-btn {
+            display: none;
+        }
+
+
+        /* MODIFIED: v3.24 - Consolidated Z-Indexing */
+        /* All standard modals are z-50 */
+        #edit-bell-modal { z-index: 50; }
+        #change-sound-modal { z-index: 50; }
+        #nearby-bell-modal { z-index: 50; }
+        #confirm-delete-bell-modal { z-index: 50; }
+        #confirm-delete-audio-modal { z-index: 50; }
+        #internal-conflict-warning-modal { z-index: 50; }
+        #external-conflict-modal { z-index: 50; }
+        #create-personal-schedule-modal { z-index: 50; }
+        /* MODIFIED V4.60: Increase delete modal z-index */
+        #confirm-delete-personal-modal { z-index: 70; }
+        #confirm-restore-modal { z-index: 50; }
+        /* NEW: v3.26 - Add rename modal to z-50 */
+        #rename-personal-schedule-modal { z-index: 50; }
+        
+        /* Modals that appear ON TOP of other modals are z-60 */
+        #confirm-linked-edit-modal { z-index: 60; }
+        #internal-conflict-confirm-modal { z-index: 60; }
+        /* Note: Overlays (welcome, audio) and base modals 
+           (add-bell, confirm-delete) are set in HTML classes. */
+        /* END v3.24 Z-Index Cleanup */
+
+        
+        /* NEW: Hide file input, style the button */
+        #import-file-input, #audio-upload-input, #restore-file-input, #visual-upload-input {
+            display: none;
+        }
+
+        /* NEW: Hide elements that require non-anonymous auth */
+        .auth-required {
+            display: none;
+        }
+        /* When authenticated AND not anonymous, show them */
+        body.authenticated.not-anonymous .auth-required {
+            display: block;
+        }
+
+        /* NEW: Admin-only elements, hidden by default */
+        .admin-only {
+            display: none;
+        }
+        /* Show when in admin mode */
+        body.admin-mode .admin-only {
+            display: inline-flex; /* MODIFIED: Use inline-flex to work with flex properties */
+        }
+
+        /* DELETED: These rules don't work with the CDN build */
+        /*
+        .quick-bell-btn {
+            @apply bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg;
+        }
+
+        .quick-bell-btn:active {
+            @apply transform scale-95;
+        }
+        */
