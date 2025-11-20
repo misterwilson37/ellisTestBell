@@ -1,4 +1,5 @@
-        const APP_VERSION = "5.27"
+        const APP_VERSION = "5.28.1"
+        // The goal of 5.28 is to fix the anchor bell confusion.
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -2152,24 +2153,26 @@
                     // 2c. Find the anchor bell (start or end) within that period.
                     // Note: We MUST recursively find the time for these, as they could also be relative.
                     let anchorBell;
-                    // --- MODIFIED V4.78: Multi-Add Circular Dependency FIX ---
-                    // We must find the first/last *STATIC* (non-relative) bell.
-                    // This prevents a new relative bell from anchoring to itself,
-                    // which was the source of the circular dependency errors.
-                    const staticBellsInPeriod = parentPeriod.bells.filter(b => !b.relative);
+                       
+                    // --- MODIFIED V4.78 & V5.28: Only anchor to SHARED bells ---
+                    // Relative bells should ONLY anchor to admin-controlled shared bells,
+                    // never to teacher-added personal bells. This keeps anchors stable.
+                    const sharedStaticBells = parentPeriod.bells.filter(b => 
+                        !b.relative && b._originType === 'shared'
+                    );
                     
-                    if (staticBellsInPeriod.length === 0) {
-                         console.warn(`Could not find a STATIC anchor bell in period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
-                         return { ...bell, isOrphan: true, fallbackTime: "00:00:00" };
+                    if (sharedStaticBells.length === 0) {
+                        console.warn(`No shared anchor bells in period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
+                        return { ...bell, isOrphan: true, fallbackTime: "00:00:00" };
                     }
-                    
+                        
                     if (parentAnchorType === 'period_start') {
-                        anchorBell = staticBellsInPeriod[0];
+                       anchorBell = sharedStaticBells[0]; // First shared bell
                     } else {
-                        // 'period_end'
-                        anchorBell = staticBellsInPeriod[staticBellsInPeriod.length - 1];
+                       // 'period_end'
+                       anchorBell = sharedStaticBells[sharedStaticBells.length - 1]; // Last shared bell
                     }
-                    // --- END V4.78 FIX ---
+                    // --- END V4.78/V5.28 FIX ---
 
                     // 2d. Recursively find the anchor bell's time
                     const anchorTime = calculateRelativeBellTime(anchorBell, bellMap, allPeriods, new Set(visited));
@@ -2522,35 +2525,44 @@
                 allPeriods.forEach(period => {
                     period.bells.forEach(bell => {
                         if (!bell.relative) return; // Skip non-relative bells
-
+                        
                         // Check for old-style ID link
                         const isIdMatch = bell.relative.parentBellId === parentBellId;
-
+                        
                         // Check for new-style anchor link
                         let isAnchorMatch = false;
-                        // MODIFIED V4.80: Use the calculated anchor bells (trueFirstBell, trueLastBell)
+                        // MODIFIED V4.80 & V5.28.1: Use calculated anchor bells AND check they're shared
                         if (bell.relative.parentPeriodName && calculatedParentPeriod && trueFirstBell && trueLastBell) {
                             const isSamePeriod = bell.relative.parentPeriodName === calculatedParentPeriod.name;
                             const anchorType = bell.relative.parentAnchorType; // 'period_start' or 'period_end'
                             
-                            // Check if this bell is anchored to 'period_start' AND the bell being deleted *is* the true start bell
-                            if (isSamePeriod && anchorType === 'period_start' && trueFirstBell.bellId === parentBellId) {
-                                isAnchorMatch = true;
-                            // Check if this bell is anchored to 'period_end' AND the bell being deleted *is* the true end bell
-                            } else if (isSamePeriod && anchorType === 'period_end' && trueLastBell.bellId === parentBellId) {
+                            // NEW V5.28.1: Only match if the anchor bell is SHARED (not personal)
+                            // This prevents personal static bells from being treated as anchors
+                            const isStartAnchor = isSamePeriod && 
+                                                 anchorType === 'period_start' && 
+                                                 trueFirstBell.bellId === parentBellId &&
+                                                 trueFirstBell._originType === 'shared';
+                                                 
+                            const isEndAnchor = isSamePeriod && 
+                                               anchorType === 'period_end' && 
+                                               trueLastBell.bellId === parentBellId &&
+                                               trueLastBell._originType === 'shared';
+                            
+                            if (isStartAnchor || isEndAnchor) {
                                 isAnchorMatch = true;
                             }
                         }
-
+                        
                         if (isIdMatch || isAnchorMatch) {
                             children.push({
                                 ...bell,
                                 periodName: period.name // Tag with periodName for the update
                             });
                         }
-                    });
+                     });
                 });
-                return children;
+                
+                return children; // Return the collected children
             }
             
             /**
