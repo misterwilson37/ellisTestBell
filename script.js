@@ -1,5 +1,5 @@
-        const APP_VERSION = "5.38"
-        // Visual Cue logic with before and after
+        const APP_VERSION = "5.39"
+        // edit bell modal issues
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -5877,7 +5877,30 @@
                 // Get saved visual
                 const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
                 const savedVisual = periodVisualOverrides[visualKey] || "";
-                editPeriodImageSelect.value = savedVisual;
+                
+                // If saved visual is custom text, add it as an option to the dropdown
+                if (savedVisual.startsWith('[CUSTOM_TEXT]')) {
+                    const parts = savedVisual.replace('[CUSTOM_TEXT] ', '').split('|');
+                    const customText = parts[0] || '?';
+                    
+                    // Check if option already exists
+                    let option = editPeriodImageSelect.querySelector(`option[value="${savedVisual}"]`);
+                    if (!option) {
+                        option = document.createElement('option');
+                        option.value = savedVisual;
+                        option.textContent = `Custom Text: ${customText}`;
+                        // Insert before the Default SVGs optgroup
+                        const defaultGroup = editPeriodImageSelect.querySelector('optgroup[label="Default SVGs"]');
+                        if (defaultGroup) {
+                            defaultGroup.insertAdjacentElement('beforebegin', option);
+                        } else {
+                            editPeriodImageSelect.appendChild(option);
+                        }
+                    }
+                    editPeriodImageSelect.value = savedVisual;
+                } else {
+                    editPeriodImageSelect.value = savedVisual;
+                }
                 
                 // Show previews (MODIFIED in 4.51: Split into two columns)
                 document.getElementById('edit-period-image-preview-full').innerHTML = getVisualHtml(savedVisual, periodName);
@@ -8629,17 +8652,23 @@
                         return;
                     }
                     
-                    if (e.target.value === '[CUSTOM_TEXT]') {
+                    if (e.target.value === '[CUSTOM_TEXT]' || e.target.value.startsWith('[CUSTOM_TEXT] ')) {
                         //5.25.7: Console logging
                         console.log('Custom text selected!');
                         console.log('customTextVisualModal:', customTextVisualModal);
                         console.log('Has hidden class?', customTextVisualModal.classList.contains('hidden'));
                             
-                        // Keep the current selection if it was a file URL, otherwise revert to empty
-                        const selectedOption = Array.from(e.target.options).find(opt => opt.selected);
-                        
-                        // MODIFIED V4.75 (FIX): Renamed to avoid redeclaration error
-                        const originalValueCustom = selectedOption ? selectedOption.value : ''; 
+                        // Get the actual saved value - check if this is the period editor
+                        let originalValueCustom = '';
+                        if (e.target.id === 'edit-period-image-select' && currentRenamingPeriod) {
+                            // For period editor, look up the actual saved visual
+                            const visualKey = getVisualOverrideKey(activeBaseScheduleId, currentRenamingPeriod.name);
+                            originalValueCustom = periodVisualOverrides[visualKey] || '';
+                        } else {
+                            // For other dropdowns, use the selected option value
+                            const selectedOption = Array.from(e.target.options).find(opt => opt.selected);
+                            originalValueCustom = selectedOption ? selectedOption.value : ''; 
+                        }
                         
                         // MODIFIED V4.75: Logic to pre-fill input AND colors
                         if (originalValueCustom.startsWith('[CUSTOM_TEXT]')) {
