@@ -1,5 +1,5 @@
-        const APP_VERSION = "5.35"
-        // anchor bell image edits bug
+        const APP_VERSION = "5.36"
+        // Try to fix editing relative bell logic
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -3927,21 +3927,39 @@
                 `).join('');
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
 
-                // 5. Populate fields with the bell's saved data -->
-                // MODIFIED V4.96: Prioritize V4.47 (stable) anchors first
-                if (rawBell.relative.parentPeriodName && resolvedBells.length > 0) {
-                    // New V4.47 logic: Anchor is 'period_start' or 'period_end'
-                    if (rawBell.relative.parentAnchorType === 'period_start') {
-                        relativeAnchorBellSelect.value = resolvedBells[0].bellId; // First bell
+                // 5. Populate fields with the bell's saved data
+                // Check for specific parent bell ID first
+                if (rawBell.relative.parentBellId) {
+                    // Check if this bell ID actually exists in the dropdown
+                    const parentExists = resolvedBells.some(b => b.bellId === rawBell.relative.parentBellId);
+                    if (parentExists) {
+                        relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
                     } else {
-                        // Default to last bell if not 'period_start' (e.g., 'period_end')
-                        relativeAnchorBellSelect.value = resolvedBells[resolvedBells.length - 1].bellId; // Last bell
+                        // Parent bell was deleted - leave blank so user must choose
+                        relativeAnchorBellSelect.value = '';
+                        console.warn(`Parent bell ID ${rawBell.relative.parentBellId} not found - user must select new parent`);
                     }
-                } else if (rawBell.relative.parentBellId) {
-                    // Old V4.10 logic: Anchor is a specific bell ID
-                    relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
+                } else if (rawBell.relative.parentPeriodName && rawBell.relative.parentAnchorType) {
+                    // Multi-period relative bell - anchored to first/last anchor bell of each period
+                    // Find anchor bells in this period (bells with type 'shared')
+                    const anchorBells = resolvedBells.filter(b => b.type === 'shared');
+                    
+                    if (anchorBells.length > 0) {
+                        if (rawBell.relative.parentAnchorType === 'period_start') {
+                            relativeAnchorBellSelect.value = anchorBells[0].bellId; // First anchor bell
+                        } else if (rawBell.relative.parentAnchorType === 'period_end') {
+                            relativeAnchorBellSelect.value = anchorBells[anchorBells.length - 1].bellId; // Last anchor bell
+                        }
+                    } else {
+                        // No anchor bells found - leave blank
+                        relativeAnchorBellSelect.value = '';
+                        console.warn('No anchor bells found for multi-period relative bell - user must select parent');
+                    }
+                } else {
+                    // No parent info - leave blank
+                    relativeAnchorBellSelect.value = '';
                 }
-                // END V4.96 FIX
+                // END FIX
                 
                 relativeBellNameInput.value = rawBell.name;
                 relativeBellSoundSelect.value = rawBell.sound;
