@@ -1,5 +1,5 @@
-        const APP_VERSION = "5.39"
-        // edit bell modal issues
+        const APP_VERSION = "5.40.1"
+        // fixing custom bell audio
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -659,16 +659,19 @@
 
         // --- NEW in 4.44: Period Visual Override Functions ---
         function getVisualOverrideKey(scheduleId, originalPeriodName) {
-            if (!scheduleId || !originalPeriodName) return null;
-            return `${scheduleId}-${originalPeriodName}`;
+            // Use personal schedule ID if available, otherwise fall back to base schedule
+            const effectiveScheduleId = activePersonalScheduleId || scheduleId;
+            if (!effectiveScheduleId || !originalPeriodName) return null;
+            return `${effectiveScheduleId}-${originalPeriodName}`;
         }
 
         function loadVisualOverrides() {
             try {
                 const stored = localStorage.getItem('periodVisualOverrides');
+                console.log('Loading from localStorage:', stored);
                 if (stored) {
                     periodVisualOverrides = JSON.parse(stored);
-                    console.log(`Loaded ${Object.keys(periodVisualOverrides).length} period visual overrides.`);
+                    console.log(`Loaded ${Object.keys(periodVisualOverrides).length} period visual overrides:`, periodVisualOverrides);
                 }
             } catch (e) {
                 console.error("Failed to load visual overrides", e);
@@ -678,7 +681,9 @@
 
         function saveVisualOverrides() {
             try {
+                console.log('Saving to localStorage:', periodVisualOverrides);
                 localStorage.setItem('periodVisualOverrides', JSON.stringify(periodVisualOverrides));
+                console.log('Successfully saved to localStorage');
             } catch (e) {
                 console.error("Failed to save visual overrides", e);
             }
@@ -1519,6 +1524,8 @@
                     const textColor = bell ? (bell.iconFgColor || '#FFFFFF') : '#FFFFFF';
                     const sound = bell ? bell.sound : 'ellisBell.mp3';
                     
+                    console.log(`Rendering bell ${id}:`, { name, sound, bell });
+                    
                     // FIX 5.19.1: A slot is ACTIVE (editable) if the checkbox is checked.
                     // Default to TRUE (checked) for empty slots so users can fill them in.
                     // If there's data, use the saved isActive value (defaulting to true).
@@ -1707,12 +1714,14 @@
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = sharedSoundSelect.innerHTML;
                 
-                // Select the current sound
+                // Select the current sound - use setAttribute to ensure it persists in HTML
                 const options = Array.from(tempDiv.querySelectorAll('option'));
                 options.forEach(opt => {
                     if (opt.value === currentSound) {
+                        opt.setAttribute('selected', 'selected');
                         opt.selected = true;
                     } else {
+                        opt.removeAttribute('selected');
                         opt.selected = false;
                     }
                 });
@@ -2519,6 +2528,16 @@
                 try {
                     // Filter out null/empty slots before saving
                     const bellsToSave = finalBells.filter(bell => bell && bell.name); 
+                    
+                    console.log("Saving bells to Firestore:");
+                    bellsToSave.forEach(bell => {
+                        console.log(`  Bell ${bell.id}:`, {
+                            name: bell.name,
+                            sound: bell.sound,
+                            minutes: bell.minutes,
+                            seconds: bell.seconds
+                        });
+                    });
 
                     await setDoc(quickBellDocRef, { bells: bellsToSave }, { merge: false });
                     console.log("Custom Quick Bells saved:", bellsToSave.length);
@@ -3300,7 +3319,9 @@
                 console.log("Listening for real-time custom quick bell updates...");
                 
                 customQuickBellsListenerUnsubscribe = onSnapshot(quickBellDocRef, (docSnap) => {
+                    console.log("Custom Quick Bells snapshot received");
                     if (docSnap.exists() && docSnap.data().bells) {
+                        console.log("Raw bells from Firestore:", docSnap.data().bells);
                         // Ensure we have max 4 and they are structured correctly
                         // Initialize bellId if missing and ensure proper structure
                         const bells = (docSnap.data().bells || []).slice(0, 4).map((b, index) => ({
@@ -3318,6 +3339,7 @@
                             sound: b.sound || 'ellisBell.mp3',
                             isActive: b.isActive !== false // 5.19.3 Default to TRUE (active/checked)
                         }));
+                        console.log("Processed bells:", bells);
                         customQuickBells = bells.filter(b => b.name); // Filter out empty slots if structure is clean
                     } else {
                         // Initialize the array to empty, renderCustomQuickBells will handle slots
@@ -5877,6 +5899,8 @@
                 // Get saved visual
                 const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
                 const savedVisual = periodVisualOverrides[visualKey] || "";
+                console.log('Loading visual override:', { activeBaseScheduleId, periodName, visualKey, savedVisual });
+                console.log('All periodVisualOverrides:', periodVisualOverrides);
                 
                 // If saved visual is custom text, add it as an option to the dropdown
                 if (savedVisual.startsWith('[CUSTOM_TEXT]')) {
@@ -5921,6 +5945,10 @@
                 const { name: originalPeriodName, type } = currentRenamingPeriod;
                 const newNickname = editPeriodNewNameInput.value.trim();
                 const newVisualCue = editPeriodImageSelect.value; // NEW in 4.44
+                
+                console.log('Submitting edit period form:', { originalPeriodName, newNickname, newVisualCue });
+                console.log('Dropdown element:', editPeriodImageSelect);
+                console.log('All dropdown options:', Array.from(editPeriodImageSelect.options).map(o => ({value: o.value, text: o.textContent, selected: o.selected})));
                 
                 editPeriodStatusMsg.textContent = "Saving...";
                 editPeriodStatusMsg.classList.remove('hidden');
@@ -5969,11 +5997,13 @@
 
                     // NEW in 4.44: Save Visual Cue
                     const visualKey = getVisualOverrideKey(activeBaseScheduleId, originalPeriodName);
+                    console.log('Saving visual override:', { activeBaseScheduleId, originalPeriodName, visualKey, newVisualCue });
                     if (newVisualCue) {
                         periodVisualOverrides[visualKey] = newVisualCue;
                     } else {
                         delete periodVisualOverrides[visualKey]; // User selected [None/Default]
                     }
+                    console.log('periodVisualOverrides after save:', periodVisualOverrides);
                     saveVisualOverrides(); // Save to localStorage
 
                     // Force an immediate re-render and clock update
@@ -7754,14 +7784,23 @@
                             
                             // 1. Collect data for this slot ID
                             const slotInputs = Array.from(formElements).filter(el => 
-                                parseInt(el.dataset.bellId) === id && !el.classList.contains('custom-quick-bell-toggle') && !el.classList.contains('clear-custom-quick-bell')
+                                parseInt(el.dataset.bellId) === id && 
+                                el.dataset.field && // CRITICAL: Only include elements that have a data-field attribute
+                                !el.classList.contains('custom-quick-bell-toggle') && 
+                                !el.classList.contains('clear-custom-quick-bell')
                             );
 
                             if (slotInputs.length > 0) {
                                 slotInputs.forEach(input => {
                                     slotData[input.dataset.field] = input.value;
+                                    if (input.dataset.field === 'sound') {
+                                        console.log(`Bell ${id} sound input:`, input.value, input);
+                                    }
                                 });
                             }
+                            
+                            console.log(`Bell ${id} collected data:`, slotData);
+                            console.log(`Bell ${id} sound field:`, slotData.sound);
 
                             // 2. Check if the slot should be cleared or is empty
                             // 5.20 Don't save slots with no name OR no time
@@ -7792,6 +7831,20 @@
                                 sound: slotData.sound || 'ellisBell.mp3',
                                 isActive: isActive
                             };
+                        });
+                        
+                        console.log('Bells to save:');
+                        newBells.forEach((bell, idx) => {
+                            if (bell) {
+                                console.log(`  Bell ${bell.id}:`, {
+                                    name: bell.name,
+                                    sound: bell.sound,
+                                    minutes: bell.minutes,
+                                    seconds: bell.seconds
+                                });
+                            } else {
+                                console.log(`  Slot ${idx + 1}: null`);
+                            }
                         });
                         
                         await saveCustomQuickBells(newBells);
@@ -7915,7 +7968,7 @@
                         }
                         return;
                     }
-                    const customText = customTextInput.value.trim().toUpperCase().substring(0, 3);
+                    const customText = customTextInput.value.trim().substring(0, 3);
                     const fgColor = customTextColorInput.value;
                     const bgColor = customTextBgColorInput.value;
                     
@@ -8349,10 +8402,12 @@
                 editPeriodImageSelect.addEventListener('change', (e) => {
                     // NEW in 4.44: Update the preview
                     const selectedValue = e.target.value; // Use e.target.value
+                    console.log('Edit period dropdown changed:', selectedValue);
                     
                     // MODIFIED V4.96: This listener must *not* fire if the 'visualSelectChangeHandler'
                     // is handling an [UPLOAD] or [CUSTOM_TEXT] action.
-                    if (selectedValue === '[UPLOAD]' || selectedValue === '[CUSTOM_TEXT]') {
+                    if (selectedValue === '[UPLOAD]' || selectedValue === '[CUSTOM_TEXT]' || selectedValue.startsWith('[CUSTOM_TEXT] ')) {
+                        console.log('Skipping preview update for upload/custom text trigger');
                         return;
                     }
 
@@ -8581,18 +8636,22 @@
                     
                 customTextVisualForm.addEventListener('submit', (e) => {
                     e.preventDefault();
-                    const customText = customTextInput.value.trim().toUpperCase().substring(0, 3);
+                    const customText = customTextInput.value.trim().substring(0, 3);
                     // NEW V4.75: Get colors
                     const fgColor = customTextColorInput.value;
                     const bgColor = customTextBgColorInput.value;
                     
+                    console.log('Custom text form submitted:', { customText, fgColor, bgColor, currentVisualSelectTarget });
+                    
                     if (!customText || !currentVisualSelectTarget) {
+                        console.log('Missing text or target, closing modal');
                         customTextVisualModal.classList.add('hidden');
                         return;
                     }
 
                     // MODIFIED V4.75: The stored value now includes colors
                     const storedValue = `[CUSTOM_TEXT] ${customText}|${bgColor}|${fgColor}`;
+                    console.log('Creating custom text value:', storedValue);
                     
                     // Set the value in the original select element
                     // We must dynamically add the option first if it doesn't exist
@@ -8610,17 +8669,33 @@
                             // Fallback if the optgroup structure changes
                             currentVisualSelectTarget.appendChild(option);
                         }
+                        console.log('Created new option for custom text');
                     } else {
                         option.value = storedValue; // Update value to capture color changes
                         option.textContent = `Custom Text: ${customText}`; // Update existing option text
+                        console.log('Updated existing option for custom text');
                     }
                     
+                    console.log('Setting dropdown value to:', storedValue);
+                    console.log('Dropdown before set:', currentVisualSelectTarget.value);
                     currentVisualSelectTarget.value = storedValue;
-                    currentVisualSelectTarget.dispatchEvent(new Event('change')); // Trigger change event
+                    console.log('Dropdown after set:', currentVisualSelectTarget.value);
+                    
+                    // Update the preview if it's the period editor
+                    if (currentVisualSelectTarget.id === 'edit-period-image-select' && currentRenamingPeriod) {
+                        const periodName = currentRenamingPeriod.name;
+                        document.getElementById('edit-period-image-preview-full').innerHTML = getVisualHtml(storedValue, periodName);
+                        document.getElementById('edit-period-image-preview-icon').innerHTML = getVisualIconHtml(storedValue, periodName);
+                        console.log('Updated period editor preview');
+                    }
+                    
+                    // DON'T dispatch change event - it causes visualSelectChangeHandler to re-open the modal
+                    // The dropdown value is set, which is all we need
 
                     // Clear state and hide modal
                     currentVisualSelectTarget = null;
                     customTextVisualModal.classList.add('hidden');
+                    console.log('Modal hidden, target cleared');
                 });
                 
                 // --- DELETED V4.75 (FIX): Removing the duplicated, broken code block ---
@@ -8653,6 +8728,12 @@
                     }
                     
                     if (e.target.value === '[CUSTOM_TEXT]' || e.target.value.startsWith('[CUSTOM_TEXT] ')) {
+                        // Prevent opening if already open
+                        if (!customTextVisualModal.classList.contains('hidden')) {
+                            console.log('Modal already open, ignoring duplicate trigger');
+                            return;
+                        }
+                        
                         //5.25.7: Console logging
                         console.log('Custom text selected!');
                         console.log('customTextVisualModal:', customTextVisualModal);
@@ -8670,7 +8751,12 @@
                             originalValueCustom = selectedOption ? selectedOption.value : ''; 
                         }
                         
-                        // MODIFIED V4.75: Logic to pre-fill input AND colors
+                        // ALWAYS clear inputs first, then fill if there's a saved value
+                        customTextInput.value = ''; 
+                        customTextBgColorInput.value = '#4338CA';
+                        customTextColorInput.value = '#FFFFFF';
+                        
+                        // MODIFIED V4.75: Logic to pre-fill input AND colors if saved
                         if (originalValueCustom.startsWith('[CUSTOM_TEXT]')) {
                             const parts = originalValueCustom.replace('[CUSTOM_TEXT] ', '').split('|');
                             customTextInput.value = parts[0] || '';
@@ -8678,10 +8764,6 @@
                             customTextColorInput.value = parts[2] || '#FFFFFF';
                             e.target.value = originalValueCustom; // Keep the original custom value selected
                         } else {
-                            // No custom text saved, set defaults
-                            customTextInput.value = ''; 
-                            customTextBgColorInput.value = '#4338CA';
-                            customTextColorInput.value = '#FFFFFF';
                             // CRITICAL: Revert value to ""
                             e.target.value = ""; 
                         }
@@ -8705,7 +8787,7 @@
                         customTextBgColorInput.addEventListener('input', updateCustomTextPreviews);
                         
                         function updateCustomTextPreviews() {
-                            const text = customTextInput.value.trim().toUpperCase().substring(0, 3) || '?';
+                            const text = customTextInput.value.trim().substring(0, 3) || '?';
                             const fgColor = customTextColorInput.value;
                             const bgColor = customTextBgColorInput.value;
                             
