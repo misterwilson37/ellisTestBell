@@ -1,5 +1,5 @@
-        const APP_VERSION = "5.37"
-        // Relative bells and visual cues
+        const APP_VERSION = "5.38"
+        // Visual Cue logic with before and after
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -508,6 +508,7 @@
         
         let periodCollapsePreference = {}; // NEW in 4.49: Store collapse state { periodName: bool }
         let currentVisualPeriodName = null; // NEW in 4.50: Tracks the period currently displayed by the visual cue.
+        let currentVisualKey = null; // NEW: Tracks the actual visual being displayed (e.g., "after:bellId", "before:bellId", "period:name")
 
         // NEW V5.05: Global Mute State and UI Sync
         let isGlobalMuted = false;
@@ -1352,45 +1353,46 @@
                     // Determine the name of the period whose visual cue we SHOULD be displaying
                     const nextPeriodName = currentPeriod ? currentPeriod.name : 
                                            (millisToQuickBell < Infinity ? "Quick Bell" : "Passing Period");
-                                           
-                    // CRITICAL: Only proceed if the visual cue needs to change
-                    if (nextPeriodName === currentVisualPeriodName) {
-                        return; // Exit function early if the period hasn't changed
-                    }
-
-                    // Store the new period name
-                    currentVisualPeriodName = nextPeriodName; 
-
+                    
                     // Store the new period name
                     currentVisualPeriodName = nextPeriodName; 
                     let visualHtml = '';
                     let visualSource = ''; // For debugging
+                    let newVisualKey = ''; // Track what visual should be showing
                         
                     // NEW 5.31: Check for per-bell visual modes (before/after)
                     // Priority: 1) After-mode bells that recently rang, 2) Before-mode upcoming bell, 3) Period default
                       
-                    // Get all bells from current schedule
+                    // Get all bells from current schedule, sorted by time
                     const allBells = calculatedPeriodsList.flatMap(p => 
                         p.bells.map(b => ({ ...b, periodName: p.name }))
-                    );
+                    ).sort((a, b) => a.time.localeCompare(b.time));
                         
-                    // 1. Check for "after" mode bells that recently rang
+                    // Find the current time
                     const now = new Date();
                     const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
                         
-                    const afterBells = allBells
-                        .filter(b => b.visualMode === 'after' && b.visualCue && b.time <= currentTimeStr)
-                        .sort((a, b) => b.time.localeCompare(a.time)); // Most recent first
+                    // Find the most recent bell that has already rung
+                    const previousBell = allBells
+                        .filter(b => b.time < currentTimeStr)
+                        .sort((a, b) => b.time.localeCompare(a.time))[0]; // Most recent first
                         
-                    if (afterBells.length > 0 && afterBells[0].visualCue) {
-                        visualHtml = getVisualHtml(afterBells[0].visualCue, afterBells[0].name);
-                        visualSource = `After: ${afterBells[0].name}`;
+                    // scheduleBellObject is already the next upcoming bell
+                        
+                    // Priority 1: Show "after" visual from previous bell (if it has one)
+                    // This shows from when the bell rang until the next bell rings
+                    if (previousBell && previousBell.visualMode === 'after' && previousBell.visualCue) {
+                        visualHtml = getVisualHtml(previousBell.visualCue, previousBell.name);
+                        visualSource = `After: ${previousBell.name}`;
+                        newVisualKey = `after:${previousBell.bellId}`;
                     }
                         
-                    // 2. Check for "before" mode on the upcoming bell
+                    // Priority 2: Show "before" visual from upcoming bell (if it has one and no "after" is showing)
+                    // This shows from when previous bell rang until this bell rings
                     if (!visualHtml && scheduleBellObject && scheduleBellObject.visualMode === 'before' && scheduleBellObject.visualCue) {
                         visualHtml = getVisualHtml(scheduleBellObject.visualCue, scheduleBellObject.name);
                         visualSource = `Before: ${scheduleBellObject.name}`;
+                        newVisualKey = `before:${scheduleBellObject.bellId}`;
                     }
                         
                     // 3. Quick bells (existing logic)
@@ -1401,9 +1403,11 @@
                             const visualCue = activeCustomBell.visualCue || `[CUSTOM_TEXT] ${activeCustomBell.iconText}|${activeCustomBell.iconBgColor}|${activeCustomBell.iconFgColor}`;
                             visualHtml = getVisualHtml(visualCue, activeCustomBell.name);
                             visualSource = `Quick Bell: ${activeCustomBell.name}`;
+                            newVisualKey = `quickbell:${activeCustomBell.id}`;
                         } else {
                             visualHtml = `<div class="w-full h-full p-8 text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg></div>`;
                             visualSource = 'Quick Bell (generic)';
+                            newVisualKey = 'quickbell:generic';
                         }
                     }
                      
@@ -1413,18 +1417,22 @@
                         const visualValue = periodVisualOverrides[visualKey] || "";
                         visualHtml = getVisualHtml(visualValue, currentPeriod.name);
                         visualSource = `Period: ${currentPeriod.name}`;
+                        newVisualKey = `period:${currentPeriod.name}`;
                     }
                         
                     // 5. Default passing period
                     if (!visualHtml) {
                         visualHtml = getDefaultVisualCue("Passing Period");
                         visualSource = 'Passing Period (default)';
+                        newVisualKey = 'passing';
                     }
                     
-                    console.log(`Visual: ${visualSource}`);
-                      
-                    // Inject into main container
-                    visualCueContainer.innerHTML = visualHtml;
+                    // Only update the DOM if the visual has actually changed
+                    if (newVisualKey !== currentVisualKey) {
+                        console.log(`Visual: ${visualSource}`);
+                        visualCueContainer.innerHTML = visualHtml;
+                        currentVisualKey = newVisualKey;
+                    }
                         
                     } catch (e) {
                         console.error("Error updating visual cue:", e);
