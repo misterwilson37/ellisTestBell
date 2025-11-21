@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- MODIFIED: Version Bump -->
-    <title>Ellis Web Bell 5.21</title>
-    <!-- NEW: SVG Favicon (FIXED: Removed extra quote in viewBox) -->
+    <title>Ellis Web Bell 5.23</title>
+
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -25,14 +24,14 @@
     </script>
     <!-- Updated Google Font to include Questrial as a Century Gothic fallback -->
     <link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet">
-	
+
 	<!-- Moving to stylesheet 5.06-->
     <link rel="stylesheet" href="styles.css">
 
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans"> <!-- Added font-sans to apply tailwind default -->
 
-    <!-- NEW: Auth/Welcome Overlay -->
+
     <div id="welcome-overlay" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
         <div class="bg-white p-10 rounded-lg shadow-xl w-full max-w-md text-center">
             <h2 class="text-3xl font-bold text-blue-700 mb-4">Welcome to the Ellis Web Bell!</h2>
@@ -55,7 +54,7 @@
         </div>
     </div>
 
-    <!-- NEW: Audio Start Overlay (for refresh) -->
+
     <div id="audio-overlay" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-40 hidden">
         <button id="start-audio-btn" class="px-8 py-4 bg-blue-600 text-white font-bold text-2xl rounded-lg shadow-lg hover:bg-blue-700 transition-colors text-center">
             <!-- MODIFIED: Default text changed, will be updated by JS -->
@@ -64,11 +63,10 @@
     </div>
 
     <!-- NEW: Add Bell to Multiple Schedules Modal -->
-    <!-- MODIFIED: v3.24 - Changed z-40 to z-50 -->
     <div id="add-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="multi-add-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Add Bell to Schedules</h3>
-            
+
             <!-- Bell Details -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
@@ -82,7 +80,7 @@
             </div>
             <div>
                 <label for="multi-bell-sound" class="block text-sm font-medium text-gray-700">Sound</label>
-                <!-- MODIFIED: Sound select now uses optgroups -->
+
                 <select id="multi-bell-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <optgroup label="Default Sounds">
                         <option value="Bell">Bell</option>
@@ -106,7 +104,7 @@
 			        <option value="[CUSTOM_TEXT]">Custom Text/Color...</option>
 			    </select>
 			</div>
-			
+
 			<!-- NEW 5.18: Visual Display Mode -->
 			<div class="mb-4">
 			    <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
@@ -129,11 +127,11 @@
 			        <strong>After:</strong> Show visual after bell rings
 			    </p>
 			</div>
-			
+
             <!-- Schedule Checkboxes -->
             <div class="mt-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Select Schedules to Add to:</label>
-                <!-- NEW: Select All/None buttons -->
+
                 <div class="flex gap-2 mb-2">
                     <button type="button" id="multi-select-all" class="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300">Select All</button>
                     <button type="button" id="multi-select-none" class="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300">Select None</button>
@@ -143,7 +141,7 @@
                     <p class="text-gray-500">Loading schedules...</p>
                 </div>
             </div>
-            
+
             <p id="multi-add-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
@@ -157,7 +155,7 @@
     <div id="edit-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="edit-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-6">Edit Bell</h3>
-            
+
             <!-- Bell Details -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div class="mb-4">
@@ -175,11 +173,11 @@
                     <input type="text" id="edit-bell-name" placeholder="e.g. 1st Period End" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
             </div>
-            <!-- MODIFIED V4.95: Add play button and flex layout -->
+
             <div class="flex items-end gap-2">
                 <div class="flex-grow">
                     <label for="edit-bell-sound" class="block text-sm font-medium text-gray-700">Sound</label>
-                    <!-- MODIFIED: Sound select now uses optgroups -->
+
                     <select id="edit-bell-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <optgroup label="Default Sounds">
                             <option value="Bell">Bell</option>
@@ -193,7 +191,7 @@
                         <optgroup label="Shared Sounds" id="edit-shared-sounds-optgroup"></optgroup>
                     </select>
                 </div>
-                <!-- NEW V4.95: Preview button for edit modal -->
+
                 <button type="button" id="preview-edit-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
                     &#9654;
                 </button>
@@ -210,18 +208,11 @@
 			        <!-- Options will be populated by JS -->
 			    </select>
 			</div>
-			
-			<!-- Visual Cue & Display (Side by Side with Preview) -->
+
+			<!-- Visual Display & Preview (Side by Side) -->
 			<div class="grid grid-cols-2 gap-4 mb-4">
-			    <!-- Left: Controls -->
+			    <!-- Left: Display Controls -->
 			    <div>
-			        <label for="edit-bell-visual" class="block text-sm font-medium text-gray-700 mb-1">Visual Cue</label>
-			        <select id="edit-bell-visual" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
-			            <option value="">[None / Period Default]</option>
-			            <option value="[UPLOAD]">Upload Image...</option>
-			            <option value="[CUSTOM_TEXT]">Custom Text/Color...</option>
-			        </select>
-			        
 			        <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
 			        <div class="space-y-2">
 			            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
@@ -242,7 +233,7 @@
 			            <strong>After:</strong> Show after bell rings
 			        </p>
 			    </div>
-			    
+
 			    <!-- Right: Preview -->
 			    <div>
 			        <label class="block text-sm font-medium text-gray-700 mb-1">Preview</label>
@@ -251,7 +242,7 @@
 			        </div>
 			    </div>
 			</div>
-			
+
             <!-- NEW in 4.21: Override sound checkbox for shared bells -->
             <!-- Override shared sound checkbox -->
 			<div id="edit-bell-override-container" class="mb-4 hidden">
@@ -268,7 +259,7 @@
 			        <span class="text-sm text-gray-700">Override shared visual for all users</span>
 			    </label>
 			</div>
-            
+
             <p id="edit-bell-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
@@ -282,7 +273,7 @@
     <div id="change-sound-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="change-sound-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Change Bell Sound</h3>
-            
+
             <!-- Bell Info (Read-only) -->
             <div class="bg-gray-100 p-4 rounded-lg mb-4">
                 <p class="text-sm font-medium text-gray-700">Bell:</p>
@@ -290,7 +281,6 @@
                 <p id="change-sound-bell-time" class="text-lg font-semibold text-gray-900"></p>
             </div>
 
-            <!-- MODIFIED: v3.19 - Sound Select + Play Button -->
             <div class="flex items-end gap-2">
                 <div class="flex-grow">
                     <label for="change-sound-select" class="block text-sm font-medium text-gray-700">Sound</label>
@@ -316,7 +306,7 @@
             <div class="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-400 rounded">
                 <p class="text-sm text-yellow-800">Are you sure you want to change this bell's sound? Your sound should be a brief but obvious indication of transition.</p>
             </div>
-            
+
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" id="change-sound-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                 <button type="submit" id="change-sound-submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Sound</button>
@@ -329,12 +319,12 @@
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-medium mb-4">Update Linked Schedules?</h3>
             <p class="text-gray-700 mb-4">This bell was found in other schedules. Do you want to apply your edit to them as well?</p>
-            
+
             <p class="text-sm font-medium text-gray-700 mb-2">Schedules containing this bell:</p>
             <div id="linked-schedule-list" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <!-- Linked schedules will be injected here -->
             </div>
-            
+
             <p id="linked-edit-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
@@ -344,10 +334,7 @@
             </div>
         </div>
     </div>
-
-
     <!-- NEW: Confirm Delete Schedule Modal -->
-    <!-- MODIFIED: v3.24 - Changed z-40 to z-50 -->
     <div id="confirm-delete-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
             <h3 class="text-xl font-medium mb-4">Delete Schedule</h3>
@@ -358,7 +345,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- **** NEW: Confirm Delete BELL Modal **** -->
     <!-- This replaces the browser's `confirm()` dialog -->
     <div id="confirm-delete-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
@@ -376,16 +363,16 @@
     <div id="rename-shared-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="rename-shared-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Rename Shared Schedule</h3>
-            
+
             <p class="text-gray-700 mb-4">
                 Current Name: <strong id="rename-shared-old-name">...</strong>
             </p>
-            
+
             <div>
                 <label for="rename-shared-new-name" class="block text-sm font-medium text-gray-700">New Schedule Name</label>
                 <input type="text" id="rename-shared-new-name" placeholder="e.g. A-Day Schedule" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
-            
+
             <p id="rename-shared-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
@@ -394,17 +381,17 @@
             </div>
         </form>
     </div>
-    
+
     <!-- **** NEW: Confirm Delete AUDIO Modal **** -->
     <div id="confirm-delete-audio-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-medium mb-4">Delete Audio File</h3>
             <p id="confirm-delete-audio-text" class="text-gray-700 mb-4">Are you sure you want to delete this audio file?</p>
-            
+
             <ul id="confirm-delete-audio-list" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4 space-y-1 bg-gray-50 mb-6">
                 <!-- Linked bells will be injected here -->
             </ul>
-            
+
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" id="delete-audio-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                 <button type="button" id="delete-audio-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete Anyway</button>
@@ -432,7 +419,7 @@
         </form>
     </div>
 
-    <!-- **** NEW: v5.21 - Rename Visual Modal **** -->
+    <!-- **** NEW: v5.23 - Rename Visual Modal **** -->
     <div id="rename-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="rename-visual-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Rename Visual File</h3>
@@ -457,17 +444,15 @@
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-medium mb-4">Nearby Bell Detected</h3>
             <p class="text-gray-700 mb-6">A bell named "<strong id="nearby-bell-name">...</strong>" is already scheduled for <strong id="nearby-bell-time">...</strong>. This is very close to your new time.</p>
-            
+
             <p id="nearby-bell-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <!-- Controls for Custom Bells (Req 1) -->
             <div id="nearby-bell-custom-controls" class="mt-6 flex justify-end gap-3">
                 <button type="button" id="nearby-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <!-- MODIFIED: v3.25 - Text updated for clarity -->
                 <button type="button" id="nearby-bell-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirm Action Anyway</button>
             </div>
-            
-            <!-- DELETED: Old Admin Controls (Req 3) -->
+
             <!-- This is now handled by the new v3.02 modals -->
         </div>
     </div>
@@ -477,7 +462,7 @@
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-medium mb-4 text-yellow-800">Warning: Confusing Bell Time</h3>
             <p class="text-gray-700 mb-6">The time you selected (<strong id="internal-conflict-new-time">...</strong>) is within 60 seconds of an existing bell (<strong id="internal-conflict-existing-bell">...</strong>) in this *same* schedule. This would be very confusing for end users. We strongly suggest editing the existing bell first.</p>
-            
+
             <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
                 <button type="button" id="internal-conflict-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                 <button type="button" id="internal-conflict-edit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Edit Existing Bell</button>
@@ -491,7 +476,7 @@
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-medium mb-4 text-red-700">Are you sure?</h3>
             <p class="text-gray-700 mb-6">Are you absolutely positive you want to create a new bell at <strong id="internal-conflict-final-new-time">...</strong>, just <strong id="internal-conflict-final-diff">...</strong> seconds apart from the existing <strong id="internal-conflict-final-existing">...</strong> bell?</p>
-            
+
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" id="internal-conflict-final-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                 <button type="button" id="internal-conflict-final-create" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Yes, Create This Bell</button>
@@ -504,13 +489,13 @@
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl"> <!-- Increased max-w -->
             <h3 class="text-xl font-medium mb-4">Similar Bell Found in Other Schedules</h3>
             <p class="text-gray-700 mb-4">One or more other shared schedules have bells with the same name very close to your new time of <strong id="external-conflict-new-time">...</strong>. Please select how you'd like to proceed.</p>
-            
+
             <p class="text-sm font-medium text-gray-700 mb-2">Conflicting bells (select to "Create and Match"):</p>
             <div id="external-conflict-list" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6 bg-gray-50">
                 <!-- Conflicting bells will be injected here -->
                 <p class="text-gray-500">Loading conflicts...</p>
             </div>
-            
+
             <p id="external-conflict-status" class="text-blue-600 text-sm mt-4 mb-4 hidden"></p>
 
             <div class="mt-6 flex flex-col gap-3">
@@ -535,20 +520,19 @@
     </div>
 
     <!-- MOVED: Personal Schedule Modals (v3.08) -->
-    <!-- NEW: v3.03 - Create Personal Schedule Modal -->
     <div id="create-personal-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="create-personal-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-2xl font-medium mb-6">New Personal Schedule</h3>
-            
+
             <p class="text-gray-700 mb-4">
                 Base Schedule: <strong id="personal-base-schedule-name">...</strong>
             </p>
-            
+
             <div>
                 <label for="new-personal-schedule-name" class="block text-sm font-medium text-gray-700">New Schedule Name</label>
                 <input type="text" id="new-personal-schedule-name" placeholder="e.g. My A-Day Schedule" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
-            
+
             <p id="create-personal-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
@@ -558,7 +542,6 @@
         </form>
     </div>
 
-    <!-- NEW: v3.03 - Confirm Delete Personal Schedule Modal -->
     <div id="confirm-delete-personal-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
             <h3 class="text-xl font-medium mb-4">Delete Personal Schedule</h3>
@@ -569,8 +552,7 @@
             </div>
         </div>
     </div>
-    
-    <!-- NEW: v3.05 - Confirm Restore Personal Schedule Modal -->
+
     <div id="confirm-restore-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
             <h3 class="text-xl font-medium mb-4">Overwrite Personal Schedule</h3>
@@ -581,21 +563,20 @@
             </div>
         </div>
     </div>
-    
-    <!-- NEW: v3.26 - Rename Personal Schedule Modal -->
+
     <div id="rename-personal-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <form id="rename-personal-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Rename Personal Schedule</h3>
-            
+
             <p class="text-gray-700 mb-4">
                 Current Name: <strong id="rename-old-schedule-name">...</strong>
             </p>
-            
+
             <div>
                 <label for="rename-new-schedule-name" class="block text-sm font-medium text-gray-700">New Schedule Name</label>
                 <input type="text" id="rename-new-schedule-name" placeholder="e.g. My A-Day Schedule" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
-            
+
             <p id="rename-personal-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
@@ -605,17 +586,14 @@
         </form>
     </div>
     <!-- END: Moved Modals (v3.08) -->
-
-
     <!-- Main Application -->
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <!-- MODIFIED: Version Bump -->
             <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.21</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
-            
-            <!-- MODIFIED: User info and signout button grouped -->
+
+
             <div class="mt-4 flex flex-col sm:flex-row justify-center items-center gap-4">
                 <!-- NEW: User display name -->
                 <p id="user-display-name" class="text-gray-700"></p>
@@ -627,60 +605,59 @@
 
         <!-- MODIFIED: This card now shows countdown AND current time -->
         <!-- NEW in 4.44: Converted to 2-column grid for Visual Cues -->
-        <!-- MODIFIED V4.98: Reorganized to a simpler 2-column layout -->
+
         <div class="bg-white rounded-xl shadow-md mb-8 overflow-hidden p-4 md:p-6">
-            
+
             <!-- MODIFIED in 4.49: Grid for Visual Cue (25%) and Clock (75%) -->
-            <!-- MODIFIED V4.99: Changed to 5-col grid (2 cols / 40% for icon, 3 cols / 60% for text) -->
+
             <div class="grid grid-cols-1 md:grid-cols-5 items-center gap-4 md:gap-6">
                 <!-- Column 1: Visual Cue (md:col-span-2 = 40%) -->
-                <!-- MODIFIED V4.99: Removed max-w-xs so it can fill the 40% width -->
+
                 <div id="visual-cue-container" class="md:col-span-2 bg-gray-800 flex items-center justify-center min-h-[150px] aspect-square rounded-lg overflow-hidden w-full mx-auto">
                     <!-- Default SVG or Image will be injected here by JS -->
                     <svg id="default-visual-cue" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-gray-500">
                         <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
                     </svg>
                 </div>
-                
+
                 <!-- Column 2: Countdown / Clock (md:col-span-3 = 75%) -->
-                <!-- MODIFIED V4.98: All text content moved into this column -->
+
                 <div class="md:col-span-3 p-2 flex flex-col justify-center">
                     <!-- MOVED V4.98: Live Clock Sentence -->
                     <div id="live-clock-sentence" class="text-2xl font-medium text-gray-600 tabular-nums text-center md:text-left">
                         Loading...
                     </div>
-                    
+
                     <!-- Line 2: "HH:MM:SS" (countdown) -->
                     <div id="countdown-display" class="text-6xl md:text-8xl font-bold text-gray-800 tabular-nums my-2 text-center md:text-left">
                         --:--
                     </div>
-                    
+
                     <!-- Line 3: "until XXBELLXX" -->
                     <div id="next-bell-sentence" class="text-2xl font-medium text-gray-600 text-center md:text-left">
                         until the next bell.
                     </div>
-                    
-                    <!-- MODIFIED: v3.21 -> v3.22 - This line's content logic is updated -->
+
                     <div id="next-bell-info" class="text-lg text-gray-500 mt-2 text-center md:text-left">
                         <!-- JS will populate this -->
                     </div>
-                    
+
                     <!-- MOVED V4.98: Status Footer -->
                     <div class="text-center md:text-left text-gray-500 text-lg mt-4 pt-4 border-t border-gray-100">
                         Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
                     </div>
                 </div>
-            
+
             </div> <!-- End Grid (Graphic/Countdown) -->
 
         </div>
 
         <!-- **** NEW: Quick Bell Section **** -->
-        <!-- MODIFIED V4.98: Reorganized layout -->
+
         <div id="quickBellControls" class="p-4 bg-white rounded-xl shadow-md mb-8 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
             <!-- 1. Label -->
             <span class="font-semibold text-gray-700 flex-shrink-0">Quick Bell:</span>
-            
+
             <!-- 2. Sound Dropdown -->
             <!-- 5.14: Dynamically change size to factor in quick bells -->
 			<div class="w-full sm:flex-1">
@@ -705,9 +682,9 @@
                 <button data-minutes="10" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">10</button>
                 <button data-minutes="15" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">15</button>
             	<!-- MOVED 5.12 -->
-				<!-- NEW V5.00: Vertical Separator (hidden by default, shown by JS if customs exist) -->
+
                 <div id="custom-quick-bell-separator" class="hidden h-11 border-l-2 border-gray-300 mx-1"></div>
-				<!-- NEW V5.00: Container for custom quick bells -->
+
                 <div id="custom-quick-bells-container" class="flex flex-wrap gap-2">
                     <!-- Custom buttons will be injected here -->
                 </div>
@@ -719,7 +696,7 @@
 		<button id="cancel-quick-bell-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 hidden">
 		    Cancel Timer
 		</button>
-		
+
         <!-- Combined Bell Schedule List -->
         <div>
             <!-- NEW: Mute & Collapse Controls added -->
@@ -745,33 +722,29 @@
         <!-- Schedule Selector -->
         <div class="bg-white p-6 rounded-xl shadow-md mb-8">
             <div class="flex justify-between items-center mb-2">
-                <!-- MODIFIED: v3.03 - Relabeled -->
                 <label for="schedule-selector" class="block text-lg font-medium text-gray-700">Active Schedule</label>
                 <!-- MODIFIED: Disabled by default, enabled via JS for admins -->
                 <button id="admin-toggle" class="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded-full hover:bg-gray-300 transition-colors opacity-50 cursor-not-allowed" disabled title="Sign in to see admin options">
                     Toggle Admin
                 </button>
             </div>
-            
+
             <!-- NEW (FIXED): Re-inserted the missing select element -->
             <select id="schedule-selector" class="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
                 <option value="">Loading schedules...</option>
             </select>
- 
-            <!-- NEW: v3.03 - Button to create personal schedule -->
+
             <button id="create-personal-schedule-btn" class="auth-required w-full mt-4 px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                 Copy as Personal Schedule
             </button>
         </div>
-        
-        <!-- DELETED: v3.08 - Personal Schedule Modals were here and breaking layout -->
-        <!-- DELETED: Malformed, duplicate confirm-delete-personal-modal -->
+
 
 
         <!-- NEW: Admin Zone for creating schedules and adding bells -->
         <div class="admin-control bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
             <h3 class="text-xl font-semibold text-gray-800 border-b pb-2">Admin Zone</h3>
-            
+
             <!-- Create New Schedule Form -->
             <form id="create-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <label for="new-schedule-name" class="block text-sm font-medium text-gray-700 mb-1">Create New Schedule</label>
@@ -786,11 +759,11 @@
             <!-- NEW: Add Bell to THIS Schedule Form -->
             <form id="add-shared-bell-form" class="border-t pt-6">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Add Bell to This Schedule</label>
-                <!-- NEW V4.02: Period Selector added to Admin Form -->
+
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                     <div>
                         <label for="shared-bell-period" class="block text-sm font-medium text-gray-700 mb-1">Period</label>
-                        <!-- NEW V4.02: Period selector -->
+
                         <select id="shared-bell-period" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <!-- Options populated by JS -->
                             <option value="">Select Period...</option>
@@ -808,7 +781,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-end gap-4">
                     <div class="flex-grow" style="min-width: 120px;">
                         <label for="shared-bell-sound" class="block text-sm font-medium text-gray-700 mb-1">Sound</label>
-                        <!-- MODIFIED: Sound select now uses optgroups -->
+
                         <select id="shared-bell-sound" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <optgroup label="Default Sounds">
                                 <option value="Bell">Bell</option>
@@ -841,7 +814,7 @@
             </div>
 
             <!-- MOVED: Delete Selected Schedule Button -->
-            <!-- MODIFIED V4.91: Added Rename button, put in grid -->
+
             <div class="border-t pt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Rename Current Schedule</label>
@@ -860,8 +833,8 @@
             <!-- NEW: Import/Export Section -->
             <div class="border-t pt-6 space-y-4">
                 <h4 class="text-lg font-medium text-gray-800">Backup & Restore</h4>
-                
-                <!-- MODIFIED V4.90: 2x2 Grid for Backup/Restore -->
+
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <!-- Top Row: Current Schedule -->
                     <button type="button" id="export-current-schedule-btn" class="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -870,7 +843,7 @@
                     <button type="button" id="import-current-schedule-btn" class="w-full px-4 py-2 bg-gray-600 text-white font-medium rounded-lg shadow-md hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                         Import & Overwrite Current
                     </button>
-                    
+
                     <!-- Bottom Row: All Schedules -->
                     <button type="button" id="export-schedules-btn" class="w-full px-4 py-2 bg-blue-700 text-white font-medium rounded-lg shadow-md hover:bg-blue-800 transition-colors">
                         Export ALL Shared Schedules
@@ -879,28 +852,25 @@
                         Import & Overwrite ALL
                     </button>
                 </div>
-                
+
                 <!-- Hidden file inputs -->
                 <input type="file" id="import-file-input" accept="application/json">
-                <input type="file" id="import-current-file-input" accept="application/json" class="hidden"> <!-- NEW V4.90 -->
-                
+                <input type="file" id="import-current-file-input" accept="application/json" class="hidden">
+
                 <p id="import-status" class="text-blue-600 text-sm mt-2 hidden"></p>
             </div>
 
         </div>
 
-        <!-- MODIFIED: Custom Bells (Local) -> Personal Bells (Cloud) v3.03 -->
         <div class="auth-required mt-12"> <!-- Hidden for anonymous users -->
             <!-- DELETED in 4.40: Removed the old H2 and 'add-personal-bell-form'. -->
             <!-- This functionality is replaced by the in-period '+ Bell' button -->
             <!-- and the new 'Multi-Add' feature. -->
-            
-            <!-- NEW: v3.03 - Delete Personal Schedule Button -->
-            <!-- MODIFIED: v3.05 - Moved into new Manager section -->
+
             <div class="bg-white p-6 rounded-xl shadow-md mb-8">
                 <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">My Personal Schedule Manager</h3>
-                
-                <!-- NEW V5.00: Split Row for Multi-Add and Custom Quick Bells -->
+
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <button type="button" id="show-custom-quick-bell-manager-btn" class="w-full px-4 py-3 bg-indigo-600 text-white font-medium rounded-lg shadow-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                         <span class="font-semibold">Custom Quick Bells</span>
@@ -911,7 +881,7 @@
                         <span class="block text-sm opacity-90">Add one relative bell (e.g., "Clean up") to many periods.</span>
                     </button>
                 </div>
-                
+
                 <!-- ROW 1: Creation / Renaming (2-Column Grid) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <!-- NEW in 4.54: Add New Period Button -->
@@ -922,7 +892,7 @@
                         Rename Schedule
                     </button>
                 </div>
-                
+
                 <!-- ROW 2: Backup / Restore (2-Column Grid) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-4 mb-4">
                     <button type="button" id="backup-personal-schedule-btn" class="px-4 py-2 bg-gray-600 text-white font-medium rounded-lg shadow-md hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -942,14 +912,12 @@
                 </div>
             </div>
         </div>
-        
-        <!-- NEW: v4.04 - Relative Bell Modal -->
+
         <div id="relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <form id="relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-4">Add Relative Bell</h3>
                 <p class="text-gray-700 mb-6">Create a bell relative to the start or end of the period <strong id="relative-period-name">...</strong>.</p>
-                
-                <!-- NEW: v4.10 - Anchor Bell Selector (All Bells) -->
+
                 <div class="mb-4">
                     <label for="relative-anchor-bell" class="block text-sm font-medium text-gray-700 mb-1">Parent Bell</label>
                     <select id="relative-anchor-bell" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">                        <!-- Options will be populated by JS -->
@@ -965,7 +933,7 @@
                         <option value="after">After Parent</option>
                     </select>
                 </div>
-    
+
                 <!-- Offset Time Input -->
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div>
@@ -977,7 +945,7 @@
                         <input type="number" id="relative-seconds" value="0" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
-    
+
                 <!-- Bell Name and Sound -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
@@ -1002,7 +970,7 @@
 				        <!-- Options will be populated by JS -->
 				    </select>
 				</div>
-				
+
 				<!-- NEW 5.18: Visual Display Mode -->
 				<div class="mb-4">
 				    <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
@@ -1025,9 +993,9 @@
 				        <strong>After:</strong> Show visual after bell rings
 				    </p>
 				</div>
-				
+
                 <p id="relative-time-preview" class="text-lg font-medium text-blue-600 mt-4">Calculated Time: <span id="calculated-time">--:--:--</span></p>
-                
+
                 <!-- NEW in 4.31: Convert to Static (for editing) -->
                 <div id="convert-to-static-container" class="hidden mt-4 p-3 bg-gray-100 rounded-lg">
                     <label class="flex items-center space-x-2 cursor-pointer">
@@ -1037,7 +1005,7 @@
                 </div>
 
                 <p id="relative-bell-status" class="text-red-600 text-sm mt-2 hidden"></p>
-    
+
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" id="relative-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Bell</button>
@@ -1050,7 +1018,7 @@
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
                 <h3 class="text-xl font-medium mb-4">Add Bell</h3>
                 <p class="text-gray-700 mb-6">What type of bell do you want to add to <strong id="add-bell-type-period-name">...</strong>?</p>
-                
+
                 <div class="mt-6 flex flex-col gap-3">
                     <button type="button" id="add-bell-type-static" class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                         <span class="font-semibold">Static Time Bell</span>
@@ -1072,7 +1040,7 @@
             <form id="add-static-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-4">Add Static Bell</h3>
                 <p class="text-gray-700 mb-6">Adding a new bell to the period <strong id="add-static-period-name">...</strong>.</p>
-                
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label for="add-static-bell-time" class="block text-sm font-medium text-gray-700">Time (HH:MM:SS)</label>
@@ -1083,7 +1051,7 @@
                         <input type="text" id="add-static-bell-name" placeholder="e.g. My Reminder" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
-                
+
                 <div class="flex items-end gap-2">
                     <div class="flex-grow">
                         <label for="add-static-bell-sound" class="block text-sm font-medium text-gray-700">Sound</label>
@@ -1106,7 +1074,7 @@
 				        <!-- Options will be populated by JS -->
 				    </select>
 				</div>
-				
+
 				<!-- NEW 5.18: Visual Display Mode -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
@@ -1129,9 +1097,9 @@
                         <strong>After:</strong> Show visual after bell rings
                     </p>
                 </div>
-				
+
                 <p id="add-static-bell-status" class="text-red-600 text-sm mt-4 hidden"></p>
-    
+
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" id="add-static-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Bell</button>
@@ -1143,13 +1111,13 @@
         <div id="orphan-handling-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
                 <h3 class="text-xl font-medium mb-4 text-red-700">Warning: This is a Parent Bell!</h3>
                 <p class="text-gray-700 mb-4">You are trying to delete "<strong id="orphan-parent-name">...</strong>". This bell is the "parent" for the following child bell(s):</p>
-                
+
                 <div id="orphan-child-list" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4 space-y-1 bg-gray-50 mb-6">
                     <!-- Child bells will be injected here by JS -->
                 </div>
 
                 <p class="text-gray-700 mb-6">How do you want to handle these "orphaned" bells?</p>
-                
+
                 <div class_="mt-6 flex flex-col gap-3">
                     <button type="button" id="orphan-action-independent" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                         Make Children Independent (Keep their current time)
@@ -1163,7 +1131,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- DELETED in 4.44: Replaced by 'edit-period-details-modal' -->
         <!-- <div id="rename-period-modal" ...> ... </div> -->
 
@@ -1183,16 +1151,16 @@
         <div id="edit-period-details-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <form id="edit-period-details-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
                 <h3 class="text-2xl font-medium mb-6">Edit Period Details</h3>
-                
+
                 <p class="text-gray-700 mb-4">
                     Original Name: <strong id="edit-period-old-name">...</strong>
                 </p>
-                
+
                 <div class="mb-4">
                     <label for="edit-period-new-name" class="block text-sm font-medium text-gray-700">Period Nickname</label>
                     <input type="text" id="edit-period-new-name" placeholder="e.g. My Science Block" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-                
+
                 <div class="mb-4">
                     <label for="edit-period-image-select" class="block text-sm font-medium text-gray-700">Visual Cue</label>
                     <select id="edit-period-image-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -1200,7 +1168,7 @@
                         <option value="">Loading visuals...</option>
                     </select>
                 </div>
-                
+
                 <!-- NEW in 4.51: Two-Column Preview Layout (Full Size + Icon Size) -->
                 edit-bell-visual
                     <!-- Column 1: Full Size Square Preview -->
@@ -1223,7 +1191,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <p id="edit-period-status-msg" class="text-blue-600 text-sm mt-4 hidden"></p>
                 <!-- NEW in 4.58: Delete button for custom periods -->
                 <div class="mt-6 flex justify-between gap-3">
@@ -1242,7 +1210,7 @@
         <div id="new-period-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <form id="new-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl">
                 <h3 class="text-2xl font-medium mb-6">Create New Personal Period</h3>
-                
+
                 <!-- Period Name and Visual -->
                 <div class="mb-4">
                     <label for="new-period-name" class="block text-sm font-medium text-gray-700">Period Name</label>
@@ -1272,7 +1240,7 @@
                 <div class="border-t pt-4 mb-4">
                     <h4 class="text-lg font-semibold text-gray-800 mb-2">Start Bell (Anchor)</h4>
                     <!-- Static Inputs -->
-                    <!-- MODIFIED V4.81: Added sound dropdown, changed to 3 cols -->
+
                     <div id="new-period-start-static" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="sm:col-span-1">
                             <label for="new-period-start-time" class="block text-sm font-medium text-gray-700">Time (HH:MM:SS)</label>
@@ -1287,9 +1255,9 @@
                     </div>
                     <!-- Relative Inputs -->
                     <div id="new-period-start-relative" class="hidden space-y-3">
-                        <!-- DELETED V4.83: Removing stray input tag and extra div -->
+
                         <!-- This was breaking the modal layout -->
-                        <div class="grid grid-cols-2 gap-4"> 
+                        <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-start-parent" class="block text-sm font-medium text-gray-700">Anchor Period</label>
                                 <select id="new-period-start-parent" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
@@ -1312,7 +1280,7 @@
                                     <option value="after">After</option>
                                 </select>
                             </div>
-                            <!-- MODIFIED V4.83: Corrected layout and fixed duplicate/wrong inputs -->
+
                             <div>
                                 <label for="new-period-start-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
                                 <input type="number" id="new-period-start-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
@@ -1322,7 +1290,7 @@
                                 <input type="number" id="new-period-start-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                             </div>
                         </div>
-                        <!-- NEW V4.81: Sound dropdown for relative start bell -->
+
                         <div>
                             <label for="new-period-start-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
                             <select id="new-period-start-sound-relative" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
@@ -1336,7 +1304,7 @@
                 <div class="border-t pt-4">
                     <h4 class="text-lg font-semibold text-gray-800 mb-2">End Bell (Anchor)</h4>
                     <!-- Static Inputs -->
-                    <!-- MODIFIED V4.81: Added sound dropdown, changed to 3 cols -->
+
                     <div id="new-period-end-static" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="sm:col-span-1">
                             <label for="new-period-end-time" class="block text-sm font-medium text-gray-700">Time (HH:MM:SS)</label>
@@ -1383,7 +1351,7 @@
                                 <input type="number" id="new-period-end-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                             </div>
                         </div>
-                        <!-- NEW V4.81: Sound dropdown for relative end bell -->
+
                         <div>
                             <label for="new-period-end-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
                             <select id="new-period-end-sound-relative" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
@@ -1401,7 +1369,6 @@
                 </div>
             </form>
         </div>
-        <!-- NEW: v4.22 - General User Message Modal -->
         <div id="user-message-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
                 <h3 id="user-message-title" class="text-xl font-medium mb-4">Notification</h3>
@@ -1425,23 +1392,23 @@
         </div>
 
         <!-- **** NEW: v4.60.7 - Custom Text Visual Modal **** -->
-        <!-- MODIFIED V5.03: Increased Z-index to z-60 to sit above the Quick Bell Manager (z-50) -->
+
         <div id="custom-text-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden" style="z-index: 90;">
-            <!-- MODIFIED V5.03: Max width increased to accommodate visual select -->
+
             <form id="custom-text-visual-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
                 <h3 class="text-xl font-medium mb-4">Edit Quick Bell Visual</h3>
                 <p class="text-gray-700 mb-6">Select a visual cue OR set custom text and colors.</p>
 
-                <!-- NEW V5.03: Visual Select Dropdown -->
+
                 <div class="mb-6">
                     <label for="quick-bell-visual-select" class="block text-sm font-medium text-gray-700">Visual Cue Type</label>
-                    <!-- NEW V5.03: This select uses the same options as period editor -->
+
                     <select id="quick-bell-visual-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <!-- Options populated by JS in openIconModal -->
                     </select>
                 </div>
 
-                <!-- NEW V5.03: Preview Area -->
+
                 <div class="grid grid-cols-2 gap-4 mb-6">
                      <div class="flex flex-col items-center">
                         <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Live Preview (Large)</label>
@@ -1463,13 +1430,13 @@
                 <!-- Custom Text/Color Area (Toggled by JS) -->
                 <div id="custom-text-color-container" class="border-t pt-4 hidden">
                     <h4 class="text-lg font-medium mb-3">Custom Text Configuration</h4>
-                    
+
                     <div class="mb-4 text-center">
                         <label for="custom-text-input" class="block text-sm font-medium text-gray-700 mb-1">Custom Text (1-3 Chars)</label>
                         <input type="text" id="custom-text-input" placeholder="ABC" required maxlength="3" class="text-4xl font-extrabold tracking-widest text-center uppercase w-32 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </div>
-                    
-                    <!-- NEW V4.75: Color Pickers -->
+
+
                     <div class="mt-4 grid grid-cols-2 gap-4">
                         <div class="text-center">
                             <label for="custom-text-color" class="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
@@ -1488,12 +1455,12 @@
                 </div>
             </form>
         </div>
-        
+
         <!-- **** NEW: v4.75 - Reusable Visual Upload Modal **** -->
         <div id="upload-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-70 hidden">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
                 <h3 class="text-2xl font-medium mb-6">Upload New Visual</h3>
-                
+
                 <!-- This is the content moved from the visual-manager-panel -->
                 <div>
                     <p class="text-sm text-gray-600 mb-4">Files must be under 1MB. (Supports .png, .jpg, .svg, .gif)</p>
@@ -1509,7 +1476,7 @@
                     </button>
                     <p id="visual-upload-status" class="text-blue-600 text-sm mt-3 hidden"></p>
                 </div>
-                
+
                 <div class="mt-6 flex justify-end">
                     <button type="button" id="upload-visual-close-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
                 </div>
@@ -1521,7 +1488,7 @@
         <div id="upload-audio-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
                 <h3 class="text-2xl font-medium mb-6">Upload New Audio</h3>
-                
+
                 <div>
                     <p class="text-sm text-gray-600 mb-4">Files must be under 1MB. (Supports .mp3, .wav, .m4a, .ogg)</p>
                     <!-- This input uses the *existing* ID from the audio manager -->
@@ -1540,7 +1507,7 @@
                     <!-- This status uses the *existing* ID -->
                     <p id="audio-upload-status" class="text-blue-600 text-sm mt-3 hidden"></p>
                 </div>
-                
+
                 <div class="mt-6 flex justify-end">
                     <button type="button" id="upload-audio-close-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
                 </div>
@@ -1552,7 +1519,7 @@
         <div id="multi-add-relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <form id="multi-add-relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-6">Add Multi-Period Relative Bell</h3>
-                
+
                 <!-- Bell Name and Sound -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
@@ -1577,7 +1544,7 @@
 				        <!-- Options will be populated by JS -->
 				    </select>
 				</div>
-				
+
 				<!-- NEW 5.18: Visual Display Mode -->
 				<div class="mb-4">
 				    <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
@@ -1600,7 +1567,7 @@
 				        <strong>After:</strong> Show visual after bell rings
 				    </p>
 				</div>
-				
+
                 <!-- Relative Time Config -->
                 <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
                     <div class="sm:col-span-2">
@@ -1637,22 +1604,22 @@
                         <p class="text-gray-500">Loading periods...</p>
                     </div>
                 </div>
-                
+
                 <p id="multi-add-relative-status" class="text-red-600 text-sm mt-4 hidden"></p>
-    
+
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" id="multi-add-relative-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Add Bells</button>
                 </div>
             </form>
         </div>
-        
+
         <!-- **** NEW: v5.00 - Custom Quick Bell Manager Modal **** -->
         <div id="custom-quick-bell-manager-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
             <form id="custom-quick-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-6">Custom Quick Bells Manager</h3>
                 <p class="text-gray-700 mb-4">Define up to four custom, reusable quick bells.</p>
-                
+
                 <div id="custom-quick-bell-list-container" class="space-y-4">
                     <!-- Custom Quick Bell Rows (to be injected by JS) -->
                     <p class="text-gray-500">Loading custom bells...</p>
@@ -1666,14 +1633,13 @@
                 </div>
             </form>
         </div>
-        
-        <!-- NEW: Audio Manager Panel (Hidden for anonymous users) -->
+
+
         <div id="audio-manager-panel" class="auth-required mt-12 max-w-4xl mx-auto">
-            <!-- MODIFIED: v3.09 - Made H2 a cursor-pointer -->
             <h2 class="text-2xl font-semibold mb-4 cursor-pointer" title="Click to refresh file lists">My Audio Manager</h2>
             <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
-                
-                <!-- MODIFIED V4.76: Audio Upload Form replaced with a simple button -->
+
+
                 <div>
                     <h3 class="text-lg font-medium text-gray-800 mb-2">Upload New Audio File</h3>
                     <button type="button" id="show-audio-upload-modal-btn" class="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors">
@@ -1704,8 +1670,8 @@
         <div id="visual-manager-panel" class="auth-required mt-12 max-w-4xl mx-auto">
             <h2 class="text-2xl font-semibold mb-4 cursor-pointer" title="Click to refresh file lists">My Visual Manager</h2>
             <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
-                
-                <!-- MODIFIED V4.75: Visual Upload Form replaced with a simple button -->
+
+
                 <div>
                     <h3 class="text-lg font-medium text-gray-800 mb-2">Upload New Visual File</h3>
                     <button type="button" id="show-visual-upload-modal-btn" class="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors">
@@ -1742,8 +1708,7 @@
    		 		App Version: <span id="app-version-display" class="font-bold text-gray-600">Loading...</span>
 			</div>
         </footer>
-        
-        <!-- NEW: v3.05 - Hidden file input for restore -->
+
         <input type="file" id="restore-file-input" class="hidden" accept="application/json,.json">
 
     </div>
@@ -1776,5 +1741,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- MODIFIED: Version Bump -->
-<!-- Version 5.21 -->
+<!-- Version 5.23 -->
