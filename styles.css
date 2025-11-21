@@ -4,7 +4,7 @@
         }
         /* Styles for Admin Controls */
         /* Hide admin controls and shared delete/edit buttons by default */
-        .admin-control, #combined-bell-list .delete-btn, #combined-bell-list .edit-btn {
+        .admin-control, #combined-bell-list .delete-btn {
             display: none;
         }
         /* When body has .admin-mode, show them */
@@ -12,8 +12,11 @@
             display: block; 
         }
         /* Show shared delete/edit buttons in admin mode */
-        body.admin-mode #combined-bell-list .delete-btn,
-        body.admin-mode #combined-bell-list .edit-btn {
+        body.admin-mode #combined-bell-list .delete-btn {
+            display: inline-block;
+        }
+        
+        #combined-bell-list .edit-btn {
             display: inline-block;
         }
         /* Always show custom delete/edit buttons */
