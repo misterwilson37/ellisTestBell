@@ -1,5 +1,5 @@
-        const APP_VERSION = "5.34"
-        // Fixed editBellOverrideCheckbox error and added visual rename functionality
+        const APP_VERSION = "5.35"
+        // anchor bell image edits bug
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -8729,8 +8729,8 @@
                 // NEW 5.31.1: Bell visual dropdowns
                 document.getElementById('add-static-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
                 document.getElementById('relative-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
-                document.getElementById('edit-bell-visual')?.addEventListener('change', function() {
-                    visualSelectChangeHandler.call(this);
+                document.getElementById('edit-bell-visual')?.addEventListener('change', function(e) {
+                    visualSelectChangeHandler.call(this, e);
                     updateEditBellVisualPreview(); // NEW 5.32: Update preview
                 });
                 document.getElementById('multi-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
