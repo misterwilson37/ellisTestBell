@@ -1,5 +1,5 @@
-        const APP_VERSION = "5.36"
-        // Try to fix editing relative bell logic
+        const APP_VERSION = "5.37"
+        // Relative bells and visual cues
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -3983,6 +3983,13 @@
                     relativeBellSoundSelect.innerHTML = sharedSoundSelect.innerHTML;
                     relativeBellSoundSelect.value = rawBell.sound; // Select the bell's sound
                 }
+                
+                // NEW: Set the visual cue dropdown
+                const relativeBellVisualSelect = document.getElementById('relative-bell-visual');
+                if (relativeBellVisualSelect) {
+                    updateVisualDropdowns(); // Make sure dropdowns are populated
+                    relativeBellVisualSelect.value = rawBell.visualCue || '';
+                }
 
                 // 7. Show "Convert to Static" checkbox
                 document.getElementById('convert-to-static-container').classList.remove('hidden');
@@ -5021,6 +5028,9 @@
                     relativeBellSoundSelect.innerHTML = sharedSoundSelect.innerHTML;
                     relativeBellSoundSelect.value = 'ellisBell.mp3';
                 }
+    
+                // NEW: Populate visual dropdowns
+                updateVisualDropdowns();
     
                 // Initial calculation
                 updateCalculatedTime(); 
