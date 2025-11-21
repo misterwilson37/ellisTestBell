@@ -1,5 +1,5 @@
-        const APP_VERSION = "5.29"
-        // The goal of 5.29 is to fix the countdown grammar & punctuation duplicates.
+        const APP_VERSION = "5.34"
+        // Fixed editBellOverrideCheckbox error and added visual rename functionality
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -116,6 +116,15 @@
         const renameAudioStatus = document.getElementById('rename-audio-status');
         const renameAudioCancelBtn = document.getElementById('rename-audio-cancel');
         let audioToRename = null; // NEW V4.97: State for renaming
+        
+        // NEW V5.34: Rename Visual Modal
+        const renameVisualModal = document.getElementById('rename-visual-modal');
+        const renameVisualForm = document.getElementById('rename-visual-form');
+        const renameVisualOldName = document.getElementById('rename-visual-old-name');
+        const renameVisualNewName = document.getElementById('rename-visual-new-name');
+        const renameVisualStatus = document.getElementById('rename-visual-status');
+        const renameVisualCancelBtn = document.getElementById('rename-visual-cancel');
+        let visualToRename = null; // NEW V5.34: State for renaming
         
         // Nearby Bell Modal (Custom)
         const nearbyBellModal = document.getElementById('nearby-bell-modal');
@@ -471,6 +480,7 @@
         
         // NEW V5.00: Custom Quick Bell State
         let customQuickBells = []; // Array of { id, name, minutes, seconds, iconText, sound, isActive }
+        window.customQuickBells = customQuickBells; // 5.30: Make it accessible from console
 
         let mutedBellIds = new Set(); 
         let bellSoundOverrides = {}; // NEW: Store local sound overrides
@@ -1351,41 +1361,74 @@
                     // Store the new period name
                     currentVisualPeriodName = nextPeriodName; 
 
+                    // Store the new period name
+                    currentVisualPeriodName = nextPeriodName; 
                     let visualHtml = '';
-                    if (currentPeriod) {
+                    let visualSource = ''; // For debugging
+                        
+                    // NEW 5.31: Check for per-bell visual modes (before/after)
+                    // Priority: 1) After-mode bells that recently rang, 2) Before-mode upcoming bell, 3) Period default
+                      
+                    // Get all bells from current schedule
+                    const allBells = calculatedPeriodsList.flatMap(p => 
+                        p.bells.map(b => ({ ...b, periodName: p.name }))
+                    );
+                        
+                    // 1. Check for "after" mode bells that recently rang
+                    const now = new Date();
+                    const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                        
+                    const afterBells = allBells
+                        .filter(b => b.visualMode === 'after' && b.visualCue && b.time <= currentTimeStr)
+                        .sort((a, b) => b.time.localeCompare(a.time)); // Most recent first
+                        
+                    if (afterBells.length > 0 && afterBells[0].visualCue) {
+                        visualHtml = getVisualHtml(afterBells[0].visualCue, afterBells[0].name);
+                        visualSource = `After: ${afterBells[0].name}`;
+                    }
+                        
+                    // 2. Check for "before" mode on the upcoming bell
+                    if (!visualHtml && scheduleBellObject && scheduleBellObject.visualMode === 'before' && scheduleBellObject.visualCue) {
+                        visualHtml = getVisualHtml(scheduleBellObject.visualCue, scheduleBellObject.name);
+                        visualSource = `Before: ${scheduleBellObject.name}`;
+                    }
+                        
+                    // 3. Quick bells (existing logic)
+                    if (!visualHtml && millisToQuickBell < Infinity) {
+                        const activeCustomBell = customQuickBells.find(b => b && b.isActive !== false && b.name === activeTimerLabel);
+                          
+                        if (activeCustomBell) {
+                            const visualCue = activeCustomBell.visualCue || `[CUSTOM_TEXT] ${activeCustomBell.iconText}|${activeCustomBell.iconBgColor}|${activeCustomBell.iconFgColor}`;
+                            visualHtml = getVisualHtml(visualCue, activeCustomBell.name);
+                            visualSource = `Quick Bell: ${activeCustomBell.name}`;
+                        } else {
+                            visualHtml = `<div class="w-full h-full p-8 text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg></div>`;
+                            visualSource = 'Quick Bell (generic)';
+                        }
+                    }
+                     
+                    // 4. Fall back to period visual
+                    if (!visualHtml && currentPeriod) {
                         const visualKey = getVisualOverrideKey(activeBaseScheduleId, currentPeriod.name);
                         const visualValue = periodVisualOverrides[visualKey] || "";
                         visualHtml = getVisualHtml(visualValue, currentPeriod.name);
-                    } else if (millisToQuickBell < Infinity) { // A Quick Bell is active
-                        // Check if it's a Custom Quick Bell
-                        const activeCustomBell = customQuickBells.find(b => b && b.isActive !== false && b.name === activeTimerLabel);
-                        console.log('All custom quick bells:', customQuickBells); // 5.26.2: Console logging for to try to find the quickbell graphic
-                        console.log('Quick bell active. Timer label:', activeTimerLabel);
-
-                        // 5.26.1: Console logging to find big graphic
-                        console.log('Quick bell active. Timer label:', activeTimerLabel);
-                        console.log('Found custom bell?', activeCustomBell);
-                        if (activeCustomBell) console.log('Visual cue:', activeCustomBell.visualCue);
+                        visualSource = `Period: ${currentPeriod.name}`;
+                    }
                         
-                        if (activeCustomBell) {
-                            // NEW 5.20: Use the bell's actual visualCue (which could be image URL or custom text)
-                            const visualCue = activeCustomBell.visualCue || `[CUSTOM_TEXT] ${activeCustomBell.iconText}|${activeCustomBell.iconBgColor}|${activeCustomBell.iconFgColor}`;
-                            visualHtml = getVisualHtml(visualCue, activeCustomBell.name);
-                        } else {
-                            // Special icon for Generic Quick Bell
-                            visualHtml = `<div class="w-full h-full p-8 text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg></div>`;
-                        }
-                    } else {
-                        // Default / Passing Period
+                    // 5. Default passing period
+                    if (!visualHtml) {
                         visualHtml = getDefaultVisualCue("Passing Period");
+                        visualSource = 'Passing Period (default)';
                     }
                     
-                    // Inject into main container (now only runs once per period change)
+                    console.log(`Visual: ${visualSource}`);
+                      
+                    // Inject into main container
                     visualCueContainer.innerHTML = visualHtml;
-                    
-                } catch (e) {
-                    console.error("Error updating visual cue:", e);
-                }
+                        
+                    } catch (e) {
+                        console.error("Error updating visual cue:", e);
+                    }
             }
             
             // --- NEW: Quick Bell Function (MODIFIED V5.00) ---
@@ -1596,10 +1639,10 @@
                 if (activeCustomBells.length > 0) {
                     customQuickBellSeparator.classList.remove('hidden');
                     customQuickBellsContainer.innerHTML = activeCustomBells.map(bell => {
-                        // V5.04: Format tooltip time to omit seconds if zero
-                        const formattedTime = bell.seconds === 0 
-                            ? `${bell.minutes}m` 
-                            : `${bell.minutes}m ${bell.seconds}s`;
+                        // V5.30.4: Format tooltip time to omit seconds or minutes if zero
+                        const formattedTime = bell.minutes > 0 
+                            ? (bell.seconds > 0 ? `${bell.minutes}m ${bell.seconds}s` : `${bell.minutes}m`)
+                            : `${bell.seconds}s`;
                         
                         // NEW 5.20: Get the visual content (image or text)
                         const visualCue = bell.visualCue || `[CUSTOM_TEXT] ${bell.iconText}|${bell.iconBgColor}|${bell.iconFgColor}`;
@@ -1621,7 +1664,8 @@
                             // Fallback
                             visualContent = `<span class="text-xl font-bold block leading-none">${bell.iconText}</span>`;
                         }
-                        
+
+                        // 5.30.3 Add mouseover text to buttons
                         return `
                         <button data-custom-id="${bell.id}"
                                 data-minutes="${bell.minutes}"
@@ -1629,9 +1673,11 @@
                                 data-sound="${bell.sound}"
                                 data-name="${bell.name}"
                                 class="custom-quick-launch-btn font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11 w-11 relative overflow-hidden group flex items-center justify-center"
-                                style="background-color: ${bell.iconBgColor || '#4338CA'}; color: ${bell.iconFgColor || '#FFFFFF'};"
-                                title="${bell.name}: ${formattedTime}">
-                            ${visualContent}
+                                style="background-color: ${bell.iconBgColor}; color: ${bell.iconFgColor};">
+                                ${visualContent}
+                                <span class="absolute inset-0 bg-black bg-opacity-75 text-white text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                        ${formattedTime}
+                                </span>
                         </button>`;
                     }).join('');
                 } else {
@@ -1858,7 +1904,9 @@
                                 data-sound="${finalSound}" data-type="${bell.type}"
                                 data-bell-id="${bell.bellId || getBellId(bell)}"
                                 data-original-sound="${originalSound}" data-period-name="${period.name}"
-                                data-is-relative="${!!bell.relative}"> <!-- NEW in 4.31 -->
+                                data-is-relative="${!!bell.relative}"
+                                data-visual-cue="${bell.visualCue || ''}"
+                                data-visual-mode="${bell.visualMode || 'none'}">
                                 
                                 <!-- Bell Info (Time, Name, Sound) (left) -->
                                 <div class="flex items-center space-x-4 min-w-0 flex-grow">
@@ -1880,7 +1928,13 @@
                                             <!-- NEW: v4.10.3 - Relative Bell Icon -->
                                             ${bell.relative ? 
                                                 `<span class="ml-2 text-purple-600" title="Relative Bell (Time is calculated)">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/></svg>
+                                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/></svg>
+                                                </span>` : ''}
+                                            
+                                            <!-- NEW 5.32: Visual Cue Indicator -->
+                                            ${bell.visualCue && bell.visualMode && bell.visualMode !== 'none' ? 
+                                                `<span class="ml-2 text-green-600" title="Has custom visual (${bell.visualMode} mode)">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
                                                 </span>` : ''}
                                         </span>
                                         <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
@@ -1893,7 +1947,6 @@
                                 
                                     <!-- 1. Edit Button (Consolidated for Custom or Shared/Admin) -->
                                     <button class="${isCustom ? 'edit-custom-btn' : 'edit-btn'} px-3 py-1 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                                            style="${!isCustom && !isAdmin && bell.type === 'shared' ? 'display: none;' : ''}" 
                                             aria-label="Edit bell ${safeName}"
                                             title="Edit bell">Edit</button>
 
@@ -1903,11 +1956,7 @@
                                             aria-label="Delete bell ${safeName}"
                                             title="Delete bell">Delete</button>
 
-                                    <!-- MODIFIED V4.81: Show Sound button for ALL bells -->
-                                    <!-- For custom bells, it will open the Edit modal -->
-                                    <button class="${isCustom ? 'edit-custom-btn' : 'sound-btn'} px-3 py-1 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                                            aria-label="Change sound for ${safeName}"
-                                            title="Change Sound">Sound</button>
+                                    <!-- The old "Sound" button is now redundant and removed here. -->
 
                                     <!-- 3. Play/Preview Button -->
                                     <button class="preview-bell-btn px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
@@ -3863,6 +3912,10 @@
                 relativePeriodName.textContent = bell.periodName;
                 relativeBellForm.reset();
                 relativeBellStatus.classList.add('hidden');
+                // NEW 5.31: Set the visual mode radio button
+                const visualMode = bell.visualMode || 'none';
+                const visualRadio = document.querySelector(`input[name="relative-visual-mode"][value="${visualMode}"]`);
+                if (visualRadio) visualRadio.checked = true;
 
                 // NEW: Change modal title for editing
                 const modalTitle = relativeBellModal.querySelector('h3');
@@ -3936,41 +3989,89 @@
                     openEditRelativeModal(bell);
                 } else {
                     // It's a static bell, open the static editor
-                    // (This is the original logic)
                     currentEditingBell = { ...bell }; // Store state
                     
                     // Set fields
                     editBellTimeInput.value = bell.time;
                     editBellNameInput.value = bell.name;
-                        
-                   // FIX 5.19: Use the bell's actual sound for custom bells, originalSound for shared bells
-                   const soundToShow = bell.type === 'custom' ? bell.sound : bell.originalSound;
-                   editBellSoundInput.value = soundToShow || 'ellisBell.mp3'; // Fallback to Ellis Bell if empty
-                        
-                   editBellStatus.classList.add('hidden'); // Clear status
-                        
-                   updateSoundDropdowns();
-                        
-                   editBellSoundInput.value = soundToShow || 'ellisBell.mp3'; // Set again after dropdown update 5.18.2
-                        
-                   if (bell.type === 'shared') {
-                        editBellOverrideContainer.classList.remove('hidden');
-                        editBellOverrideCheckbox.checked = false;
-                        // NEW V4.95: Disable sound select by default for shared bells
-                        editBellSoundInput.disabled = true;
-                    } else {
-                        editBellOverrideContainer.classList.add('hidden');
-                        editBellOverrideCheckbox.checked = false;
-                        // NEW V4.95: Enable sound select for custom bells
-                        editBellSoundInput.disabled = false;
+                    
+                    // NEW 5.31: Set the visual mode radio button
+                    const visualMode = bell.visualMode || 'none';
+                    const visualRadio = document.querySelector(`input[name="edit-visual-mode"][value="${visualMode}"]`);
+                    if (visualRadio) visualRadio.checked = true;
+                    
+                    // NEW 5.31: Set the visual cue dropdown
+                    const visualCue = bell.visualCue || '';
+                    const visualSelect = document.getElementById('edit-bell-visual');
+                    if (visualSelect) {
+                        updateVisualDropdowns();
+                        visualSelect.value = visualCue;
+                        updateEditBellVisualPreview(); // NEW 5.33: Show initial preview
                     }
+                    
+                    // FIX 5.19: Use the bell's actual sound for custom bells, originalSound for shared bells
+                    const soundToShow = bell.type === 'custom' ? bell.sound : bell.originalSound;
+                    editBellSoundInput.value = soundToShow || 'ellisBell.mp3';
+                    
+                    editBellStatus.classList.add('hidden');
+                    
+                    updateSoundDropdowns();
+                    editBellSoundInput.value = soundToShow || 'ellisBell.mp3'; // Set again after dropdown update
+                    
+                    // NEW 5.32.3: Handle anchor bells (shared type) - lock time but allow visual/sound/name
+                    if (bell.type === 'shared') {
+                        const isAdmin = document.body.classList.contains('admin-mode');
+                            
+                        if (isAdmin) {
+                            // Admin editing anchor bell - full control with override checkbox
+                            editBellTimeInput.disabled = false;
+                            editBellTimeInput.style.opacity = '1';
+                            editBellTimeInput.style.cursor = 'text';
+                                
+                            // Hide lock message
+                            const lockMsgDiv = document.getElementById('edit-time-lock-message');
+                            if (lockMsgDiv) lockMsgDiv.classList.add('hidden');
+                                
+                            editBellOverrideContainer.classList.remove('hidden');
+                            document.getElementById('edit-bell-visual-override-container')?.classList.remove('hidden'); // NEW 5.32
+                            if (editBellOverrideCheckbox) editBellOverrideCheckbox.checked = false;
+                            editBellSoundInput.disabled = true;
+                        } else {
+                            // Teacher editing anchor bell - lock time, auto-override sound/name/visual
+                            editBellTimeInput.disabled = true;
+                            editBellTimeInput.style.opacity = '0.5';
+                            editBellTimeInput.style.cursor = 'not-allowed';
+                                
+                            // Show lock message in dedicated div
+                            const lockMsgDiv = document.getElementById('edit-time-lock-message');
+                            if (lockMsgDiv) lockMsgDiv.classList.remove('hidden');
+                                
+                            // Hide override checkboxes - teachers always override
+                            editBellOverrideContainer.classList.add('hidden');
+                            document.getElementById('edit-bell-visual-override-container')?.classList.add('hidden'); // NEW 5.32
+                            // Enable sound editing (auto-override for teachers)
+                            editBellSoundInput.disabled = false;
+                        }
+                }
+                    
                     editBellModal.classList.remove('hidden');
                 }
             }
                 
             // DELETED in 4.31: Removed duplicate/old handleEditBellClick function.
             // The new router function is located below.
-    
+
+            // NEW 5.33: Update visual preview in edit modal
+            function updateEditBellVisualPreview() {
+                const visualSelect = document.getElementById('edit-bell-visual');
+                const preview = document.getElementById('edit-bell-visual-preview');
+                if (!visualSelect || !preview) return;
+            
+                const visualValue = visualSelect.value;
+                const html = getVisualHtml(visualValue, 'Preview');
+                preview.innerHTML = html;
+            }
+                
             /**
              * NEW: v3.25 (4.03?) - Executes the edit of a personal bell (used by conflict resolution).
              * @param {object} oldBell - Original bell data.
@@ -4005,13 +4106,16 @@
                 if (!currentEditingBell) return;
                 
                 const oldBell = currentEditingBell;
-                
-                // MODIFIED in 4.21: Build the newBell object
+                const visualMode = document.querySelector('input[name="edit-visual-mode"]:checked')?.value || 'none';
+                const visualCue = document.getElementById('edit-bell-visual')?.value || '';
+                    
                 const newBell = {
-                    bellId: oldBell.bellId, // NEW in 4.36: Pass the bellId
+                    bellId: oldBell.bellId,
                     time: editBellTimeInput.value,
                     name: editBellNameInput.value.trim(),
-                    sound: oldBell.sound // Start by assuming the sound does NOT change
+                    sound: oldBell.sound,
+                    visualMode,
+                    visualCue
                 };
 
                 // NEW in 4.21: Check if we should override the sound
@@ -4969,22 +5073,24 @@
  
                 // 3. Create the new bell object
                 let finalBell;
-
+                const visualMode = document.querySelector('input[name="relative-visual-mode"]:checked')?.value || 'none';
+                const visualCue = document.getElementById('relative-bell-visual')?.value || '';
+                    
                 if (isEditing && convertToStatic) {
-                    // --- Case 1: Editing and Converting to Static ---
-                    const calculatedTime = updateCalculatedTime(); // Get the HH:MM:SS time
                     finalBell = {
                         name: bellName,
                         sound: bellSound,
-                        bellId: currentEditingBell.bellId, // Keep existing ID
-                        time: calculatedTime // This makes it a static bell
-                        // 'relative' property is removed
+                        visualMode,
+                        visualCue,
+                        bellId: currentEditingBell.bellId,
+                        time: calculatedTime
                     };
                 } else {
-                    // --- Case 2: Adding new or Editing existing Relative Bell ---
                     finalBell = {
                         name: bellName,
                         sound: bellSound,
+                        visualMode,
+                        visualCue,
                         bellId: isEditing ? currentEditingBell.bellId : generateBellId(),
                         relative: {
                             parentBellId: parentBellId,
@@ -5101,7 +5207,17 @@
                 }
                 
                 // 2. Create the new bell object
-                const newBell = { time, name, sound, bellId: generateBellId() };
+                const visualMode = document.querySelector('input[name="add-static-visual-mode"]:checked')?.value || 'none';
+                const visualCue = document.getElementById('add-static-bell-visual')?.value || '';
+                
+                const newBell = { 
+                    time, 
+                    name, 
+                    sound, 
+                    visualMode,
+                    visualCue, // ADD THIS LINE!
+                    bellId: generateBellId() 
+                };
                 // 5.18.1 Log static bell information for reference
                 console.log('🔔 Creating static bell:', JSON.stringify(newBell));
                     
@@ -5260,15 +5376,18 @@
                     // We will save the *reference* and let the calculation engine find it.
                     
                     // Create the new relative bell
+                    const visualMode = document.querySelector('input[name="multi-relative-visual-mode"]:checked')?.value || 'none';
+                    const visualCue = document.getElementById('multi-relative-bell-visual')?.value || '';
+                            
                     const newBell = {
                         name: bellName,
                         sound: bellSound,
+                        visualMode,
+                        visualCue,
                         bellId: generateBellId(),
                         relative: {
-                            // DELETED: parentBellId: anchorBell.bellId,
-                            // NEW: Store the stable anchor info
                             parentPeriodName: periodName,
-                            parentAnchorType: parentAnchorType, // 'period_start' or 'period_end'
+                            parentAnchorType: parentAnchorType,
                             offsetSeconds: totalOffsetSeconds
                         }
                     };
@@ -5453,8 +5572,12 @@
                         const userFilesResult = await listAll(userFolderRef);
                         userVisualFiles = await Promise.all(userFilesResult.items.map(async (itemRef) => {
                             const url = await getDownloadURL(itemRef);
-                            return { name: itemRef.name, url: url, path: itemRef.fullPath };
+                            const meta = await getMetadata(itemRef); // NEW V5.34
+                            const nickname = meta.customMetadata?.nickname || ''; // NEW V5.34
+                            return { name: itemRef.name, url: url, path: itemRef.fullPath, nickname: nickname }; // MODIFIED V5.34
                         }));
+                        // NEW V5.34: Sort by nickname if it exists, otherwise by name
+                        userVisualFiles.sort((a, b) => (a.nickname || a.name).localeCompare(b.nickname || b.name));
                     } catch (e) { 
                         console.error("Error loading user visuals:", e); 
                         userVisualFiles = [];
@@ -5472,8 +5595,11 @@
                         const url = await getDownloadURL(itemRef);
                         const meta = await getMetadata(itemRef);
                         const owner = meta.customMetadata?.ownerEmail || 'unknown';
-                        return { name: itemRef.name, url: url, path: itemRef.fullPath, owner: owner };
+                        const nickname = meta.customMetadata?.nickname || ''; // NEW V5.34
+                        return { name: itemRef.name, url: url, path: itemRef.fullPath, owner: owner, nickname: nickname }; // MODIFIED V5.34
                     }));
+                    // NEW V5.34: Sort by nickname if it exists, otherwise by name
+                    sharedVisualFiles.sort((a, b) => (a.nickname || a.name).localeCompare(b.nickname || b.name));
                 } catch (e) { 
                     console.error("Error loading shared visuals:", e); 
                     sharedVisualFiles = [];
@@ -5496,14 +5622,18 @@
                 } else {
                    myVisualFilesList.innerHTML = userVisualFiles.map(file => {
                         const isShared = sharedVisualFiles.some(sharedFile => sharedFile.name === file.name);
+                        // NEW V5.34: Display nickname or name
+                        const displayName = file.nickname || file.name;
+                        const title = file.nickname ? `Nickname: ${file.nickname}\nFilename: ${file.name}` : file.name;
                         return `
                         <div class="relative group border rounded-lg overflow-hidden shadow-sm">
                             <!-- MODIFIED in 4.46: Changed h-24 to aspect-square for a square preview -->
                             <img src="${file.url}" alt="${file.name}" class="w-full aspect-square object-contain bg-gray-100" loading="lazy">
-                            <p class="text-xs text-gray-700 p-2 truncate" title="${file.name}">${file.name}</p>
+                            <p class="text-xs text-gray-700 p-2 truncate" title="${title}">${displayName}</p>
                             <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-2">
                                 ${!isShared && isAdmin ? `<button class="make-visual-public-btn text-xs px-2 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 w-full" data-path="${file.path}" data-name="${file.name}">Make Public</button>` : ''}
                                 ${isShared ? `<span class="text-xs font-medium text-white">(Published)</span>` : ''}
+                                <button class="rename-visual-btn text-xs px-2 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 w-full" data-path="${file.path}" data-name="${file.name}" data-nickname="${file.nickname || ''}">Rename</button>
                                 <button class="delete-visual-btn text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 w-full" data-path="${file.path}" data-url="${file.url}">Delete</button>
                             </div>
                         </div>`;
@@ -5514,17 +5644,22 @@
                 if (sharedVisualFiles.length === 0) {
                     sharedVisualFilesList.innerHTML = '<p class="text-gray-500 col-span-full">No shared visuals are available.</p>';
                 } else {
-                    sharedVisualFilesList.innerHTML = sharedVisualFiles.map(file => `
+                    sharedVisualFilesList.innerHTML = sharedVisualFiles.map(file => {
+                        // NEW V5.34: Display nickname or name
+                        const displayName = file.nickname || file.name;
+                        const title = file.nickname ? `Nickname: ${file.nickname}\nFilename: ${file.name}` : file.name;
+                        return `
                         <div class="relative group border rounded-lg overflow-hidden shadow-sm">
                             <!-- MODIFIED in 4.46: Changed h-24 to aspect-square for a square preview -->
                             <img src="${file.url}" alt="${file.name}" class="w-full aspect-square object-contain bg-gray-100" loading="lazy">
-                            <p class="text-xs text-gray-700 p-2 truncate" title="${file.name}">${file.name}</p>
+                            <p class="text-xs text-gray-700 p-2 truncate" title="${title}">${displayName}</p>
                             <p class="text-xs text-gray-500 px-2 pb-2 truncate" title="Owner: ${file.owner}">(by ${file.owner})</p>
                             <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-2">
+                                ${isAdmin ? `<button class="rename-visual-btn text-xs px-2 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 w-full" data-path="${file.path}" data-name="${file.name}" data-nickname="${file.nickname || ''}">Rename</button>` : ''}
                                 ${isAdmin ? `<button class="delete-visual-btn text-xs px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 w-full" data-path="${file.path}" data-url="${file.url}">Delete</button>` : ''}
                             </div>
                         </div>
-                    `).join('');
+                    `}).join('');
                 }
             }
 
@@ -5533,6 +5668,18 @@
              */
             async function handleVisualListClick(e) {
                 const target = e.target;
+                
+                // NEW V5.34: Handle Rename
+                const renameBtn = target.closest('.rename-visual-btn');
+                if (renameBtn) {
+                    const path = renameBtn.dataset.path;
+                    const name = renameBtn.dataset.name;
+                    const nickname = renameBtn.dataset.nickname;
+                    if (path && name) {
+                        openRenameVisualModal(path, name, nickname);
+                    }
+                    return;
+                }
                 
                 // Handle Delete
                 const deleteBtn = target.closest('.delete-visual-btn'); // Use closest() for robustness
@@ -5891,8 +6038,17 @@
             }
 
             function updateVisualDropdowns() {
-                const selects = [ editPeriodImageSelect, newPeriodImageSelect, quickBellVisualSelect ]; // Add any future visual selects here
-                
+                // Added 5.31.1: Dropdowns to add images to individual bells
+                const selects = [ 
+                    editPeriodImageSelect, 
+                    newPeriodImageSelect, 
+                    quickBellVisualSelect,
+                    document.getElementById('add-static-bell-visual'),
+                    document.getElementById('relative-bell-visual'),
+                    document.getElementById('edit-bell-visual'),
+                    document.getElementById('multi-bell-visual'),
+                    document.getElementById('multi-relative-bell-visual')
+                ];
                 // 1. Create options for default SVGs (dynamically)
                 // MODIFIED V4.61: Removed static number options ('1st Period', '2nd Period')
                 const defaultVisuals = ['Lunch', 'Passing Period'];
@@ -5901,20 +6057,24 @@
                     return `<option value="${key}">${name} (Default)</option>`;
                 }).join('');
 
-                // 2. Add custom image upload option (always available)
-                const uploadHtml = `<option value="[UPLOAD]">Upload Image...</option>`;
+                // NEW V4.76: Add [UPLOAD] option
+                const uploadHtml = `<option value="[UPLOAD]">Upload Audio...</option>`;
 
                 // NEW V4.60.3: Add Custom Text entry option
                 const customTextOption = `<option value="[CUSTOM_TEXT]">Custom Text/Color...</option>`;
             
                 // 3. Create options for user files
+                // MODIFIED V5.34: Use nickname if available
                 const userHtml = userVisualFiles.map(file => {
-                    return `<option value="${file.url}">${file.name} (My File)</option>`;
+                    const displayName = file.nickname || file.name;
+                    return `<option value="${file.url}">${displayName} (My File)</option>`;
                 }).join('');
                 
                 // NEW V4.61.5: Create options for shared files (Fixes missing 'sharedHtml' variable error)
+                // MODIFIED V5.34: Use nickname if available
                 const sharedHtml = sharedVisualFiles.map(file => {
-                    return `<option value="${file.url}">${file.name} (Shared)</option>`;
+                    const displayName = file.nickname || file.name;
+                    return `<option value="${file.url}">${displayName} (Shared)</option>`;
                 }).join('');
 
                 // 4. Populate all select elements
@@ -6356,11 +6516,16 @@
                 
             async function handleMultiAddSubmit(e) {
                 e.preventDefault();
-                
+
+                const visualMode = document.querySelector('input[name="multi-add-visual-mode"]:checked')?.value || 'none';
+                const visualCue = document.getElementById('multi-bell-visual')?.value || '';
+                    
                 const newBell = {
                     time: multiBellTimeInput.value,
                     name: multiBellNameInput.value,
-                    sound: multiBellSoundInput.value
+                    sound: multiBellSoundInput.value,
+                    visualMode,
+                    visualCue
                 };
                 
                 if (!newBell.time || !newBell.name) {
@@ -6857,6 +7022,61 @@
                 }
             }
     
+            /**
+             * NEW: v5.34 - Opens the rename visual modal.
+             */
+            function openRenameVisualModal(path, name, nickname) {
+                visualToRename = { path, name, nickname }; // Store state
+                renameVisualOldName.textContent = name;
+                renameVisualNewName.value = nickname || '';
+                renameVisualStatus.classList.add('hidden');
+                renameVisualModal.classList.remove('hidden');
+            }
+
+            /**
+             * NEW: v5.34 - Submits the visual rename (nickname).
+             */
+            async function handleRenameVisualSubmit(e) {
+                e.preventDefault();
+                if (!visualToRename) return;
+
+                const newNickname = renameVisualNewName.value.trim();
+                const { path, name } = visualToRename;
+                
+                renameVisualStatus.textContent = "Saving...";
+                renameVisualStatus.classList.remove('hidden');
+
+                try {
+                    const storageRef = ref(storage, path);
+                    const metadata = await getMetadata(storageRef);
+                    
+                    // Create new metadata object, preserving existing custom metadata
+                    const newMetadata = {
+                        contentType: metadata.contentType,
+                        customMetadata: {
+                            ...(metadata.customMetadata || {}), // Preserve owner, etc.
+                            'nickname': newNickname // Add or update the nickname
+                        }
+                    };
+
+                    await updateMetadata(storageRef, newMetadata);
+                    
+                    renameVisualStatus.textContent = "Nickname saved! Refreshing lists...";
+
+                    // Reload all files to get updated nicknames and re-render
+                    await loadAllVisualFiles();
+
+                    setTimeout(() => {
+                        renameVisualModal.classList.add('hidden');
+                        visualToRename = null;
+                    }, 1000);
+
+                } catch (error) {
+                    console.error("Error saving visual nickname:", error);
+                    renameVisualStatus.textContent = `Error: ${error.message}`;
+                }
+            }
+    
             async function loadAllAudioFiles() {
                 // 1. Load User's Private Files
                 if (!isUserAnonymous && userId) {
@@ -7043,6 +7263,8 @@
             
                 // NEW V4.76: Add [UPLOAD] option
                 const uploadHtml = `<option value="[UPLOAD]">Upload Audio...</option>`;
+                // NEW 5.32: Add [SILENT] option
+                const silentHtml = `<option value="[SILENT]">Silent / None</option>`;
                 
                 // Create options HTML
                 // --- THIS IS THE FIX from v2.24 ---
@@ -7056,17 +7278,23 @@
                     if (!item.el) return; // Guard clause
                     
                     // NEW V4.76: Inject [UPLOAD] option
-                    // Ensure it's not already there
                     if (!item.el.querySelector('option[value="[UPLOAD]"]')) {
-                        const defaultGroup = item.el.querySelector('optgroup[label="Default Sounds"]');
-                        if (defaultGroup) {
-                            // Insert upload option right before the default sounds
-                            defaultGroup.insertAdjacentHTML('beforebegin', uploadHtml);
-                        } else {
-                            // Fallback
-                            item.el.insertAdjacentHTML('afterbegin', uploadHtml);
-                        }
+                    const defaultGroup = item.el.querySelector('optgroup[label="Default Sounds"]');
+                    if (defaultGroup) {
+                        defaultGroup.insertAdjacentHTML('beforebegin', uploadHtml);
+                    } else {
+                        item.el.insertAdjacentHTML('afterbegin', uploadHtml);
                     }
+                }
+                
+                // NEW 5.33: Inject [SILENT] option at the top of Default Sounds
+                if (!item.el.querySelector('option[value="[SILENT]"]')) {
+                    const defaultGroup = item.el.querySelector('optgroup[label="Default Sounds"]');
+                    if (defaultGroup) {
+                        // Insert as first option inside Default Sounds group
+                        defaultGroup.insertAdjacentHTML('afterbegin', silentHtml);
+                    }
+                }
                     
                     // MODIFIED in 4.29: Find optgroups by class, not ID, since IDs aren't unique for new modals
                     const myGroup = item.el.querySelector('optgroup[label="My Sounds"]');
@@ -7589,6 +7817,10 @@
                             console.log('Trying to set value to:', visualCue);
                             visualSelectElement.value = visualCue;
                             console.log('Actual value set:', visualSelectElement.value);
+                            
+                            // NEW 5.30.1: Manually trigger preview update for existing custom text
+                            const changeEvent = new Event('change', { bubbles: true });
+                            visualSelectElement.dispatchEvent(changeEvent);
                         }
 
                         // 3. Load text/color inputs for the custom text section (for pre-fill)
@@ -7621,7 +7853,6 @@
                         } else {
                             // Fallback, just close
                             customTextVisualModal.classList.add('hidden');
-                            // customQuickBellManagerModal.style.opacity = '1'; // NEW: Restore manager
                         }
                         return;
                     }
@@ -7645,7 +7876,13 @@
                         iconTextInput.value = customText;
                         if (bgColorInput) bgColorInput.value = bgColor;
                         if (fgColorInput) fgColorInput.value = fgColor;
-                        
+                            
+                        // NEW 5.30: Update the visualCue hidden input with the full custom text format
+                        const visualCueInput = formContainer.querySelector(`input[data-field="visualCue"][data-bell-id="${currentCustomBellIconSlot}"]`);
+                        if (visualCueInput) {
+                            visualCueInput.value = `[CUSTOM_TEXT] ${customText}|${bgColor}|${fgColor}`;
+                        }
+                            
                         // Update visible button (for immediate visual feedback)
                         iconButton.dataset.iconText = customText;
                         iconButton.dataset.bgColor = bgColor;
@@ -7658,7 +7895,6 @@
                     // 3. Clear state and hide modal
                     currentCustomBellIconSlot = null;
                     customTextVisualModal.classList.add('hidden');
-                    // customQuickBellManagerModal.style.opacity = '1'; // NEW: Restore manager
                     customTextVisualModal.querySelector('h3').textContent = `Set Custom Text Visual`;
                 });
                 
@@ -7918,9 +8154,9 @@
                 // NEW V4.95: Add listener for preview button
                 document.getElementById('preview-edit-sound').addEventListener('click', () => playBell(editBellSoundInput.value));
                 // NEW V4.95: Add listener for override checkbox to enable/disable sound select
-                editBellOverrideCheckbox.addEventListener('change', (e) => {
+                editBellOverrideCheckbox?.addEventListener('change', function() {
                     if (currentEditingBell && currentEditingBell.type === 'shared') {
-                        editBellSoundInput.disabled = !e.target.checked;
+                        editBellSoundInput.disabled = !this.checked; // Use 'this' instead of 'e.target'
                     }
                 });
                 
@@ -8131,11 +8367,12 @@
                         name: bellElement.dataset.name,
                         sound: bellElement.dataset.sound,
                         type: bellElement.dataset.type,
-                        // NEW: v4.12.1 - Add bellId
                         bellId: bellElement.dataset.bellId, 
                         originalSound: bellElement.dataset.originalSound,
-                        periodName: bellElement.dataset.periodName, // NEW: Grab period name
-                        isRelative: bellElement.dataset.isRelative === 'true' // NEW in 4.31
+                        periodName: bellElement.dataset.periodName,
+                        isRelative: bellElement.dataset.isRelative === 'true',
+                        visualCue: bellElement.dataset.visualCue || '', // NEW 5.32
+                        visualMode: bellElement.dataset.visualMode || 'none' // NEW 5.32
                     };
                         
                     // MODIFIED: v4.12.1 - Fixed 'contents' typo to 'contains' and passing full bell object
@@ -8271,7 +8508,6 @@
                 // NEW in 4.60.3: Custom Text Modal Listeners
                 customTextCancelBtn.addEventListener('click', () => {
                     customTextVisualModal.classList.add('hidden');
-                    // customQuickBellManagerModal.style.opacity = '1'; // NEW in 5.25.7: Restore manager
                     // MODIFIED V4.75: Do not reset the select, just close.
                     // The original value is preserved by the change handler.
                     currentVisualSelectTarget = null;
@@ -8389,7 +8625,6 @@
                         // Store the target select element
                         currentVisualSelectTarget = e.target;
                         console.log('Opening custom text modal, z-index 80'); // New in 5.25.6: Console logging!
-                        // customQuickBellManagerModal.style.opacity = '0.3'; // New in 5.25.8: Dim the manager modal
                         customTextVisualModal.classList.remove('hidden');
                         customTextVisualModal.style.zIndex = '80'; // NEW in 5.25.?: Make sure it's on top of everything
                         
@@ -8399,6 +8634,28 @@
                             customTextContainer.classList.remove('hidden');
                         }
 
+                        // NEW 5.30.2: Add live preview updates
+                        customTextInput.addEventListener('input', updateCustomTextPreviews);
+                        customTextColorInput.addEventListener('input', updateCustomTextPreviews);
+                        customTextBgColorInput.addEventListener('input', updateCustomTextPreviews);
+                        
+                        function updateCustomTextPreviews() {
+                            const text = customTextInput.value.trim().toUpperCase().substring(0, 3) || '?';
+                            const fgColor = customTextColorInput.value;
+                            const bgColor = customTextBgColorInput.value;
+                            
+                            // Update live preview (large)
+                            const livePreview = document.getElementById('quick-bell-visual-preview-full');
+                            livePreview.innerHTML = `<div class="w-full h-full flex items-center justify-center" style="background-color: ${bgColor};">
+                                <span class="text-6xl font-bold" style="color: ${fgColor};">${text}</span>
+                            </div>`;
+                            
+                            // Update quick bell button preview (small)
+                            const iconPreview = document.getElementById('quick-bell-visual-preview-icon-inner');
+                            iconPreview.innerHTML = `<span class="text-xl font-bold" style="color: ${fgColor};">${text}</span>`;
+                            iconPreview.style.backgroundColor = bgColor;
+                        }
+                            
                         // 5.25.7: More console logging
                         console.log('After removing hidden:', customTextVisualModal.classList.contains('hidden'));
                             
@@ -8468,6 +8725,16 @@
                 editPeriodImageSelect.addEventListener('change', visualSelectChangeHandler);
                 newPeriodImageSelect.addEventListener('change', visualSelectChangeHandler);
                 quickBellVisualSelect.addEventListener('change', visualSelectChangeHandler); // NEW 5.24.4: Add quick bell support
+
+                // NEW 5.31.1: Bell visual dropdowns
+                document.getElementById('add-static-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
+                document.getElementById('relative-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
+                document.getElementById('edit-bell-visual')?.addEventListener('change', function() {
+                    visualSelectChangeHandler.call(this);
+                    updateEditBellVisualPreview(); // NEW 5.32: Update preview
+                });
+                document.getElementById('multi-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
+                document.getElementById('multi-relative-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
                     
                 // --- NEW V4.76: Sound Select Change Handler (for [UPLOAD]) ---
                 function changeSoundSelectHandler(e) {
@@ -8580,6 +8847,13 @@
                 renameAudioCancelBtn.addEventListener('click', () => {
                     renameAudioModal.classList.add('hidden');
                     audioToRename = null;
+                });
+                
+                // NEW V5.34: Rename Visual Modal Listeners
+                renameVisualForm.addEventListener('submit', handleRenameVisualSubmit);
+                renameVisualCancelBtn.addEventListener('click', () => {
+                    renameVisualModal.classList.add('hidden');
+                    visualToRename = null;
                 });
     
                 // DELETED: v3.03 - loadCustomBells()
