@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.27</title>
+    <title>Ellis Web Bell 5.30.0</title>
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -64,7 +64,7 @@
 
     <!-- NEW: Add Bell to Multiple Schedules Modal -->
     <div id="add-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="multi-add-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <form id="multi-add-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-6">Add Bell to Schedules</h3>
 
             <!-- Bell Details -->
@@ -106,26 +106,38 @@
 			</div>
 
 			<!-- NEW 5.18: Visual Display Mode -->
-			<div class="mb-4">
-			    <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
-			    <div class="grid grid-cols-3 gap-2">
-			        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-			            <input type="radio" name="multi-add-visual-mode" value="none" checked class="mr-2">
-			            <span class="text-sm">None</span>
-			        </label>
-			        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-			            <input type="radio" name="multi-add-visual-mode" value="before" class="mr-2">
-			            <span class="text-sm">Before</span>
-			        </label>
-			        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-			            <input type="radio" name="multi-add-visual-mode" value="after" class="mr-2">
-			            <span class="text-sm">After</span>
-			        </label>
+			<!-- MODIFIED V5.42: Two-column layout with centralized CSS -->
+			<div class="visual-mode-preview-grid">
+			    <!-- Left Column: Visual Display Mode -->
+			    <div>
+			        <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
+			        <div class="visual-mode-stack">
+			            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+			                <input type="radio" name="multi-add-visual-mode" value="none" checked class="mr-2">
+			                <span class="text-sm">None</span>
+			            </label>
+			            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+			                <input type="radio" name="multi-add-visual-mode" value="before" class="mr-2">
+			                <span class="text-sm">Before</span>
+			            </label>
+			            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+			                <input type="radio" name="multi-add-visual-mode" value="after" class="mr-2">
+			                <span class="text-sm">After</span>
+			            </label>
+			        </div>
+			        <p class="text-xs text-gray-500 mt-2">
+			            <strong>Before:</strong> Show while counting down<br>
+			            <strong>After:</strong> Show after bell rings
+			        </p>
 			    </div>
-			    <p class="text-xs text-gray-500 mt-1">
-			        <strong>Before:</strong> Show visual while counting down<br>
-			        <strong>After:</strong> Show visual after bell rings
-			    </p>
+			    
+			    <!-- Right Column: Preview -->
+			    <div>
+			        <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+			        <div id="multi-bell-visual-preview" class="visual-preview-full">
+			            <span class="visual-preview-placeholder">Select visual</span>
+			        </div>
+			    </div>
 			</div>
 
             <!-- Schedule Checkboxes -->
@@ -210,11 +222,12 @@
 			</div>
 
 			<!-- Visual Display & Preview (Side by Side) -->
-			<div class="grid grid-cols-2 gap-4 mb-4">
+			<!-- MODIFIED V5.42: Use centralized CSS classes -->
+			<div class="visual-mode-preview-grid">
 			    <!-- Left: Display Controls -->
 			    <div>
 			        <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
-			        <div class="space-y-2">
+			        <div class="visual-mode-stack">
 			            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
 			                <input type="radio" name="edit-visual-mode" value="none" checked class="mr-2">
 			                <span class="text-sm">None</span>
@@ -236,9 +249,9 @@
 
 			    <!-- Right: Preview -->
 			    <div>
-			        <label class="block text-sm font-medium text-gray-700 mb-1">Preview</label>
-			        <div id="edit-bell-visual-preview" class="w-full h-48 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center text-gray-400">
-			            <span class="text-sm">Select a visual to preview</span>
+			        <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+			        <div id="edit-bell-visual-preview" class="visual-preview-full">
+			            <span class="visual-preview-placeholder">Select visual</span>
 			        </div>
 			    </div>
 			</div>
@@ -590,7 +603,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.27</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.30.0</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
 
 
@@ -643,8 +656,15 @@
                     </div>
 
                     <!-- MOVED V4.98: Status Footer -->
-                    <div class="text-center md:text-left text-gray-500 text-lg mt-4 pt-4 border-t border-gray-100">
-                        Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
+                    <!-- MODIFIED V5.42: Added Cancel Timer button to status row -->
+                    <div class="flex justify-between items-center text-gray-500 text-lg mt-4 pt-4 border-t border-gray-100">
+                        <div class="text-center md:text-left">
+                            Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
+                        </div>
+                        <!-- Cancel Quick Bell Button - right aligned in status row -->
+                        <button id="cancel-quick-bell-btn" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 hidden">
+                            Cancel Timer
+                        </button>
                     </div>
                 </div>
 
@@ -691,11 +711,6 @@
 			</div>
         </div>
         <!-- **** END NEW: Quick Bell Section **** -->
-
-		<!-- NEW in 5.17: Cancel Quick Bell Button -->
-		<button id="cancel-quick-bell-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 hidden">
-		    Cancel Timer
-		</button>
 
         <!-- Combined Bell Schedule List -->
         <div>
@@ -882,6 +897,18 @@
                     </button>
                 </div>
 
+                <!-- NEW V5.29.0 / V5.42.0: Passing Period Visual Button -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <button type="button" id="passing-period-visual-btn" 
+                            class="w-full px-4 py-3 bg-teal-600 text-white font-medium rounded-lg shadow-md hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                            disabled>
+                        <span class="font-semibold">Passing Period Visual</span>
+                        <span class="block text-sm opacity-90">Set the icon shown between periods.</span>
+                    </button>
+                    <!-- Second column intentionally empty for future feature -->
+                    <div></div>
+                </div>
+
                 <!-- ROW 1: Creation / Renaming (2-Column Grid) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <!-- NEW in 4.54: Add New Period Button -->
@@ -946,6 +973,21 @@
                     </div>
                 </div>
 
+                <!-- Calculated Time Preview -->
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Calculated Time</label>
+                    <span id="calculated-time" class="text-lg font-semibold text-blue-600">--:--:-- --</span>
+                </div>
+
+                <!-- Convert to Static (Edit Mode Only) -->
+                <div id="convert-to-static-container" class="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200 hidden">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="convert-to-static-checkbox" class="mr-2 h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+                        <span class="text-sm font-medium text-gray-700">Convert to Static Bell</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">This will set the bell's time to <strong id="convert-to-static-time">--:--:-- --</strong> and remove the relative dependency.</p>
+                </div>
+
                 <!-- Bell Name and Sound -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
@@ -971,40 +1013,41 @@
 				    </select>
 				</div>
 
-				<!-- NEW 5.18: Visual Display Mode -->
-				<div class="mb-4">
-				    <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
-				    <div class="grid grid-cols-3 gap-2">
-				        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-				            <input type="radio" name="relative-visual-mode" value="none" checked class="mr-2">
-				            <span class="text-sm">None</span>
-				        </label>
-				        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-				            <input type="radio" name="relative-visual-mode" value="before" class="mr-2">
-				            <span class="text-sm">Before</span>
-				        </label>
-				        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-				            <input type="radio" name="relative-visual-mode" value="after" class="mr-2">
-				            <span class="text-sm">After</span>
-				        </label>
+				<!-- Visual Display Mode & Preview (Two Column) -->
+				<div class="visual-mode-preview-grid">
+				    <!-- Left Column: Visual Display Mode -->
+				    <div>
+				        <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
+				        <div class="visual-mode-stack">
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="relative-visual-mode" value="none" checked class="mr-2">
+				                <span class="text-sm">None</span>
+				            </label>
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="relative-visual-mode" value="before" class="mr-2">
+				                <span class="text-sm">Before</span>
+				            </label>
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="relative-visual-mode" value="after" class="mr-2">
+				                <span class="text-sm">After</span>
+				            </label>
+				        </div>
+				        <p class="text-xs text-gray-500 mt-2">
+				            <strong>Before:</strong> Show while counting down<br>
+				            <strong>After:</strong> Show after bell rings
+				        </p>
 				    </div>
-				    <p class="text-xs text-gray-500 mt-1">
-				        <strong>Before:</strong> Show visual while counting down<br>
-				        <strong>After:</strong> Show visual after bell rings
-				    </p>
+				    
+				    <!-- Right Column: Preview -->
+				    <div>
+				        <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+				        <div id="relative-bell-visual-preview-full" class="visual-preview-full">
+				            <span class="visual-preview-placeholder">Select visual</span>
+				        </div>
+				    </div>
 				</div>
 
-                <p id="relative-time-preview" class="text-lg font-medium text-blue-600 mt-4">Calculated Time: <span id="calculated-time">--:--:--</span></p>
-
-                <!-- NEW in 4.31: Convert to Static (for editing) -->
-                <div id="convert-to-static-container" class="hidden mt-4 p-3 bg-gray-100 rounded-lg">
-                    <label class="flex items-center space-x-2 cursor-pointer">
-                        <input type="checkbox" id="convert-to-static-checkbox" class="h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
-                        <span class="text-sm font-medium text-gray-700">Convert to static bell at <strong id="convert-to-static-time">--:--:--</strong></span>
-                    </label>
-                </div>
-
-                <p id="relative-bell-status" class="text-red-600 text-sm mt-2 hidden"></p>
+                <p id="relative-bell-status" class="text-red-600 text-sm mt-4 hidden"></p>
 
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" id="relative-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
@@ -1075,28 +1118,40 @@
 				    </select>
 				</div>
 
-				<!-- NEW 5.18: Visual Display Mode -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                            <input type="radio" name="add-static-visual-mode" value="none" checked class="mr-2">
-                            <span class="text-sm">None</span>
-                        </label>
-                        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                            <input type="radio" name="add-static-visual-mode" value="before" class="mr-2">
-                            <span class="text-sm">Before</span>
-                        </label>
-                        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                            <input type="radio" name="add-static-visual-mode" value="after" class="mr-2">
-                            <span class="text-sm">After</span>
-                        </label>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">
-                        <strong>Before:</strong> Show visual while counting down<br>
-                        <strong>After:</strong> Show visual after bell rings
-                    </p>
-                </div>
+				<!-- Visual Display Mode - Two Column Layout -->
+				<!-- MODIFIED V5.42: Use centralized CSS classes -->
+				<div class="visual-mode-preview-grid">
+				    <!-- Left Column: Visual Display Mode -->
+				    <div>
+				        <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
+				        <div class="visual-mode-stack">
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="add-static-visual-mode" value="none" checked class="mr-2">
+				                <span class="text-sm">None</span>
+				            </label>
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="add-static-visual-mode" value="before" class="mr-2">
+				                <span class="text-sm">Before</span>
+				            </label>
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="add-static-visual-mode" value="after" class="mr-2">
+				                <span class="text-sm">After</span>
+				            </label>
+				        </div>
+				        <p class="text-xs text-gray-500 mt-2">
+				            <strong>Before:</strong> Show while counting down<br>
+				            <strong>After:</strong> Show after bell rings
+				        </p>
+				    </div>
+				    
+				    <!-- Right Column: Preview -->
+				    <div>
+				        <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+				        <div id="add-static-bell-visual-preview" class="visual-preview-full">
+				            <span class="visual-preview-placeholder">Select visual</span>
+				        </div>
+				    </div>
+				</div>
 
                 <p id="add-static-bell-status" class="text-red-600 text-sm mt-4 hidden"></p>
 
@@ -1170,24 +1225,20 @@
                 </div>
 
                 <!-- NEW in 4.51: Two-Column Preview Layout (Full Size + Icon Size) -->
-                <div class="mb-4 grid grid-cols-2 gap-4">
+                <!-- MODIFIED V5.42: Use centralized CSS classes -->
+                <div class="visual-dual-preview-grid">
                     <!-- Column 1: Full Size Square Preview -->
-                    <div class="flex flex-col items-center">
-                        <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Full Size</label>
-                        <!-- MODIFIED in 4.53: Use a fixed, larger square container -->
-                        <div id="edit-period-image-preview-full" class="w-40 h-40 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 overflow-hidden p-2">
-                            <span class="text-gray-400 text-xs">Preview</span>
+                    <div class="text-center">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Full Size</label>
+                        <div id="edit-period-image-preview-full" class="visual-preview-full">
+                            <span class="visual-preview-placeholder">Preview</span>
                         </div>
                     </div>
                     <!-- Column 2: Period Preview Size (Small Icon) -->
-                    <div class="flex flex-col items-center">
-                        <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Period Preview Size</label>
-                        <!-- MODIFIED in 4.53: Use a fixed, small container to hold the circle icon -->
-                        <div class="w-40 h-40 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                            <!-- This inner DIV is the actual target for the tiny icon -->
-                            <div id="edit-period-image-preview-icon" class="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden">
-                                <span class="text-gray-400 text-xs">Icon</span>
-                            </div>
+                    <div class="text-center">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Period Preview Size</label>
+                        <div id="edit-period-image-preview-icon" class="visual-preview-icon-wrapper">
+                            <span class="visual-preview-placeholder text-xs">Icon</span>
                         </div>
                     </div>
                 </div>
@@ -1208,7 +1259,7 @@
 
         <!-- **** NEW: v4.57 - New Period Modal (Static/Relative) **** -->
         <div id="new-period-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="new-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl">
+            <form id="new-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-6">Create New Personal Period</h3>
 
                 <!-- Period Name and Visual -->
@@ -1222,6 +1273,23 @@
                     <select id="new-period-image-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <!-- Options populated by JS -->
                     </select>
+                    
+                    <!-- Visual Preview (Two Column Layout) -->
+                    <!-- MODIFIED V5.42: Use centralized CSS classes -->
+                    <div class="visual-dual-preview-grid">
+                        <div class="text-center">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Full Preview</label>
+                            <div id="new-period-image-preview-full" class="visual-preview-full">
+                                <span class="visual-preview-placeholder text-xs">No visual selected</span>
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Icon Preview</label>
+                            <div id="new-period-image-preview-icon" class="visual-preview-icon-wrapper">
+                                <span class="visual-preview-placeholder text-xs">No visual selected</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- NEW: Static/Relative Toggle -->
@@ -1395,56 +1463,44 @@
 
         <div id="custom-text-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden" style="z-index: 90;">
 
-            <form id="custom-text-visual-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
-                <h3 class="text-xl font-medium mb-4">Custom Visual Cue</h3>
-                <p class="text-gray-700 mb-6">Select a visual cue OR set custom text and colors.</p>
+            <form id="custom-text-visual-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <h3 class="text-xl font-medium mb-4">Custom Text Visual</h3>
+                <p class="text-gray-700 mb-6">Enter custom text (1-3 characters) and choose colors.</p>
 
-
-                <div class="mb-6">
-                    <label for="quick-bell-visual-select" class="block text-sm font-medium text-gray-700">Visual Cue Type</label>
-
-                    <select id="quick-bell-visual-select" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <!-- Options populated by JS in openIconModal -->
-                    </select>
-                </div>
-
-
-                <div class="grid grid-cols-2 gap-4 mb-6">
-                     <div class="flex flex-col items-center">
-                        <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Live Preview (Large)</label>
-                        <div id="quick-bell-visual-preview-full" class="w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 overflow-hidden p-2">
-                            <span class="text-gray-400 text-xs">Preview</span>
-                        </div>
-                    </div>
-                    <div class="flex flex-col items-center">
-                        <label class="block text-sm font-medium text-gray-700 mb-1 text-center">Quick Bell Button</label>
-                        <div id="quick-bell-visual-preview-icon" class="w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                            <!-- This inner DIV is the actual icon preview -->
-                            <div id="quick-bell-visual-preview-icon-inner" class="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden">
-                                <span class="text-gray-400 text-xs">Icon</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Custom Text/Color Area (Toggled by JS) -->
-                <div id="custom-text-color-container" class="border-t pt-4 hidden">
-                    <h4 class="text-lg font-medium mb-3">Custom Text Configuration</h4>
-
+                <!-- Custom Text/Color Area - Now always visible since modal is only for custom text -->
+                <div id="custom-text-color-container" class="mb-4">
                     <div class="mb-4 text-center">
                         <label for="custom-text-input" class="block text-sm font-medium text-gray-700 mb-1">Custom Text (1-3 Chars)</label>
                         <input type="text" id="custom-text-input" placeholder="ABC" required maxlength="3" class="text-4xl font-extrabold tracking-widest text-center w-32 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </div>
 
-
-                    <div class="mt-4 grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-2 gap-4">
                         <div class="text-center">
                             <label for="custom-text-color" class="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
-                            <input type="color" id="custom-text-color" value="#FFFFFF" class="w-16 h-10 p-0 border-none rounded-md cursor-pointer">
+                            <input type="color" id="custom-text-color" value="#FFFFFF" class="w-16 h-10 p-0 border-none rounded-md cursor-pointer mx-auto block">
                         </div>
                         <div class="text-center">
                             <label for="custom-text-bg-color" class="block text-sm font-medium text-gray-700 mb-1">Background</label>
-                            <input type="color" id="custom-text-bg-color" value="#4338CA" class="w-16 h-10 p-0 border-none rounded-md cursor-pointer">
+                            <input type="color" id="custom-text-bg-color" value="#4338CA" class="w-16 h-10 p-0 border-none rounded-md cursor-pointer mx-auto block">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Previews - FIX V5.42: Labels now dynamic based on context -->
+                <div class="visual-dual-preview-grid mt-4">
+                     <div class="text-center">
+                        <label id="custom-text-preview-full-label" class="block text-sm font-medium text-gray-700 mb-1">Full Size Preview</label>
+                        <div id="quick-bell-visual-preview-full" class="visual-preview-full mx-auto">
+                            <span class="visual-preview-placeholder text-xs">Preview</span>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <label id="custom-text-preview-icon-label" class="block text-sm font-medium text-gray-700 mb-1">Icon Preview</label>
+                        <!-- V5.42: Icon preview - will be styled based on context (circle for period, square for button) -->
+                        <div id="quick-bell-visual-preview-icon" class="visual-preview-icon-wrapper mx-auto">
+                            <div id="quick-bell-visual-preview-icon-inner" class="visual-preview-icon-circle bg-gray-200">
+                                <span class="visual-preview-placeholder text-xs">Icon</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1545,27 +1601,38 @@
 				    </select>
 				</div>
 
-				<!-- NEW 5.18: Visual Display Mode -->
-				<div class="mb-4">
-				    <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
-				    <div class="grid grid-cols-3 gap-2">
-				        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-				            <input type="radio" name="multi-relative-visual-mode" value="none" checked class="mr-2">
-				            <span class="text-sm">None</span>
-				        </label>
-				        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-				            <input type="radio" name="multi-relative-visual-mode" value="before" class="mr-2">
-				            <span class="text-sm">Before</span>
-				        </label>
-				        <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-				            <input type="radio" name="multi-relative-visual-mode" value="after" class="mr-2">
-				            <span class="text-sm">After</span>
-				        </label>
+				<!-- Visual Display Mode & Preview (Two Column) -->
+				<div class="visual-mode-preview-grid">
+				    <!-- Left Column: Visual Display Mode -->
+				    <div>
+				        <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
+				        <div class="visual-mode-stack">
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="multi-relative-visual-mode" value="none" checked class="mr-2">
+				                <span class="text-sm">None</span>
+				            </label>
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="multi-relative-visual-mode" value="before" class="mr-2">
+				                <span class="text-sm">Before</span>
+				            </label>
+				            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+				                <input type="radio" name="multi-relative-visual-mode" value="after" class="mr-2">
+				                <span class="text-sm">After</span>
+				            </label>
+				        </div>
+				        <p class="text-xs text-gray-500 mt-2">
+				            <strong>Before:</strong> Show while counting down<br>
+				            <strong>After:</strong> Show after bell rings
+				        </p>
 				    </div>
-				    <p class="text-xs text-gray-500 mt-1">
-				        <strong>Before:</strong> Show visual while counting down<br>
-				        <strong>After:</strong> Show visual after bell rings
-				    </p>
+				    
+				    <!-- Right Column: Preview -->
+				    <div>
+				        <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+				        <div id="multi-relative-bell-visual-preview" class="visual-preview-full">
+				            <span class="visual-preview-placeholder">Select visual</span>
+				        </div>
+				    </div>
 				</div>
 
                 <!-- Relative Time Config -->
@@ -1632,6 +1699,90 @@
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save All Custom Bells</button>
                 </div>
             </form>
+        </div>
+
+        <!-- NEW V5.29.0 / V5.42.0: Passing Period Visual Modal -->
+        <div id="passing-period-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <form id="passing-period-visual-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+                <h3 class="text-2xl font-medium mb-4">Passing Period Visual</h3>
+                <p class="text-gray-700 mb-6">This icon displays between periods (passing time).</p>
+
+                <!-- Visual Cue Picker -->
+                <div class="mb-4">
+                    <label for="passing-period-visual-select" class="block text-sm font-medium text-gray-700 mb-1">Visual Cue</label>
+                    <select id="passing-period-visual-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        <option value="">[Default - Walking Person]</option>
+                        <option value="[UPLOAD]">Upload Image...</option>
+                        <option value="[CUSTOM_TEXT]">Custom Text/Color...</option>
+                        <!-- Additional options populated by JS via updateVisualDropdowns() -->
+                    </select>
+                </div>
+
+                <!-- Preview (centered, single column) -->
+                <div class="mb-6 flex justify-center">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2 text-center">Preview</label>
+                        <div id="passing-period-visual-preview" class="visual-preview-full">
+                            <span class="visual-preview-placeholder">Select visual</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p id="passing-period-visual-status" class="text-red-600 text-sm mt-4 hidden"></p>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" id="passing-period-visual-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Save</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- NEW V5.29.0: Visual Background Color Picker Modal -->
+        <div id="visual-bg-color-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+                <h3 class="text-2xl font-medium mb-4">Customize Background Color</h3>
+                <p class="text-gray-700 mb-6">Click on the preview to see how it looks with different backgrounds.</p>
+
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <!-- Before Preview -->
+                    <div class="text-center">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Current</label>
+                        <div id="visual-bg-before-preview" class="visual-preview-full mx-auto">
+                            <span class="visual-preview-placeholder">Loading...</span>
+                        </div>
+                    </div>
+                    
+                    <!-- After Preview -->
+                    <div class="text-center">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">New</label>
+                        <div id="visual-bg-after-preview" class="visual-preview-full mx-auto">
+                            <span class="visual-preview-placeholder">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Color Picker -->
+                <div class="mb-6">
+                    <label for="visual-bg-color-input" class="block text-sm font-medium text-gray-700 mb-2">Background Color</label>
+                    <div class="flex items-center gap-3">
+                        <input type="color" id="visual-bg-color-input" value="#1f2937" 
+                               class="w-16 h-10 rounded cursor-pointer border border-gray-300">
+                        <input type="text" id="visual-bg-color-hex" value="#1f2937" 
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                               placeholder="#1f2937">
+                        <button type="button" id="visual-bg-reset-btn" 
+                                class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm">
+                            Reset
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Default: #1f2937 (dark gray)</p>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="visual-bg-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="visual-bg-apply" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Apply</button>
+                </div>
+            </div>
         </div>
 
 
@@ -1741,4 +1892,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.27 -->
+<!-- Version 5.30.0 - V5.43.0: Fix preview color mismatch -->
