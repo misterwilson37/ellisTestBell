@@ -1,94 +1,193 @@
- body {
-            /* Apply the new font stack */
-            font-family: 'Century Gothic', 'Questrial', 'sans-serif';
-        }
-        /* Styles for Admin Controls */
-        /* Hide admin controls and shared delete/edit buttons by default */
-        .admin-control, #combined-bell-list .delete-btn {
-            display: none;
-        }
-        /* When body has .admin-mode, show them */
-        body.admin-mode .admin-control {
-            display: block; 
-        }
-        /* Show shared delete/edit buttons in admin mode */
-        body.admin-mode #combined-bell-list .delete-btn {
-            display: inline-block;
-        }
-        
-        #combined-bell-list .edit-btn {
-            display: inline-block;
-        }
-        /* Always show custom delete/edit buttons */
-        #combined-bell-list .delete-custom-btn,
-        #combined-bell-list .edit-custom-btn {
-            display: inline-block;
-        }
+/* Font Configuration */
+body {
+    font-family: 'Century Gothic', 'Questrial', 'sans-serif';
+}
 
-        /* NEW: Sound override button is always visible for shared bells */
-        #combined-bell-list .sound-btn {
-            display: inline-block;
-        }
-        /* Hide sound override button for custom bells (they use 'Edit') */
-        #combined-bell-list .sound-custom-btn {
-            display: none;
-        }
+/* ============================================
+   VISUAL PREVIEW SYSTEM (Centralized)
+   Change these values to update all previews
+   ============================================ */
 
+/* Full-size preview container (used in all modals) */
+/* MODIFIED V5.29.0: Match actual visual-cue-container styling (bg-gray-800) */
+.visual-preview-full {
+    width: 10rem;      /* w-40 = 160px */
+    height: 10rem;     /* h-40 = 160px */
+    background-color: #1f2937;  /* bg-gray-800 - matches actual display */
+    border-radius: 0.5rem;      /* rounded-lg */
+    border: 1px solid #374151;  /* border-gray-700 - subtle border on dark bg */
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-        /* MODIFIED: v3.24 - Consolidated Z-Indexing */
-        /* All standard modals are z-50 */
-        #edit-bell-modal { z-index: 50; }
-        #change-sound-modal { z-index: 50; }
-        #nearby-bell-modal { z-index: 50; }
-        #confirm-delete-bell-modal { z-index: 50; }
-        #confirm-delete-audio-modal { z-index: 50; }
-        #internal-conflict-warning-modal { z-index: 50; }
-        #external-conflict-modal { z-index: 50; }
-        #create-personal-schedule-modal { z-index: 50; }
-        /* MODIFIED V4.60: Increase delete modal z-index */
-        #confirm-delete-personal-modal { z-index: 70; }
-        #confirm-restore-modal { z-index: 50; }
-        /* NEW: v3.26 - Add rename modal to z-50 */
-        #rename-personal-schedule-modal { z-index: 50; }
-        
-        /* Modals that appear ON TOP of other modals are z-60 */
-        #confirm-linked-edit-modal { z-index: 60; }
-        #internal-conflict-confirm-modal { z-index: 60; }
-        /* Note: Overlays (welcome, audio) and base modals 
-           (add-bell, confirm-delete) are set in HTML classes. */
-        /* END v3.24 Z-Index Cleanup */
+/* V5.29.0: Scale down padding in previews to maintain visual proportions */
+/* The actual display is ~250-300px with p-8 (32px), preview is 160px */
+/* Using p-4 (16px) maintains roughly the same content-to-container ratio */
+.visual-preview-full > div {
+    padding: 1rem !important;  /* Override the p-8 to p-4 for previews */
+}
 
-        
-        /* NEW: Hide file input, style the button */
-        #import-file-input, #audio-upload-input, #restore-file-input, #visual-upload-input {
-            display: none;
-        }
+/* V5.29.0: Make preview clickable for background color customization */
+.visual-preview-full.clickable {
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+.visual-preview-full.clickable:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 0 2px #3b82f6;  /* blue-500 ring */
+}
+.visual-preview-full.clickable:hover::after {
+    content: 'Click to change background';
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: white;
+    font-size: 0.625rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
 
-        /* NEW: Hide elements that require non-anonymous auth */
-        .auth-required {
-            display: none;
-        }
-        /* When authenticated AND not anonymous, show them */
-        body.authenticated.not-anonymous .auth-required {
-            display: block;
-        }
+/* Icon preview wrapper (holds the small circle, same size as full for alignment) */
+.visual-preview-icon-wrapper {
+    width: 10rem;      /* w-40 */
+    height: 10rem;     /* h-40 */
+    background-color: #f3f4f6;  /* bg-gray-100 - light bg to show dark icon circle */
+    border-radius: 0.5rem;      /* rounded-lg */
+    border: 1px solid #e5e7eb;  /* border-gray-200 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-        /* NEW: Admin-only elements, hidden by default */
-        .admin-only {
-            display: none;
-        }
-        /* Show when in admin mode */
-        body.admin-mode .admin-only {
-            display: inline-flex; /* MODIFIED: Use inline-flex to work with flex properties */
-        }
+/* The actual small circle icon inside the wrapper */
+.visual-preview-icon-circle {
+    width: 2.5rem;     /* w-10 */
+    height: 2.5rem;    /* h-10 */
+    border-radius: 9999px;  /* rounded-full */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
 
-        /* DELETED: These rules don't work with the CDN build */
-        /*
-        .quick-bell-btn {
-            @apply bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg;
-        }
+/* Two-column layout for visual mode + preview (bells) */
+.visual-mode-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;         /* gap-4 */
+    margin-bottom: 1rem;
+    justify-items: center;  /* Center columns like period modals */
+}
 
-        .quick-bell-btn:active {
-            @apply transform scale-95;
-        }
-        */
+/* Two-column layout for full + icon preview (periods) */
+.visual-dual-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;         /* gap-4 */
+    margin-top: 0.5rem;
+    justify-items: center;
+}
+
+/* Stacked radio buttons for visual mode */
+.visual-mode-stack {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;       /* gap-2 */
+}
+
+/* Placeholder text in empty previews */
+.visual-preview-placeholder {
+    font-size: 0.875rem;  /* text-sm */
+    color: #9ca3af;       /* text-gray-400 */
+}
+
+/* ============================================ */
+
+/* Admin Controls Visibility */
+.admin-control,
+#combined-bell-list .delete-btn {
+    display: none;
+}
+
+body.admin-mode .admin-control {
+    display: block; 
+}
+
+body.admin-mode #combined-bell-list .delete-btn {
+    display: inline-block;
+}
+
+/* Bell List Button Visibility */
+#combined-bell-list .edit-btn,
+#combined-bell-list .delete-custom-btn,
+#combined-bell-list .edit-custom-btn,
+#combined-bell-list .sound-btn {
+    display: inline-block;
+}
+
+#combined-bell-list .sound-custom-btn {
+    display: none;
+}
+
+/* Modal Z-Index Configuration */
+/* Standard modals (z-50) */
+#edit-bell-modal,
+#change-sound-modal,
+#nearby-bell-modal,
+#confirm-delete-bell-modal,
+#confirm-delete-audio-modal,
+#confirm-delete-visual-modal,
+#internal-conflict-warning-modal,
+#external-conflict-modal,
+#create-personal-schedule-modal,
+#confirm-restore-modal,
+#rename-personal-schedule-modal,
+#rename-shared-schedule-modal,
+#rename-audio-modal,
+#rename-visual-modal,
+#passing-period-visual-modal {
+    z-index: 50;
+}
+
+/* Higher priority delete modal */
+#confirm-delete-personal-modal {
+    z-index: 70;
+}
+
+/* Modals that appear on top of other modals (z-60) */
+#confirm-linked-edit-modal,
+#internal-conflict-confirm-modal {
+    z-index: 60;
+}
+
+/* File Input Hiding */
+#import-file-input,
+#audio-upload-input,
+#restore-file-input,
+#visual-upload-input {
+    display: none;
+}
+
+/* Authentication-Required Elements */
+.auth-required {
+    display: none;
+}
+
+body.authenticated.not-anonymous .auth-required {
+    display: block;
+}
+
+/* Admin-Only Elements */
+.admin-only {
+    display: none;
+}
+
+body.admin-mode .admin-only {
+    display: inline-flex;
+}
