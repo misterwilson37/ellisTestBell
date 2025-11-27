@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.30.0</title>
+    <title>Ellis Web Bell 5.31.6</title>
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -555,6 +555,27 @@
         </form>
     </div>
 
+    <!-- V5.44: Create Custom Standalone Schedule Modal -->
+    <div id="create-standalone-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <form id="create-standalone-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+            <h3 class="text-2xl font-medium mb-4">Create Custom Standalone Schedule</h3>
+            <p class="text-gray-700 mb-6">Create a blank schedule unlinked from any school bells. Perfect for cooking timers, personal routines, or special events.</p>
+            
+            <div class="mb-4">
+                <label for="standalone-schedule-name" class="block text-sm font-medium text-gray-700 mb-1">Schedule Name</label>
+                <input type="text" id="standalone-schedule-name" required placeholder="e.g., Thanksgiving Cooking"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+            
+            <p id="create-standalone-status" class="text-red-600 text-sm mt-4 hidden"></p>
+            
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="create-standalone-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">Create Schedule</button>
+            </div>
+        </form>
+    </div>
+
     <div id="confirm-delete-personal-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
             <h3 class="text-xl font-medium mb-4">Delete Personal Schedule</h3>
@@ -603,7 +624,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.30.0</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.31.6</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
 
 
@@ -736,8 +757,11 @@
 
         <!-- Schedule Selector -->
         <div class="bg-white p-6 rounded-xl shadow-md mb-8">
+            <!-- V5.44.8: Standardized header format -->
+            <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Active Schedule</h3>
+            
             <div class="flex justify-between items-center mb-2">
-                <label for="schedule-selector" class="block text-lg font-medium text-gray-700">Active Schedule</label>
+                <label for="schedule-selector" class="block text-sm font-medium text-gray-700">Select Schedule</label>
                 <!-- MODIFIED: Disabled by default, enabled via JS for admins -->
                 <button id="admin-toggle" class="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded-full hover:bg-gray-300 transition-colors opacity-50 cursor-not-allowed" disabled title="Sign in to see admin options">
                     Toggle Admin
@@ -748,9 +772,24 @@
             <select id="schedule-selector" class="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
                 <option value="">Loading schedules...</option>
             </select>
+            
+            <!-- V5.44: Standalone Schedule Badge -->
+            <div id="standalone-schedule-badge" class="hidden mt-2 px-3 py-2 bg-orange-100 text-orange-700 text-sm font-medium rounded-lg text-center">
+                🎯 Custom Standalone Schedule — No shared bells, fully customizable
+            </div>
 
-            <button id="create-personal-schedule-btn" class="auth-required w-full mt-4 px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            <!-- V5.44.8: Moved Rename Schedule here -->
+            <button type="button" id="rename-personal-schedule-btn" class="auth-required w-full mt-4 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Rename Schedule
+            </button>
+
+            <button id="create-personal-schedule-btn" class="auth-required w-full mt-2 px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                 Copy as Personal Schedule
+            </button>
+            
+            <!-- V5.44: Create Custom Standalone Schedule -->
+            <button id="create-standalone-schedule-btn" class="auth-required w-full mt-2 px-4 py-2 bg-orange-600 text-white font-medium rounded-lg shadow-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Create Custom Standalone Schedule
             </button>
         </div>
 
@@ -897,7 +936,7 @@
                     </button>
                 </div>
 
-                <!-- NEW V5.29.0 / V5.42.0: Passing Period Visual Button -->
+                <!-- V5.44.8: Passing Period Visual + New Period in same row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <button type="button" id="passing-period-visual-btn" 
                             class="w-full px-4 py-3 bg-teal-600 text-white font-medium rounded-lg shadow-md hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
@@ -905,22 +944,13 @@
                         <span class="font-semibold">Passing Period Visual</span>
                         <span class="block text-sm opacity-90">Set the icon shown between periods.</span>
                     </button>
-                    <!-- Second column intentionally empty for future feature -->
-                    <div></div>
-                </div>
-
-                <!-- ROW 1: Creation / Renaming (2-Column Grid) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    <!-- NEW in 4.54: Add New Period Button -->
-                    <button type="button" id="new-period-btn" class="px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        + New Period
-                    </button>
-                    <button type="button" id="rename-personal-schedule-btn" class="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        Rename Schedule
+                    <button type="button" id="new-period-btn" class="w-full px-4 py-3 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <span class="font-semibold">+ New Period</span>
+                        <span class="block text-sm opacity-90">Create a new period with start/end bells.</span>
                     </button>
                 </div>
 
-                <!-- ROW 2: Backup / Restore (2-Column Grid) -->
+                <!-- ROW: Backup / Restore (2-Column Grid) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-4 mb-4">
                     <button type="button" id="backup-personal-schedule-btn" class="px-4 py-2 bg-gray-600 text-white font-medium rounded-lg shadow-md hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                         Download Backup (JSON)
@@ -930,7 +960,7 @@
                     </button>
                 </div>
 
-                <!-- ROW 3: Delete -->
+                <!-- ROW: Delete -->
                 <div class="border-t pt-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Delete Current Personal Schedule</label>
                     <button type="button" id="delete-personal-schedule-btn" class="w-full px-4 py-2 bg-red-600 text-white font-medium rounded-lg shadow-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -961,14 +991,18 @@
                     </select>
                 </div>
 
-                <!-- Offset Time Input -->
-                <div class="grid grid-cols-2 gap-4 mb-4">
+                <!-- Offset Time Input - V5.44.1: Added hours for longer durations -->
+                <div class="grid grid-cols-3 gap-3 mb-4">
                     <div>
-                        <label for="relative-minutes" class="block text-sm font-medium text-gray-700 mb-1">Offset (Minutes)</label>
+                        <label for="relative-hours" class="block text-sm font-medium text-gray-700 mb-1">Hours</label>
+                        <input type="number" id="relative-hours" value="0" min="0" max="23" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="relative-minutes" class="block text-sm font-medium text-gray-700 mb-1">Minutes</label>
                         <input type="number" id="relative-minutes" value="0" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label for="relative-seconds" class="block text-sm font-medium text-gray-700 mb-1">Offset (Seconds)</label>
+                        <label for="relative-seconds" class="block text-sm font-medium text-gray-700 mb-1">Seconds</label>
                         <input type="number" id="relative-seconds" value="0" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
@@ -1321,10 +1355,9 @@
                             </select>
                         </div>
                     </div>
-                    <!-- Relative Inputs -->
+                    <!-- Relative Inputs - V5.44.7: Three-row layout with aligned pairs -->
                     <div id="new-period-start-relative" class="hidden space-y-3">
-
-                        <!-- This was breaking the modal layout -->
+                        <!-- Row 1: Anchor Period + Hours -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-start-parent" class="block text-sm font-medium text-gray-700">Anchor Period</label>
@@ -1333,25 +1366,32 @@
                                 </select>
                             </div>
                             <div>
+                                <label for="new-period-start-hours" class="block text-sm font-medium text-gray-700">Hours</label>
+                                <input type="number" id="new-period-start-hours" value="0" min="0" max="23" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                        <!-- Row 2: Anchor Bell + Minutes -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
                                 <label for="new-period-start-anchor-type" class="block text-sm font-medium text-gray-700">Anchor Bell</label>
                                 <select id="new-period-start-anchor-type" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                                     <option value="period_start">Period Start</option>
                                     <option value="period_end">Period End</option>
                                 </select>
                             </div>
+                            <div>
+                                <label for="new-period-start-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
+                                <input type="number" id="new-period-start-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
                         </div>
-                        <div class="grid grid-cols-3 gap-4">
+                        <!-- Row 3: Direction + Seconds -->
+                        <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-start-direction" class="block text-sm font-medium text-gray-700">Direction</label>
                                 <select id="new-period-start-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                                     <option value="before">Before</option>
                                     <option value="after">After</option>
                                 </select>
-                            </div>
-
-                            <div>
-                                <label for="new-period-start-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
-                                <input type="number" id="new-period-start-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                             </div>
                             <div>
                                 <label for="new-period-start-seconds" class="block text-sm font-medium text-gray-700">Seconds</label>
@@ -1385,8 +1425,9 @@
                             </select>
                         </div>
                     </div>
-                    <!-- Relative Inputs -->
+                    <!-- Relative Inputs - V5.44.7: Three-row layout with aligned pairs -->
                     <div id="new-period-end-relative" class="hidden space-y-3">
+                        <!-- Row 1: Anchor Period + Hours -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-end-parent" class="block text-sm font-medium text-gray-700">Anchor Period</label>
@@ -1395,24 +1436,32 @@
                                 </select>
                             </div>
                             <div>
+                                <label for="new-period-end-hours" class="block text-sm font-medium text-gray-700">Hours</label>
+                                <input type="number" id="new-period-end-hours" value="0" min="0" max="23" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                        <!-- Row 2: Anchor Bell + Minutes -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
                                 <label for="new-period-end-anchor-type" class="block text-sm font-medium text-gray-700">Anchor Bell</label>
                                 <select id="new-period-end-anchor-type" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                                     <option value="period_start">Period Start</option>
                                     <option value="period_end">Period End</option>
                                 </select>
                             </div>
+                            <div>
+                                <label for="new-period-end-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
+                                <input type="number" id="new-period-end-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
                         </div>
-                        <div class="grid grid-cols-3 gap-4">
+                        <!-- Row 3: Direction + Seconds -->
+                        <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-end-direction" class="block text-sm font-medium text-gray-700">Direction</label>
                                 <select id="new-period-end-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                                     <option value="before">Before</option>
                                     <option value="after">After</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label for="new-period-end-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
-                                <input type="number" id="new-period-end-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
                             </div>
                             <div>
                                 <label for="new-period-end-seconds" class="block text-sm font-medium text-gray-700">Seconds</label>
@@ -1437,7 +1486,7 @@
                 </div>
             </form>
         </div>
-        <div id="user-message-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
+        <div id="user-message-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] hidden">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
                 <h3 id="user-message-title" class="text-xl font-medium mb-4">Notification</h3>
                 <p id="user-message-text" class="text-gray-700 mb-6">...</p>
@@ -1635,30 +1684,41 @@
 				    </div>
 				</div>
 
-                <!-- Relative Time Config -->
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
-                    <div class="sm:col-span-2">
-                        <label for="multi-add-relative-parent-anchor" class="block text-sm font-medium text-gray-700 mb-1">Parent Anchor</label>
-                        <select id="multi-add-relative-parent-anchor" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="period_start">Period Start</option>
-                            <option value="period_end">Period End</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="multi-add-relative-direction" class="block text-sm font-medium text-gray-700 mb-1">Direction</label>
-                        <select id="multi-add-relative-direction" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="before">Before Parent</option>
-                            <option value="after">After Parent</option>
-                        </select>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
+                <!-- Relative Time Config - V5.44.2: Reorganized into 2 columns with hours -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <!-- Left Column: Anchor & Direction -->
+                    <div class="space-y-3">
                         <div>
-                            <label for="multi-add-relative-minutes" class="block text-sm font-medium text-gray-700 mb-1">Min</label>
-                            <input type="number" id="multi-add-relative-minutes" value="3" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <label for="multi-add-relative-parent-anchor" class="block text-sm font-medium text-gray-700 mb-1">Parent Anchor</label>
+                            <select id="multi-add-relative-parent-anchor" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="period_start">Period Start</option>
+                                <option value="period_end">Period End</option>
+                            </select>
                         </div>
                         <div>
-                            <label for="multi-add-relative-seconds" class="block text-sm font-medium text-gray-700 mb-1">Sec</label>
-                            <input type="number" id="multi-add-relative-seconds" value="0" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <label for="multi-add-relative-direction" class="block text-sm font-medium text-gray-700 mb-1">Direction</label>
+                            <select id="multi-add-relative-direction" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="before">Before Parent</option>
+                                <option value="after">After Parent</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Right Column: Hours, Minutes, Seconds -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Offset Time</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label for="multi-add-relative-hours" class="block text-xs text-gray-500 mb-1">Hours</label>
+                                <input type="number" id="multi-add-relative-hours" value="0" min="0" max="23" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="multi-add-relative-minutes" class="block text-xs text-gray-500 mb-1">Min</label>
+                                <input type="number" id="multi-add-relative-minutes" value="3" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="multi-add-relative-seconds" class="block text-xs text-gray-500 mb-1">Sec</label>
+                                <input type="number" id="multi-add-relative-seconds" value="0" min="0" max="59" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1787,12 +1847,12 @@
 
 
         <div id="audio-manager-panel" class="auth-required mt-12 max-w-4xl mx-auto">
-            <h2 class="text-2xl font-semibold mb-4 cursor-pointer" title="Click to refresh file lists">My Audio Manager</h2>
             <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
-
+                <!-- V5.44.8: Standardized header format -->
+                <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 cursor-pointer" title="Click to refresh file lists">My Audio Manager</h3>
 
                 <div>
-                    <h3 class="text-lg font-medium text-gray-800 mb-2">Upload New Audio File</h3>
+                    <h4 class="text-lg font-medium text-gray-800 mb-2">Upload New Audio File</h4>
                     <button type="button" id="show-audio-upload-modal-btn" class="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors">
                         Upload New Audio...
                     </button>
@@ -1800,7 +1860,7 @@
 
                 <!-- My Audio Files List -->
                 <div class="border-t pt-6">
-                    <h3 class="text-lg font-medium text-gray-800 mb-2">My Audio Files</h3>
+                    <h4 class="text-lg font-medium text-gray-800 mb-2">My Audio Files</h4>
                     <div id="my-audio-files-list" class="space-y-2">
                         <p class="text-gray-500">Loading...</p>
                     </div>
@@ -1808,7 +1868,7 @@
 
                 <!-- Shared Audio Files List -->
                 <div class="border-t pt-6">
-                    <h3 class="text-lg font-medium text-gray-800 mb-2">Shared Audio Files</h3>
+                    <h4 class="text-lg font-medium text-gray-800 mb-2">Shared Audio Files</h4>
                     <div id="shared-audio-files-list" class="space-y-2">
                         <p class="text-gray-500">Loading...</p>
                     </div>
@@ -1819,12 +1879,12 @@
 
         <!-- **** NEW: v4.44 - Visual Manager Panel **** -->
         <div id="visual-manager-panel" class="auth-required mt-12 max-w-4xl mx-auto">
-            <h2 class="text-2xl font-semibold mb-4 cursor-pointer" title="Click to refresh file lists">My Visual Manager</h2>
             <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
-
+                <!-- V5.44.8: Standardized header format -->
+                <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 cursor-pointer" title="Click to refresh file lists">My Visual Manager</h3>
 
                 <div>
-                    <h3 class="text-lg font-medium text-gray-800 mb-2">Upload New Visual File</h3>
+                    <h4 class="text-lg font-medium text-gray-800 mb-2">Upload New Visual File</h4>
                     <button type="button" id="show-visual-upload-modal-btn" class="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors">
                         Upload New Visual...
                     </button>
@@ -1832,7 +1892,7 @@
 
                 <!-- My Visual Files List -->
                 <div class="border-t pt-6">
-                    <h3 class="text-lg font-medium text-gray-800 mb-2">My Visuals</h3>
+                    <h4 class="text-lg font-medium text-gray-800 mb-2">My Visuals</h4>
                     <div id="my-visual-files-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         <p class="text-gray-500 col-span-full">Loading...</p>
                     </div>
@@ -1840,7 +1900,7 @@
 
                 <!-- Shared Visual Files List -->
                 <div class="border-t pt-6">
-                    <h3 class="text-lg font-medium text-gray-800 mb-2">Shared Visuals</h3>
+                    <h4 class="text-lg font-medium text-gray-800 mb-2">Shared Visuals</h4>
                     <div id="shared-visual-files-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         <p class="text-gray-500 col-span-full">Loading...</p>
                     </div>
@@ -1892,4 +1952,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.30.0 - V5.43.0: Fix preview color mismatch -->
+<!-- Version 5.31.6 - V5.44.8: Icon fixes, UI reorganization, hours for quick bells -->
