@@ -1,5 +1,19 @@
-        const APP_VERSION = "5.43.3"
-        // V5.43.3: Sync form values before adding/clearing custom quick bells to preserve edits
+        const APP_VERSION = "5.44.12"
+        // V5.44.11: Consistent icon/text sizing across all quick bell previews
+        // - Modal previews, manager previews, and actual buttons now all use SVG text
+        // - SVG text scales proportionally to container, ensuring consistent appearance
+        // - Font sizes: 80/45 for full preview, 70/50 for button preview (short/long text)
+        // V5.44.10: Fix custom text/color modal for quick bells
+        // - Created setupCustomTextModalPreviews() helper function for consistent preview behavior
+        // - Live preview now updates in real-time when editing custom text/colors for quick bells
+        // - Icon preview shape is now a rounded square (matching button) instead of a circle
+        // - Fixed hours field not loading from Firestore for custom quick bells
+        // V5.44.0: Custom Standalone Schedules - create blank schedules unlinked from shared bells
+        // - New "Create Custom Standalone Schedule" button and modal
+        // - Standalone schedules have baseScheduleId: null, isStandalone: true
+        // - Schedule selector now shows three groups: Personal, Standalone, Shared
+        // - Standalone badge displays when viewing a standalone schedule
+        // - Anchor dropdowns now show bells from ALL periods (for cross-period relative bells)
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -41,6 +55,7 @@
         const relativePeriodName = document.getElementById('relative-period-name');
         const relativeAnchorBellSelect = document.getElementById('relative-anchor-bell'); 
         const relativeDirection = document.getElementById('relative-direction');
+        const relativeHoursInput = document.getElementById('relative-hours');
         const relativeMinutesInput = document.getElementById('relative-minutes');
         const relativeSecondsInput = document.getElementById('relative-seconds');
         const relativeBellNameInput = document.getElementById('relative-bell-name');
@@ -58,6 +73,15 @@
         const createPersonalScheduleStatus = document.getElementById('create-personal-schedule-status');
         const createPersonalScheduleCancelBtn = document.getElementById('create-personal-schedule-cancel');
         const createPersonalScheduleBtn = document.getElementById('create-personal-schedule-btn');
+
+        // V5.44: Standalone Schedule Modal
+        const createStandaloneScheduleModal = document.getElementById('create-standalone-schedule-modal');
+        const createStandaloneScheduleForm = document.getElementById('create-standalone-schedule-form');
+        const standaloneScheduleNameInput = document.getElementById('standalone-schedule-name');
+        const createStandaloneStatus = document.getElementById('create-standalone-status');
+        const createStandaloneCancelBtn = document.getElementById('create-standalone-cancel');
+        const createStandaloneScheduleBtn = document.getElementById('create-standalone-schedule-btn');
+        const standaloneScheduleBadge = document.getElementById('standalone-schedule-badge');
 
         // Delete Personal Schedule Modal
         const confirmDeletePersonalModal = document.getElementById('confirm-delete-personal-modal');
@@ -480,7 +504,7 @@
         let quickBellSound = 'ellisBell.mp3'; // Default sound
         
         // NEW V5.00: Custom Quick Bell State
-        let customQuickBells = []; // Array of { id, name, minutes, seconds, iconText, sound, isActive }
+        let customQuickBells = []; // Array of { id, name, hours, minutes, seconds, iconText, sound, isActive }
         window.customQuickBells = customQuickBells; // 5.30: Make it accessible from console
 
         let mutedBellIds = new Set(); 
@@ -804,6 +828,7 @@
             /**
              * NEW in 4.18: Handles time calculation for the Relative Bell Modal. (MOVED/REFACTORED)
              * Reads from the new anchor bell dropdown.
+             * MODIFIED V5.44.1: Added hours support
              */
             const updateCalculatedTime = () => { 
                 if (!currentRelativePeriod || !currentRelativePeriod.bells) {
@@ -813,6 +838,7 @@
 
                 const anchorBellSelect = document.getElementById('relative-anchor-bell');
                 const relativeDirection = document.getElementById('relative-direction');
+                const relativeHoursInput = document.getElementById('relative-hours');
                 const relativeMinutesInput = document.getElementById('relative-minutes');
                 const relativeSecondsInput = document.getElementById('relative-seconds');
                 const calculatedTimeDisplay = document.getElementById('calculated-time');
@@ -832,12 +858,16 @@
                 }
 
                 const direction = relativeDirection.value;
+                const hours = parseInt(relativeHoursInput?.value) || 0;
                 const minutes = parseInt(relativeMinutesInput.value) || 0; 
                 const seconds = parseInt(relativeSecondsInput.value) || 0;
                 
+                // V5.44.1: Convert hours to minutes for calculation
+                const totalMinutes = (hours * 60) + minutes;
+                
                 const anchorSeconds = timeToSeconds(parentBell.time);
 
-                const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, minutes, seconds);
+                const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, totalMinutes, seconds);
                 
                 calculatedTimeDisplay.textContent = formatTime12Hour(calculatedTimeHHMMSS, false);
                 
@@ -1444,9 +1474,10 @@
             }
             
             // --- NEW: Quick Bell Function (MODIFIED V5.00) ---
-            function startQuickBell(minutes, seconds = 0, sound, name = "Quick Bell") {
+            function startQuickBell(hours = 0, minutes = 0, seconds = 0, sound, name = "Quick Bell") {
                 const now = new Date();
-                const totalMillis = (minutes * 60000) + (seconds * 1000);
+                // V5.44.8: Include hours in calculation
+                const totalMillis = (hours * 3600000) + (minutes * 60000) + (seconds * 1000);
                 
                 quickBellEndTime = new Date(now.getTime() + totalMillis);
                 document.getElementById('cancel-quick-bell-btn').classList.remove('hidden'); // 5.27: Show cancel button
@@ -1456,7 +1487,7 @@
                 // NEW V5.00: Store quick bell name for countdown display
                 quickBellEndTime.bellName = name; 
 
-                console.log(`Quick bell set for ${minutes}m ${seconds}s from now. Sound: ${quickBellSound}`);
+                console.log(`Quick bell set for ${hours}h ${minutes}m ${seconds}s from now. Sound: ${quickBellSound}`);
                 updateClock(); // Update display immediately
             }
             
@@ -1514,6 +1545,7 @@
                     
                     // Defaults for empty slots
                     const name = bell ? bell.name : `Slot ${id}`;
+                    const hours = bell ? (bell.hours || 0) : 0;
                     const minutes = bell ? bell.minutes : 5;
                     const seconds = bell ? bell.seconds : 0;
                     // V5.03: Read/default the full visual cue (which includes custom text/colors or URL)
@@ -1573,18 +1605,24 @@
                                            placeholder="e.g. Hamburger Time" ${disabledAttr}>
                                 </div>
 
-                                <!-- Col 3: Time (Min/Sec) (Col Span 4) -->
-                                <div class="col-span-4 grid grid-cols-2 gap-2">
+                                <!-- Col 3: Time (Hr/Min/Sec) (Col Span 4) - V5.44.8 -->
+                                <div class="col-span-4 grid grid-cols-3 gap-1">
                                     <div>
-                                        <label class="block text-xs font-medium text-gray-500 mb-1">Minutes</label>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Hr</label>
+                                        <input type="number" data-bell-id="${id}" data-field="hours" name="hours-${id}" value="${hours}" min="0" max="23" 
+                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-1 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
+                                           placeholder="Hr" ${disabledAttr}>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Min</label>
                                         <input type="number" data-bell-id="${id}" data-field="minutes" name="minutes-${id}" value="${minutes}" min="0" max="59" 
-                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-2 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
+                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-1 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
                                            placeholder="Min" ${disabledAttr}>
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-medium text-gray-500 mb-1">Seconds</label>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Sec</label>
                                         <input type="number" data-bell-id="${id}" data-field="seconds" name="seconds-${id}" value="${seconds}" min="0" max="59" 
-                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-2 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
+                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-1 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
                                            placeholder="Sec" ${disabledAttr}>
                                     </div>
                                 </div>
@@ -1676,10 +1714,18 @@
                 if (activeCustomBells.length > 0) {
                     customQuickBellSeparator.classList.remove('hidden');
                     customQuickBellsContainer.innerHTML = activeCustomBells.map(bell => {
-                        // V5.30.4: Format tooltip time to omit seconds or minutes if zero
-                        const formattedTime = bell.minutes > 0 
-                            ? (bell.seconds > 0 ? `${bell.minutes}m ${bell.seconds}s` : `${bell.minutes}m`)
-                            : `${bell.seconds}s`;
+                        // V5.44.8: Format tooltip time to include hours if present
+                        const hours = bell.hours || 0;
+                        const minutes = bell.minutes || 0;
+                        const seconds = bell.seconds || 0;
+                        let formattedTime = '';
+                        if (hours > 0) {
+                            formattedTime = seconds > 0 ? `${hours}h ${minutes}m ${seconds}s` : (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`);
+                        } else if (minutes > 0) {
+                            formattedTime = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+                        } else {
+                            formattedTime = `${seconds}s`;
+                        }
                         
                         // NEW 5.20: Get the visual content (image or text)
                         const visualCue = bell.visualCue || `[CUSTOM_TEXT] ${bell.iconText}|${bell.iconBgColor}|${bell.iconFgColor}`;
@@ -1690,23 +1736,33 @@
                             // Constantly updating in 5.25 to get the appearance right.
                             visualContent = `<img src="${visualCue}" alt="${bell.name}" class="absolute inset-0 w-full h-full object-contain p-1">`;
                         } else if (visualCue.startsWith('[CUSTOM_TEXT]')) {
-                            // It's custom text - extract text and colors
+                            // V5.44.12: Use SVG text with absolute positioning to fill button (ignoring padding)
                             const parts = visualCue.replace('[CUSTOM_TEXT] ', '').split('|');
                             const text = parts[0] || bell.iconText || bell.id;
-                            visualContent = `<span class="text-xl font-bold block leading-none">${text}</span>`;
+                            const fontSize = text.length > 2 ? 50 : 70;  // Match getCustomBellIconHtml
+                            visualContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="absolute inset-0 w-full h-full p-1">
+                                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${fontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text>
+                            </svg>`;
                         } else if (visualCue.startsWith('[DEFAULT]')) {
-                            // It's a default SVG - just show the icon text as fallback
-                            visualContent = `<span class="text-xl font-bold block leading-none">${bell.iconText}</span>`;
+                            // V5.44.11: Use SVG text for default fallback too
+                            const fontSize = bell.iconText.length > 2 ? 50 : 70;
+                            visualContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="absolute inset-0 w-full h-full p-1">
+                                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${fontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${bell.iconText}</text>
+                            </svg>`;
                         } else {
-                            // Fallback
-                            visualContent = `<span class="text-xl font-bold block leading-none">${bell.iconText}</span>`;
+                            // V5.44.11: Fallback with SVG text
+                            const fontSize = bell.iconText.length > 2 ? 50 : 70;
+                            visualContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="absolute inset-0 w-full h-full p-1">
+                                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${fontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${bell.iconText}</text>
+                            </svg>`;
                         }
 
-                        // 5.30.3 Add mouseover text to buttons
+                        // V5.44.8: Add hours data attribute
                         return `
                         <button data-custom-id="${bell.id}"
-                                data-minutes="${bell.minutes}"
-                                data-seconds="${bell.seconds}"
+                                data-hours="${hours}"
+                                data-minutes="${minutes}"
+                                data-seconds="${seconds}"
                                 data-sound="${bell.sound}"
                                 data-name="${bell.name}"
                                 class="custom-quick-launch-btn font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11 w-11 relative overflow-hidden group flex items-center justify-center"
@@ -1783,6 +1839,7 @@
                     
                     // Sync all form values
                     const nameInput = row.querySelector(`input[data-field="name"][data-bell-id="${bellId}"]`);
+                    const hoursInput = row.querySelector(`input[data-field="hours"][data-bell-id="${bellId}"]`);
                     const minutesInput = row.querySelector(`input[data-field="minutes"][data-bell-id="${bellId}"]`);
                     const secondsInput = row.querySelector(`input[data-field="seconds"][data-bell-id="${bellId}"]`);
                     const soundSelect = row.querySelector(`select[data-field="sound"][data-bell-id="${bellId}"]`);
@@ -1793,6 +1850,7 @@
                     
                     bell.isActive = toggle.checked;
                     if (nameInput) bell.name = nameInput.value;
+                    if (hoursInput) bell.hours = parseInt(hoursInput.value) || 0;
                     if (minutesInput) bell.minutes = parseInt(minutesInput.value) || 0;
                     if (secondsInput) bell.seconds = parseInt(secondsInput.value) || 0;
                     if (soundSelect) bell.sound = soundSelect.value;
@@ -1944,8 +2002,31 @@
                             <div class="flex-grow flex flex-col sm:flex-row items-start sm:items-center justify-between">
                                 <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2 sm:mb-0">
                                     <span class="text-xl font-bold text-gray-800" ${titleAttr}>${displayPeriodName}</span>
-                                    <!-- MODIFIED in 4.29: Use 'period.origin' and only show "CUSTOM" for periods created by the user -->
-                                ${period.origin === 'personal' ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full" title="This is a custom period you created.">CUSTOM</span>' : ''}
+                                    <!-- V5.44.8: Show badges based on context -->
+                                ${(() => {
+                                    // Check if this is a standalone schedule (no shared bells anywhere)
+                                    const isStandalone = localSchedulePeriods.length === 0;
+                                    
+                                    // Check if this period has relative anchor bells (meaning it's linked to another period)
+                                    // Anchor bells are identified by anchorRole OR by name "Period Start"/"Period End"
+                                    const hasRelativeAnchors = period.bells.some(b => {
+                                        const isAnchorBell = b.anchorRole || b.name === 'Period Start' || b.name === 'Period End';
+                                        return isAnchorBell && b.relative;
+                                    });
+                                    
+                                    if (period.origin === 'shared' || period.origin === 'merged') {
+                                        // Shared/merged period - show blue link icon
+                                        return '<span class="text-blue-500 ml-1" title="Linked to shared schedule"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg></span>';
+                                    } else if (hasRelativeAnchors) {
+                                        // Personal period with relative anchors - show purple link icon
+                                        return '<span class="text-purple-500 ml-1" title="Period anchors are linked to another period"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg></span>';
+                                    } else if (period.origin === 'personal' && !isStandalone) {
+                                        // Custom period on a LINKED schedule - show CUSTOM badge
+                                        return '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full" title="This is a custom period you created.">CUSTOM</span>';
+                                    }
+                                    // Standalone schedule with no relative anchors - show nothing
+                                    return '';
+                                })()}
                                 <span class="text-gray-600 text-sm mt-1 sm:mt-0">${firstBellTime} - ${lastBellTime}</span>
                             </div>
                             
@@ -2060,15 +2141,19 @@
                                         <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
                                         <span class="font-medium text-gray-800 truncate block flex items-center" title="${safeName}">
                                             ${safeName}
-                                            <!-- MODIFIED in 4.32: Anchor icon now indicates a 'shared' (admin-controlled) bell, not first/last in period -->
-                                            ${bell.type === 'shared' ?
+                                            <!-- V5.44.8: Anchor icon for anchor bells (by anchorRole OR name) -->
+                                            ${(bell.anchorRole || bell.name === 'Period Start' || bell.name === 'Period End') && !bell.type?.includes('shared') ?
+                                                `<span class="ml-2 text-amber-600" title="Anchor Bell (${bell.anchorRole === 'start' || bell.name === 'Period Start' ? 'Period Start' : 'Period End'})">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 15l1.55 1.55c-.96 1.69-3.33 3.04-5.55 3.37V11h3V9h-3V7.82C14.16 7.4 15 6.3 15 5c0-1.65-1.35-3-3-3S9 3.35 9 5c0 1.3.84 2.4 2 2.82V9H8v2h3v8.92c-2.22-.33-4.59-1.68-5.55-3.37L7 15l-4-3v3c0 3.88 4.92 7 9 7s9-3.12 9-7v-3l-4 3zM12 5c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
+                                                </span>` : ''}
+                                            <!-- V5.44.8: Show shared icon only for shared bells that aren't anchor bells -->
+                                            ${bell.type === 'shared' && !bell.anchorRole && bell.name !== 'Period Start' && bell.name !== 'Period End' ?
                                                 `<span class="ml-2 text-blue-500" title="Shared Bell (Admin Controlled)">
-                                                    <!-- MODIFIED in 4.32: Replaced disjointed path with a single, connected path -->
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-1 6v5.24c-1.72-.4-3-1.89-3-3.74h-2c0 2.8 2.2 5 5 5v2h2v-2c2.8 0 5-2.2 5-5h-2c0 1.85-1.28 3.34-3 3.74V11h-2z"/></svg>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                                                 </span>` : ''}
                                             
-                                            <!-- NEW: v4.10.3 - Relative Bell Icon -->
-                                            ${bell.relative ? 
+                                            <!-- V5.44.8: Relative Bell Icon - only for non-anchor relative bells -->
+                                            ${bell.relative && !bell.anchorRole && bell.name !== 'Period Start' && bell.name !== 'Period End' ? 
                                                 `<span class="ml-2 text-purple-600" title="Relative Bell (Time is calculated)">
                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/></svg>
                                                 </span>` : ''}
@@ -2131,6 +2216,7 @@
     
             function renderScheduleSelector() {
                 // MODIFIED: v3.03 - Renders with optgroups
+                // MODIFIED: V5.44 - Added standalone schedules optgroup
                 const lastSelectedId = localStorage.getItem('activeScheduleId') || (allSchedules.length > 0 ? `shared-${allSchedules[0].id}` : '');
                 
                 if (allSchedules.length === 0 && allPersonalSchedules.length === 0) {
@@ -2139,9 +2225,19 @@
                      return;
                 }
                 
-                let personalOptions = allPersonalSchedules.map(schedule => 
+                // V5.44: Separate personal schedules into linked and standalone
+                const linkedPersonalSchedules = allPersonalSchedules.filter(s => s.baseScheduleId && !s.isStandalone);
+                const standaloneSchedules = allPersonalSchedules.filter(s => !s.baseScheduleId || s.isStandalone);
+                
+                let personalOptions = linkedPersonalSchedules.map(schedule => 
                     `<option value="personal-${schedule.id}" ${`personal-${schedule.id}` === lastSelectedId ? 'selected' : ''}>
                         ${schedule.name} (Personal)
+                    </option>`
+                ).join('');
+                
+                let standaloneOptions = standaloneSchedules.map(schedule => 
+                    `<option value="personal-${schedule.id}" ${`personal-${schedule.id}` === lastSelectedId ? 'selected' : ''}>
+                        ${schedule.name}
                     </option>`
                 ).join('');
     
@@ -2154,6 +2250,9 @@
                 scheduleSelector.innerHTML = `
                     <optgroup label="My Personal Schedules" id="personal-schedules-optgroup">
                         ${personalOptions || '<option value="" disabled>No personal schedules created.</option>'}
+                    </optgroup>
+                    <optgroup label="My Custom Standalone Schedules" id="standalone-schedules-optgroup">
+                        ${standaloneOptions || '<option value="" disabled>No standalone schedules created.</option>'}
                     </optgroup>
                     <optgroup label="Shared Schedules" id="shared-schedules-optgroup">
                         ${sharedOptions}
@@ -2353,25 +2452,36 @@
                     // Note: We MUST recursively find the time for these, as they could also be relative.
                     let anchorBell;
                        
-                    // --- MODIFIED V4.78 & V5.28: Only anchor to SHARED bells ---
-                    // Relative bells should ONLY anchor to admin-controlled shared bells,
-                    // never to teacher-added personal bells. This keeps anchors stable.
+                    // --- MODIFIED V5.44.1: Use anchorRole for fluke periods, shared bells for linked periods ---
+                    // Determine if this is a shared/linked period or a custom/fluke period
                     const sharedStaticBells = parentPeriod.bells.filter(b => 
                         !b.relative && b._originType === 'shared'
                     );
                     
-                    if (sharedStaticBells.length === 0) {
-                        console.warn(`No shared anchor bells in period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
+                    if (sharedStaticBells.length > 0) {
+                        // LINKED PERIOD: Use first/last shared static bell as anchor
+                        if (parentAnchorType === 'period_start') {
+                            anchorBell = sharedStaticBells[0];
+                        } else {
+                            anchorBell = sharedStaticBells[sharedStaticBells.length - 1];
+                        }
+                    } else {
+                        // FLUKE/STANDALONE PERIOD: Find bells with explicit anchorRole
+                        const targetRole = parentAnchorType === 'period_start' ? 'start' : 'end';
+                        anchorBell = parentPeriod.bells.find(b => b.anchorRole === targetRole);
+                        
+                        // Legacy fallback: look for "Period Start" / "Period End" names
+                        if (!anchorBell) {
+                            const targetName = parentAnchorType === 'period_start' ? 'Period Start' : 'Period End';
+                            anchorBell = parentPeriod.bells.find(b => b.name === targetName && !b.relative);
+                        }
+                    }
+                    
+                    if (!anchorBell) {
+                        console.warn(`No anchor bell found in period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
                         return { ...bell, isOrphan: true, fallbackTime: "00:00:00" };
                     }
-                        
-                    if (parentAnchorType === 'period_start') {
-                       anchorBell = sharedStaticBells[0]; // First shared bell
-                    } else {
-                       // 'period_end'
-                       anchorBell = sharedStaticBells[sharedStaticBells.length - 1]; // Last shared bell
-                    }
-                    // --- END V4.78/V5.28 FIX ---
+                    // --- END V5.44.1 FIX ---
 
                     // 2d. Recursively find the anchor bell's time
                     const anchorTime = calculateRelativeBellTime(anchorBell, bellMap, allPeriods, new Set(visited));
@@ -2658,6 +2768,82 @@
             }
 
             /**
+             * V5.44.10: Helper function to set up the custom text modal previews.
+             * This ensures live preview updates work regardless of which code path opens the modal.
+             * @param {boolean} isQuickBell - Whether this is for a quick bell (uses square icon) or period (uses circle icon)
+             */
+            function setupCustomTextModalPreviews(isQuickBell = false) {
+                const iconInner = document.getElementById('quick-bell-visual-preview-icon-inner');
+                const fullLabel = document.getElementById('custom-text-preview-full-label');
+                const iconLabel = document.getElementById('custom-text-preview-icon-label');
+                
+                // Set labels based on context
+                if (fullLabel && iconLabel) {
+                    fullLabel.textContent = 'Full Size Preview';
+                    iconLabel.textContent = isQuickBell ? 'Button Preview' : 'Icon Preview';
+                }
+                
+                // Set icon shape based on context
+                if (iconInner) {
+                    if (isQuickBell) {
+                        // Square button shape with rounded corners (matches quick bell buttons)
+                        iconInner.className = 'w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden bg-gray-200';
+                    } else {
+                        // Circle icon shape (for periods)
+                        iconInner.className = 'visual-preview-icon-circle bg-gray-200';
+                    }
+                }
+                
+                // Define the preview update function
+                // V5.44.11: Use SVG text for consistent sizing across all preview contexts
+                function updatePreviews() {
+                    const text = customTextInput.value.trim().substring(0, 3) || '?';
+                    const fgColor = customTextColorInput.value;
+                    const bgColor = customTextBgColorInput.value;
+                    
+                    // V5.44.11: Calculate font sizes based on text length (matching VISUAL_CONFIG)
+                    const fullFontSize = text.length > 2 ? 45 : 80;  // Match VISUAL_CONFIG.full.customTextFontSize
+                    const iconFontSize = text.length > 2 ? 50 : 70;  // Match getCustomBellIconHtml
+                    
+                    // Update full size preview - using SVG for consistent scaling
+                    const livePreview = document.getElementById('quick-bell-visual-preview-full');
+                    if (livePreview) {
+                        livePreview.innerHTML = `<div class="w-full h-full p-8 flex items-center justify-center" style="background-color: ${bgColor};">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full">
+                                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${fullFontSize}" font-weight="bold" fill="${fgColor}" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text>
+                            </svg>
+                        </div>`;
+                    }
+                    
+                    // Update icon preview (small) - using SVG for consistent scaling
+                    const iconInnerEl = document.getElementById('quick-bell-visual-preview-icon-inner');
+                    if (iconInnerEl) {
+                        iconInnerEl.style.backgroundColor = bgColor;
+                        iconInnerEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full">
+                            <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${iconFontSize}" font-weight="bold" fill="${fgColor}" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text>
+                        </svg>`;
+                    }
+                }
+                
+                // Remove any existing listeners to prevent stacking (use a named function reference)
+                // We store the current handler on the element to be able to remove it later
+                if (customTextInput._previewHandler) {
+                    customTextInput.removeEventListener('input', customTextInput._previewHandler);
+                    customTextColorInput.removeEventListener('input', customTextInput._previewHandler);
+                    customTextBgColorInput.removeEventListener('input', customTextInput._previewHandler);
+                }
+                
+                // Store and add the new handler
+                customTextInput._previewHandler = updatePreviews;
+                customTextInput.addEventListener('input', updatePreviews);
+                customTextColorInput.addEventListener('input', updatePreviews);
+                customTextBgColorInput.addEventListener('input', updatePreviews);
+                
+                // Trigger initial preview update
+                updatePreviews();
+            }
+
+            /**
              * NEW V5.00: Saves the current state of customQuickBells to Firestore.
              */
             async function saveCustomQuickBells(finalBells) {
@@ -2674,6 +2860,7 @@
                         console.log(`  Bell ${bell.id}:`, {
                             name: bell.name,
                             sound: bell.sound,
+                            hours: bell.hours || 0,
                             minutes: bell.minutes,
                             seconds: bell.seconds
                         });
@@ -2729,20 +2916,42 @@
             function findBellChildren(parentBellId) {
                 if (!parentBellId) return [];
 
-                // --- MODIFIED V4.80: CRITICAL BUG FIX ---
+                // --- MODIFIED V4.80 & V5.44.1: CRITICAL BUG FIX ---
                 // We must use the time-resolved, sorted *calculatedPeriodsList* to find
                 // the true anchors. Using the raw 'allPeriods' list was causing
                 // new bells (at the end of the raw array) to be misidentified as anchors.
                 const allPeriods = [...localSchedulePeriods, ...personalBellsPeriods]; // Raw data for iteration
                 const calculatedParentPeriod = calculatedPeriodsList.find(p => p.bells.some(b => b.bellId === parentBellId));
                 
-                let trueFirstBell, trueLastBell;
+                // V5.44.1: Determine anchor bells based on period type
+                let startAnchorBell = null;
+                let endAnchorBell = null;
+                
                 if (calculatedParentPeriod && calculatedParentPeriod.bells.length > 0) {
-                    // This list IS sorted by time.
-                    trueFirstBell = calculatedParentPeriod.bells[0];
-                    trueLastBell = calculatedParentPeriod.bells[calculatedParentPeriod.bells.length - 1];
+                    // Check if this is a shared/linked period or a fluke period
+                    const sharedStaticBells = calculatedParentPeriod.bells.filter(b => 
+                        !b.relative && b._originType === 'shared'
+                    );
+                    
+                    if (sharedStaticBells.length > 0) {
+                        // SHARED/LINKED PERIOD: Anchors are first/last shared static bells by time
+                        startAnchorBell = sharedStaticBells[0];
+                        endAnchorBell = sharedStaticBells[sharedStaticBells.length - 1];
+                    } else {
+                        // FLUKE PERIOD: Find bells with explicit anchorRole
+                        startAnchorBell = calculatedParentPeriod.bells.find(b => b.anchorRole === 'start');
+                        endAnchorBell = calculatedParentPeriod.bells.find(b => b.anchorRole === 'end');
+                        
+                        // Legacy fallback: look for "Period Start" / "Period End" names
+                        if (!startAnchorBell) {
+                            startAnchorBell = calculatedParentPeriod.bells.find(b => b.name === 'Period Start' && !b.relative);
+                        }
+                        if (!endAnchorBell) {
+                            endAnchorBell = calculatedParentPeriod.bells.find(b => b.name === 'Period End' && !b.relative);
+                        }
+                    }
                 }
-                // --- END V4.80 FIX ---
+                // --- END V4.80 & V5.44.1 FIX ---
 
                 let children = [];
                 
@@ -2755,22 +2964,20 @@
                         
                         // Check for new-style anchor link
                         let isAnchorMatch = false;
-                        // MODIFIED V4.80 & V5.28.1: Use calculated anchor bells AND check they're shared
-                        if (bell.relative.parentPeriodName && calculatedParentPeriod && trueFirstBell && trueLastBell) {
+                        if (bell.relative.parentPeriodName && calculatedParentPeriod) {
                             const isSamePeriod = bell.relative.parentPeriodName === calculatedParentPeriod.name;
                             const anchorType = bell.relative.parentAnchorType; // 'period_start' or 'period_end'
                             
-                            // NEW V5.28.1: Only match if the anchor bell is SHARED (not personal)
-                            // This prevents personal static bells from being treated as anchors
+                            // V5.44.1: Check if the bell being deleted IS the anchor for this relative bell
                             const isStartAnchor = isSamePeriod && 
                                                  anchorType === 'period_start' && 
-                                                 trueFirstBell.bellId === parentBellId &&
-                                                 trueFirstBell._originType === 'shared';
+                                                 startAnchorBell &&
+                                                 startAnchorBell.bellId === parentBellId;
                                                  
                             const isEndAnchor = isSamePeriod && 
                                                anchorType === 'period_end' && 
-                                               trueLastBell.bellId === parentBellId &&
-                                               trueLastBell._originType === 'shared';
+                                               endAnchorBell &&
+                                               endAnchorBell.bellId === parentBellId;
                             
                             if (isStartAnchor || isEndAnchor) {
                                 isAnchorMatch = true;
@@ -3197,11 +3404,17 @@
                                 // NEW V5.00: Enable custom quick bell button
                                 showCustomQuickBellManagerBtn.disabled = false;
                                 showCustomQuickBellManagerBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                                // V5.44: Enable standalone schedule button
+                                createStandaloneScheduleBtn.disabled = false;
+                                createStandaloneScheduleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                             } else {
                                 allPersonalSchedules = []; // Clear personal schedules
                                 // NEW V5.00: Disable custom quick bell button
                                 showCustomQuickBellManagerBtn.disabled = true;
                                 showCustomQuickBellManagerBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                                // V5.44: Disable standalone schedule button
+                                createStandaloneScheduleBtn.disabled = true;
+                                createStandaloneScheduleBtn.classList.add('opacity-50', 'cursor-not-allowed');
                             }
                             schedulesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'schedules');
                             // MODIFIED: v3.24 - Changed to real-time listener
@@ -3467,6 +3680,7 @@
                         const bells = (docSnap.data().bells || []).slice(0, 4).map((b, index) => ({
                             id: index + 1, // Use index + 1 as the ID 
                             name: b.name || `Custom Timer ${index + 1}`,
+                            hours: b.hours || 0,   // V5.44.9: Include hours field
                             minutes: b.minutes || 0,
                             seconds: b.seconds || 0,
                             // NEW V5.00: Read Icon Colors
@@ -3601,6 +3815,11 @@
                     console.log("Setting active SHARED schedule:", scheduleId);
                     activeBaseScheduleId = scheduleId;
                     activePersonalScheduleId = null;
+                    
+                    // V5.44: Hide standalone badge for shared schedules
+                    if (standaloneScheduleBadge) {
+                        standaloneScheduleBadge.classList.add('hidden');
+                    }
     
                     const scheduleData = allSchedules.find(s => s.id === scheduleId);
                     if (scheduleData) {
@@ -3685,9 +3904,21 @@
                         console.error("Could not find personal schedule data.");
                         return;
                     }
-    
+                    
+                    // V5.44: Check if this is a standalone schedule
+                    const isStandalone = !personalSchedule.baseScheduleId || personalSchedule.isStandalone;
+                    
                     activeBaseScheduleId = personalSchedule.baseScheduleId;
                     scheduleTitle.textContent = personalSchedule.name;
+                    
+                    // V5.44: Show/hide standalone badge
+                    if (standaloneScheduleBadge) {
+                        if (isStandalone) {
+                            standaloneScheduleBadge.classList.remove('hidden');
+                        } else {
+                            standaloneScheduleBadge.classList.add('hidden');
+                        }
+                    }
                     
                     // DELETED in 4.40: Removed logic for old personal bell form
                     
@@ -3709,140 +3940,225 @@
                     const passingPeriodVisualBtn = document.getElementById('passing-period-visual-btn');
                     if (passingPeriodVisualBtn) passingPeriodVisualBtn.disabled = false;
                     
-                    // 1. Listen to the BASE shared schedule
-                    scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
-                    activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
-                        // NEW in 4.35: Set the base loaded flag
-                        isBaseScheduleLoaded = true;
+                    // V5.44: For standalone schedules, skip the base schedule listener
+                    if (isStandalone) {
+                        console.log("This is a STANDALONE schedule - no base schedule to load");
+                        isBaseScheduleLoaded = true;  // Mark as loaded since there's nothing to load
+                        localSchedulePeriods = [];     // No shared periods
+                        sharedPassingPeriodVisual = null;
+                        
+                        // Only set up the personal schedule listener
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
+                            isPersonalScheduleLoaded = true;
 
-                        if (docSnap.exists()) {
-                            const scheduleData = docSnap.data();
-                            // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
-                            if (scheduleData.periods && scheduleData.periods.length > 0) {
-                                localSchedulePeriods = scheduleData.periods;
-                            } else if (scheduleData.bells && scheduleData.bells.length > 0) {
-                                // If only old 'bells' exist, migrate it in memory.
-                                localSchedulePeriods = migrateLegacyBellsToPeriods(scheduleData.bells);
-                                console.log("Reading base shared schedule using LEGACY structure.");
+                            if (docSnap.exists()) {
+                                const personalData = docSnap.data();
+                                let periodsToUse = personalData.periods || [];
+                                let needsMigration = false;
+                                
+                                // Check for missing bellIds
+                                periodsToUse.forEach(period => {
+                                    period.bells.forEach(bell => {
+                                        if (!bell.bellId) {
+                                            bell.bellId = generateBellId();
+                                            needsMigration = true;
+                                            console.log(`Assigning new bellId to ${bell.name} in ${period.name}`);
+                                        }
+                                    });
+                                });
+                                
+                                // V5.44.1: Migrate legacy anchor bells in standalone schedules
+                                periodsToUse.forEach(period => {
+                                    period.bells.forEach(bell => {
+                                        if (bell.name === 'Period Start' && !bell.anchorRole && !bell.relative) {
+                                            bell.anchorRole = 'start';
+                                            needsMigration = true;
+                                            console.log(`Assigning anchorRole 'start' to "${bell.name}" in ${period.name}`);
+                                        }
+                                        if (bell.name === 'Period End' && !bell.anchorRole && !bell.relative) {
+                                            bell.anchorRole = 'end';
+                                            needsMigration = true;
+                                            console.log(`Assigning anchorRole 'end' to "${bell.name}" in ${period.name}`);
+                                        }
+                                    });
+                                });
+
+                                if (needsMigration) {
+                                    updateDoc(personalScheduleRef, { periods: periodsToUse })
+                                        .then(() => console.log("Standalone schedule bellId migration successful."))
+                                        .catch(err => console.error("Error saving bellId migration:", err));
+                                }
+                                
+                                personalBellsPeriods = periodsToUse;
+                                personalPassingPeriodVisual = personalData.passingPeriodVisual || null;
+                                
+                                console.log("Standalone schedule updated:", periodsToUse.length, "periods");
                             } else {
+                                console.warn("Standalone schedule removed.");
+                                personalBellsPeriods = [];
+                                personalPassingPeriodVisual = null;
+                            }
+                            recalculateAndRenderAll();
+                        });
+                        
+                    } else {
+                        // ORIGINAL: Listen to both base and personal schedules
+                        // 1. Listen to the BASE shared schedule
+                        scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
+                        activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
+                            // NEW in 4.35: Set the base loaded flag
+                            isBaseScheduleLoaded = true;
+
+                            if (docSnap.exists()) {
+                                const scheduleData = docSnap.data();
+                                // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
+                                if (scheduleData.periods && scheduleData.periods.length > 0) {
+                                    localSchedulePeriods = scheduleData.periods;
+                                } else if (scheduleData.bells && scheduleData.bells.length > 0) {
+                                    // If only old 'bells' exist, migrate it in memory.
+                                    localSchedulePeriods = migrateLegacyBellsToPeriods(scheduleData.bells);
+                                    console.log("Reading base shared schedule using LEGACY structure.");
+                                } else {
+                                    localSchedulePeriods = [];
+                                }
+
+                                // --- NEW V4.90: One-Time Bell ID Migration for SHARED bells ---
+                                // This fixes the bug where overrides wouldn't save on refresh.
+                                let needsSharedMigration = false;
+                                localSchedulePeriods.forEach(period => {
+                                    period.bells.forEach(bell => {
+                                        if (!bell.bellId) {
+                                            bell.bellId = generateBellId();
+                                            needsSharedMigration = true;
+                                            console.log(`Assigning new bellId to SHARED bell: ${bell.name} in ${period.name}`);
+                                        }
+                                    });
+                                });
+
+                                if (needsSharedMigration && document.body.classList.contains('admin-mode')) {
+                                    console.log("Saving migrated bellId data back to SHARED schedule...");
+                                    // Fire-and-forget update.
+                                    // We only save if user is an admin to prevent write errors.
+                                    // Non-admins will still have the IDs in-memory for this session.
+                                    updateDoc(scheduleRef, { periods: localSchedulePeriods }) 
+                                        .then(() => console.log("Shared schedule bellId migration successful."))
+                                        .catch(err => console.error("Error saving shared bellId migration:", err));
+                                }
+                                // --- END V4.90 Migration ---
+                                
+                                // NEW V5.42.0: Load passing period visual from shared schedule (admin-set default)
+                                sharedPassingPeriodVisual = scheduleData.passingPeriodVisual || null;
+                                
+                                console.log("Active shared schedule updated.");
+
+                            } else {
+                                console.warn("Base schedule does not exist.");
                                 localSchedulePeriods = [];
+                                localSchedule = [];
                             }
+                            // NEW: v4.10.3 - Run the master calculation engine
+                            recalculateAndRenderAll();
+                        });
+                        
+                        // 2. Listen to the PERSONAL schedule
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
+                            // NEW in 4.32: Mark personal schedule as loaded
+                            isPersonalScheduleLoaded = true;
 
-                            // --- NEW V4.90: One-Time Bell ID Migration for SHARED bells ---
-                            // This fixes the bug where overrides wouldn't save on refresh.
-                            let needsSharedMigration = false;
-                            localSchedulePeriods.forEach(period => {
-                                period.bells.forEach(bell => {
-                                    if (!bell.bellId) {
-                                        bell.bellId = generateBellId();
-                                        needsSharedMigration = true;
-                                        console.log(`Assigning new bellId to SHARED bell: ${bell.name} in ${period.name}`);
+                            if (docSnap.exists()) {
+                                const personalData = docSnap.data();
+
+                                // --- NEW in 4.38: One-Time Bell ID Migration ---
+                                let needsMigration = false;
+                                let periodsToUse = [];
+                                let fieldsToUpdate = {}; // NEW: Track updates
+
+                                // --- MODIFIED V4.69: Prioritize 'periods' field ---
+                                // If the 'periods' field exists (even if empty), use it.
+                                if (personalData.periods !== undefined) {
+                                    periodsToUse = personalData.periods;
+                                    // If the old 'bells' field *also* exists, mark it for deletion.
+                                    if (personalData.bells && personalData.bells.length > 0) {
+                                        fieldsToUpdate.bells = []; // Mark for deletion
+                                        needsMigration = true; // Trigger the update
+                                        console.log("Marking deprecated 'bells' field for cleanup.");
+                                    }
+                                } 
+                                // Only if 'periods' does NOT exist, fall back to 'bells' for migration.
+                                else if (personalData.bells && personalData.bells.length > 0) {
+                                    // This is a legacy schedule, migrate it
+                                    periodsToUse = migrateLegacyBellsToPeriods(personalData.bells);
+                                    fieldsToUpdate.periods = periodsToUse; // Add new periods
+                                    fieldsToUpdate.bells = []; // Delete old bells
+                                    needsMigration = true; // Force save if we just migrated periods
+                                    console.log("Running migration from flat 'bells' to 'periods' structure.");
+                                }
+                                
+                                // Now check for missing bellIds within the periods
+                                periodsToUse.forEach(period => {
+                                    period.bells.forEach(bell => {
+                                        if (!bell.bellId) {
+                                            bell.bellId = generateBellId();
+                                            needsMigration = true;
+                                            console.log(`Assigning new permanent bellId to ${bell.name} in ${period.name}`);
+                                        }
+                                    });
+                                });
+                                
+                                // V5.44.1: Migrate legacy fluke period anchor bells
+                                // If a period has bells named "Period Start"/"Period End" without anchorRole, add it
+                                periodsToUse.forEach(period => {
+                                    // Only check personal/fluke periods (origin === 'personal' or no origin)
+                                    if (period.origin === 'personal' || !period.origin) {
+                                        period.bells.forEach(bell => {
+                                            if (bell.name === 'Period Start' && !bell.anchorRole && !bell.relative) {
+                                                bell.anchorRole = 'start';
+                                                needsMigration = true;
+                                                console.log(`Assigning anchorRole 'start' to "${bell.name}" in ${period.name}`);
+                                            }
+                                            if (bell.name === 'Period End' && !bell.anchorRole && !bell.relative) {
+                                                bell.anchorRole = 'end';
+                                                needsMigration = true;
+                                                console.log(`Assigning anchorRole 'end' to "${bell.name}" in ${period.name}`);
+                                            }
+                                        });
                                     }
                                 });
-                            });
 
-                            if (needsSharedMigration && document.body.classList.contains('admin-mode')) {
-                                console.log("Saving migrated bellId data back to SHARED schedule...");
-                                // Fire-and-forget update.
-                                // We only save if user is an admin to prevent write errors.
-                                // Non-admins will still have the IDs in-memory for this session.
-                                updateDoc(scheduleRef, { periods: localSchedulePeriods }) 
-                                    .then(() => console.log("Shared schedule bellId migration successful."))
-                                    .catch(err => console.error("Error saving shared bellId migration:", err));
-                            }
-                            // --- END V4.90 Migration ---
-                            
-                            // NEW V5.42.0: Load passing period visual from shared schedule (admin-set default)
-                            sharedPassingPeriodVisual = scheduleData.passingPeriodVisual || null;
-                            
-                            console.log("Active shared schedule updated.");
-
-                        } else {
-                            console.warn("Base schedule does not exist.");
-                            localSchedulePeriods = [];
-                            localSchedule = [];
-                        }
-                        // NEW: v4.10.3 - Run the master calculation engine
-                        recalculateAndRenderAll();
-                    });
-                    
-                    // 2. Listen to the PERSONAL schedule
-                    const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-                    activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
-                        // NEW in 4.32: Mark personal schedule as loaded
-                        isPersonalScheduleLoaded = true;
-
-                        if (docSnap.exists()) {
-                            const personalData = docSnap.data();
-
-                            // --- NEW in 4.38: One-Time Bell ID Migration ---
-                            let needsMigration = false;
-                            let periodsToUse = [];
-                            let fieldsToUpdate = {}; // NEW: Track updates
-
-                            // --- MODIFIED V4.69: Prioritize 'periods' field ---
-                            // If the 'periods' field exists (even if empty), use it.
-                            if (personalData.periods !== undefined) {
-                                periodsToUse = personalData.periods;
-                                // If the old 'bells' field *also* exists, mark it for deletion.
-                                if (personalData.bells && personalData.bells.length > 0) {
-                                    fieldsToUpdate.bells = []; // Mark for deletion
-                                    needsMigration = true; // Trigger the update
-                                    console.log("Marking deprecated 'bells' field for cleanup.");
-                                }
-                            } 
-                            // Only if 'periods' does NOT exist, fall back to 'bells' for migration.
-                            else if (personalData.bells && personalData.bells.length > 0) {
-                                // This is a legacy schedule, migrate it
-                                periodsToUse = migrateLegacyBellsToPeriods(personalData.bells);
-                                fieldsToUpdate.periods = periodsToUse; // Add new periods
-                                fieldsToUpdate.bells = []; // Delete old bells
-                                needsMigration = true; // Force save if we just migrated periods
-                                console.log("Running migration from flat 'bells' to 'periods' structure.");
-                            }
-                            
-                            // Now check for missing bellIds within the periods
-                            periodsToUse.forEach(period => {
-                                period.bells.forEach(bell => {
-                                    if (!bell.bellId) {
-                                        bell.bellId = generateBellId();
-                                        needsMigration = true;
-                                        console.log(`Assigning new permanent bellId to ${bell.name} in ${period.name}`);
+                                if (needsMigration) {
+                                    // If we are *only* migrating IDs, we need to add periods to the update object
+                                    if (!fieldsToUpdate.periods) {
+                                        fieldsToUpdate.periods = periodsToUse;
                                     }
-                                });
-                            });
 
-                            if (needsMigration) {
-                                // If we are *only* migrating IDs, we need to add periods to the update object
-                                if (!fieldsToUpdate.periods) {
-                                    fieldsToUpdate.periods = periodsToUse;
+                                    console.log("Saving migrated/cleaned bell data back to Firestore...", fieldsToUpdate);
+                                    // Save the updated data back.
+                                    // We do this as a 'fire-and-forget' in the background.
+                                    updateDoc(personalScheduleRef, fieldsToUpdate) 
+                                        .then(() => console.log("Personal schedule migration/cleanup successful."))
+                                        .catch(err => console.error("Error saving bellId migration:", err));
                                 }
-
-                                console.log("Saving migrated/cleaned bell data back to Firestore...", fieldsToUpdate);
-                                // Save the updated data back.
-                                // We do this as a 'fire-and-forget' in the background.
-                                updateDoc(personalScheduleRef, fieldsToUpdate) 
-                                    .then(() => console.log("Personal schedule migration/cleanup successful."))
-                                    .catch(err => console.error("Error saving bellId migration:", err));
+                                // --- END 4.38 Migration ---
+                                
+                                personalBellsPeriods = periodsToUse;
+                                
+                                // NEW V5.42.0: Load passing period visual from personal schedule
+                                personalPassingPeriodVisual = personalData.passingPeriodVisual || null;
+                                
+                                console.log("Personal schedule bells updated.");
+                            } else {
+                                console.warn("Personal schedule removed.");
+                                personalBellsPeriods = [];
+                                personalBells = [];
+                                // NEW V5.42.0: Clear passing period visual when schedule is removed
+                                personalPassingPeriodVisual = null;
                             }
-                            // --- END 4.38 Migration ---
-                            
-                            personalBellsPeriods = periodsToUse;
-                            
-                            // NEW V5.42.0: Load passing period visual from personal schedule
-                            personalPassingPeriodVisual = personalData.passingPeriodVisual || null;
-                            
-                            console.log("Personal schedule bells updated.");
-                        } else {
-                            console.warn("Personal schedule removed.");
-                            personalBellsPeriods = [];
-                            personalBells = [];
-                            // NEW V5.42.0: Clear passing period visual when schedule is removed
-                            personalPassingPeriodVisual = null;
-                        }
-                        // NEW: v4.10.3 - Run the master calculation engine
-                        recalculateAndRenderAll();
-                    });
+                            // NEW: v4.10.3 - Run the master calculation engine
+                            recalculateAndRenderAll();
+                        });
+                    }
                 }
             }
     
@@ -4085,17 +4401,29 @@
                 currentEditingBell = rawBell;
 
                 // 2. We need to populate the "Parent Bell" dropdown
-                // This re-uses the logic from `openRelativeBellModal`
+                // V5.44: Use all periods for anchor options, not just the current period
                 const targetPeriod = calculatedPeriodsList.find(p => p.name === bell.periodName);
                 if (!targetPeriod) {
                     showUserMessage(`Error: Could not find period ${bell.periodName}.`);
                     return;
                 }
-                const resolvedBells = targetPeriod.bells;
-                // Store resolved bells for the time calculator
+                
+                // V5.44: Collect all bells from all periods
+                const allResolvedBells = [];
+                calculatedPeriodsList.forEach(p => {
+                    p.bells.forEach(b => {
+                        allResolvedBells.push({
+                            ...b,
+                            _periodName: p.name,
+                            _periodOrigin: p.origin
+                        });
+                    });
+                });
+                
+                // Store ALL bells for the time calculator
                 currentRelativePeriod = {
                     name: bell.periodName,
-                    bells: resolvedBells
+                    bells: allResolvedBells
                 };
                 
                 // 3. Populate Modal UI
@@ -4111,17 +4439,15 @@
                 const modalTitle = relativeBellModal.querySelector('h3');
                 if (modalTitle) modalTitle.textContent = "Edit Relative Bell";
 
-                // 4. Populate Parent Bell dropdown
-                const anchorOptionsHtml = resolvedBells.map(b => `
-                    <option value="${b.bellId}">${b.name} (${formatTime12Hour(b.time, true)})</option>
-                `).join('');
+                // 4. Populate Parent Bell dropdown - V5.44: Use helper for all periods
+                const anchorOptionsHtml = generateAnchorOptionsHtml(allResolvedBells, bell.periodName);
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
 
                 // 5. Populate fields with the bell's saved data
                 // Check for specific parent bell ID first
                 if (rawBell.relative.parentBellId) {
-                    // Check if this bell ID actually exists in the dropdown
-                    const parentExists = resolvedBells.some(b => b.bellId === rawBell.relative.parentBellId);
+                    // Check if this bell ID actually exists in the dropdown (now checking all bells)
+                    const parentExists = allResolvedBells.some(b => b.bellId === rawBell.relative.parentBellId);
                     if (parentExists) {
                         relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
                     } else {
@@ -4131,8 +4457,22 @@
                     }
                 } else if (rawBell.relative.parentPeriodName && rawBell.relative.parentAnchorType) {
                     // Multi-period relative bell - anchored to first/last anchor bell of each period
-                    // Find anchor bells in this period (bells with type 'shared')
-                    const anchorBells = resolvedBells.filter(b => b.type === 'shared');
+                    // V5.44.4: Find anchor bells based on period type
+                    const sharedStaticBells = targetPeriod.bells.filter(b => 
+                        !b.relative && b._originType === 'shared'
+                    );
+                    
+                    let anchorBells = [];
+                    if (sharedStaticBells.length > 0) {
+                        // Shared/linked period: use shared static bells
+                        anchorBells = sharedStaticBells;
+                    } else {
+                        // Fluke period: find bells with anchorRole
+                        const startAnchor = targetPeriod.bells.find(b => b.anchorRole === 'start');
+                        const endAnchor = targetPeriod.bells.find(b => b.anchorRole === 'end');
+                        if (startAnchor) anchorBells.push(startAnchor);
+                        if (endAnchor) anchorBells.push(endAnchor);
+                    }
                     
                     if (anchorBells.length > 0) {
                         if (rawBell.relative.parentAnchorType === 'period_start') {
@@ -4154,16 +4494,25 @@
                 relativeBellNameInput.value = rawBell.name;
                 relativeBellSoundSelect.value = rawBell.sound;
 
+                // V5.44.1: Populate hours, minutes, and seconds from offset
                 const offset = rawBell.relative.offsetSeconds;
+                const absOffset = Math.abs(offset);
+                const relativeHoursInput = document.getElementById('relative-hours');
+                
                 if (offset < 0) {
                     relativeDirection.value = 'before';
-                    relativeMinutesInput.value = Math.floor(Math.abs(offset) / 60);
-                    relativeSecondsInput.value = Math.abs(offset) % 60;
                 } else {
                     relativeDirection.value = 'after';
-                    relativeMinutesInput.value = Math.floor(offset / 60);
-                    relativeSecondsInput.value = offset % 60;
                 }
+                
+                const hours = Math.floor(absOffset / 3600);
+                const remainingAfterHours = absOffset % 3600;
+                const minutes = Math.floor(remainingAfterHours / 60);
+                const seconds = remainingAfterHours % 60;
+                
+                if (relativeHoursInput) relativeHoursInput.value = hours;
+                relativeMinutesInput.value = minutes;
+                relativeSecondsInput.value = seconds;
                 
                 // 6. Populate sound dropdowns
                 // MODIFIED in 4.40: Use sharedSoundInput as the template, not the deleted personalSoundInput
@@ -4186,11 +4535,23 @@
                     if (preview) {
                         const periodName = bell.periodName || 'Preview';
                         
-                        // FIX V5.42.11: For bells outside period bounds with no custom visual, use passing period visual
+                        // FIX V5.42.11 & V5.44.4: For bells outside period bounds with no custom visual, use passing period visual
                         let previewVisualCue = visualCue;
                         if (!visualCue) {
                             // Check if this bell is outside the period's anchor bells
-                            const anchorBells = resolvedBells.filter(b => b.type === 'shared');
+                            // V5.44.4: Use proper anchor detection based on period type
+                            const sharedStatic = targetPeriod.bells.filter(b => !b.relative && b._originType === 'shared');
+                            let anchorBells = [];
+                            if (sharedStatic.length > 0) {
+                                anchorBells = sharedStatic;
+                            } else {
+                                // Fluke period - use anchorRole
+                                const startAnchor = targetPeriod.bells.find(b => b.anchorRole === 'start');
+                                const endAnchor = targetPeriod.bells.find(b => b.anchorRole === 'end');
+                                if (startAnchor) anchorBells.push(startAnchor);
+                                if (endAnchor) anchorBells.push(endAnchor);
+                            }
+                            
                             if (anchorBells.length > 0) {
                                 const firstAnchorTime = anchorBells[0].time;
                                 const lastAnchorTime = anchorBells[anchorBells.length - 1].time;
@@ -4389,11 +4750,23 @@
                 // Use the period name from context
                 const periodName = currentRelativePeriod?.name || 'Preview';
                 
-                // FIX V5.42.11: For bells outside period bounds with no custom visual, use passing period visual
+                // FIX V5.42.11 & V5.44.4: For bells outside period bounds with no custom visual, use passing period visual
                 let previewVisualValue = visualValue;
                 if (!visualValue && currentRelativePeriod?.bells) {
                     // Check if this bell would be outside the period's anchor bells
-                    const anchorBells = currentRelativePeriod.bells.filter(b => b.type === 'shared');
+                    // V5.44.4: Use proper anchor detection based on period type
+                    const sharedStatic = currentRelativePeriod.bells.filter(b => !b.relative && b._originType === 'shared');
+                    let anchorBells = [];
+                    if (sharedStatic.length > 0) {
+                        anchorBells = sharedStatic;
+                    } else {
+                        // Fluke period - use anchorRole
+                        const startAnchor = currentRelativePeriod.bells.find(b => b.anchorRole === 'start');
+                        const endAnchor = currentRelativePeriod.bells.find(b => b.anchorRole === 'end');
+                        if (startAnchor) anchorBells.push(startAnchor);
+                        if (endAnchor) anchorBells.push(endAnchor);
+                    }
+                    
                     if (anchorBells.length > 0) {
                         const firstAnchorTime = anchorBells[0].time;
                         const lastAnchorTime = anchorBells[anchorBells.length - 1].time;
@@ -4838,8 +5211,15 @@
                         
                         // Create a new bells array for this period
                         const updatedBells = [...period.bells];
-                        // Replace the old bell with the new bell
-                        updatedBells[bellIndex] = newBell;
+                        
+                        // V5.44.4: Preserve anchorRole from original bell (critical for fluke periods)
+                        const originalAnchorRole = period.bells[bellIndex].anchorRole;
+                        const updatedBell = originalAnchorRole 
+                            ? { ...newBell, anchorRole: originalAnchorRole }
+                            : newBell;
+                        
+                        // Replace the old bell with the updated bell
+                        updatedBells[bellIndex] = updatedBell;
                         
                         // Return the updated period object
                         return { ...period, bells: updatedBells };
@@ -5454,6 +5834,51 @@
             }
 
             /**
+             * V5.44: Generate HTML options for the anchor bell dropdown.
+             * Groups bells by period and shows the current period's bells first.
+             * @param {Array} allBells - All resolved bells with _periodName and _periodOrigin
+             * @param {string} currentPeriodName - The period the new bell will be added to
+             * @returns {string} HTML string of option elements
+             */
+            function generateAnchorOptionsHtml(allBells, currentPeriodName) {
+                // Group bells by period
+                const periodGroups = {};
+                allBells.forEach(bell => {
+                    const pName = bell._periodName || 'Unknown';
+                    if (!periodGroups[pName]) {
+                        periodGroups[pName] = [];
+                    }
+                    periodGroups[pName].push(bell);
+                });
+                
+                let html = '';
+                
+                // Current period first (if it has bells)
+                if (periodGroups[currentPeriodName] && periodGroups[currentPeriodName].length > 0) {
+                    html += `<optgroup label="This Period: ${currentPeriodName}">`;
+                    periodGroups[currentPeriodName].forEach(bell => {
+                        html += `<option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>`;
+                    });
+                    html += `</optgroup>`;
+                }
+                
+                // Other periods
+                Object.keys(periodGroups).forEach(pName => {
+                    if (pName !== currentPeriodName && periodGroups[pName].length > 0) {
+                        const origin = periodGroups[pName][0]._periodOrigin;
+                        const label = origin === 'personal' ? `Custom: ${pName}` : pName;
+                        html += `<optgroup label="${label}">`;
+                        periodGroups[pName].forEach(bell => {
+                            html += `<option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>`;
+                        });
+                        html += `</optgroup>`;
+                    }
+                });
+                
+                return html;
+            }
+
+            /**
              * NEW: v4.28 - Opens the Relative Bell Modal (contains old logic from handleShowAddBellForm).
              */
             function openRelativeBellModal() {
@@ -5472,10 +5897,20 @@
                 }
                 
                 // 2. Use time-resolved bells as anchors
-                const resolvedBells = targetPeriod.bells;
+                // V5.44: Include bells from ALL periods, not just the current one
+                const allResolvedBells = [];
+                calculatedPeriodsList.forEach(p => {
+                    p.bells.forEach(b => {
+                        allResolvedBells.push({
+                            ...b,
+                            _periodName: p.name,
+                            _periodOrigin: p.origin
+                        });
+                    });
+                });
 
-                // 3. Store Anchor Data in State (add bells to existing state)
-                currentRelativePeriod.bells = resolvedBells;
+                // 3. Store Anchor Data in State (include ALL bells for time calculation)
+                currentRelativePeriod.bells = allResolvedBells;
     
                 // 4. Populate Modal UI
                 relativePeriodName.textContent = periodName;
@@ -5485,9 +5920,8 @@
                 const convertToStaticContainer = document.getElementById('convert-to-static-container');
                 if (convertToStaticContainer) convertToStaticContainer.classList.add('hidden');
 
-                const anchorOptionsHtml = resolvedBells.map(bell => `
-                    <option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>
-                `).join('');
+                // V5.44: Group anchor options by period for better organization
+                const anchorOptionsHtml = generateAnchorOptionsHtml(allResolvedBells, periodName);
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
     
                 // Populate sound dropdowns
@@ -5540,6 +5974,7 @@
                 const bellSound = document.getElementById('relative-bell-sound').value;
                 const parentBellId = document.getElementById('relative-anchor-bell').value;
                 const direction = document.getElementById('relative-direction').value;
+                const hours = parseInt(document.getElementById('relative-hours')?.value) || 0;
                 const minutes = parseInt(document.getElementById('relative-minutes').value) || 0;
                 const seconds = parseInt(document.getElementById('relative-seconds').value) || 0;
                 
@@ -5567,8 +6002,8 @@
                 }
                 // --- END V4.68 VALIDATION ---
 
-                // 2. Calculate the offset in seconds
-                let totalOffsetSeconds = (minutes * 60) + seconds;
+                // 2. Calculate the offset in seconds - V5.44.1: Include hours
+                let totalOffsetSeconds = (hours * 3600) + (minutes * 60) + seconds;
                 if (direction === 'before') {
                     totalOffsetSeconds = -totalOffsetSeconds; // Make it negative
                 }
@@ -5602,30 +6037,44 @@
                 }
 
                 // --- NEW in 4.48: Check if we can use a stable anchor ---
-                // We check if the selected parentBellId is *also* the first or last
-                // bell in the period. If so, we save a stable anchor instead.
-                const period = calculatedPeriodsList.find(p => p.name === currentRelativePeriod.name);
-                if (period && period.bells.length > 0) {
-                    const firstBell = period.bells[0];
-                    const lastBell = period.bells[period.bells.length - 1];
+                // MODIFIED V5.44.1: For cross-period anchoring, check if the anchor bell is 
+                // the first or last bell of ITS period (not the period we're adding to)
+                
+                // Find which period the anchor bell belongs to
+                let anchorPeriod = null;
+                for (const p of calculatedPeriodsList) {
+                    if (p.bells && p.bells.some(b => b.bellId === parentBellId)) {
+                        anchorPeriod = p;
+                        break;
+                    }
+                }
+                
+                if (anchorPeriod && anchorPeriod.bells.length > 0) {
+                    const firstBell = anchorPeriod.bells[0];
+                    const lastBell = anchorPeriod.bells[anchorPeriod.bells.length - 1];
 
                     if (parentBellId === firstBell.bellId) {
                         // It's anchored to Period Start!
                         finalBell.relative = {
-                            parentPeriodName: period.name,
+                            parentPeriodName: anchorPeriod.name,
                             parentAnchorType: 'period_start',
                             offsetSeconds: totalOffsetSeconds
                         };
-                        console.log("Saving relative bell with stable 'period_start' anchor.");
+                        console.log(`Saving relative bell with stable 'period_start' anchor to ${anchorPeriod.name}.`);
                     } else if (parentBellId === lastBell.bellId) {
                         // It's anchored to Period End!
                         finalBell.relative = {
-                            parentPeriodName: period.name,
+                            parentPeriodName: anchorPeriod.name,
                             parentAnchorType: 'period_end',
                             offsetSeconds: totalOffsetSeconds
                         };
-                        console.log("Saving relative bell with stable 'period_end' anchor.");
-                    };
+                        console.log(`Saving relative bell with stable 'period_end' anchor to ${anchorPeriod.name}.`);
+                    } else {
+                        // It's anchored to a middle bell - keep the parentBellId
+                        console.log(`Keeping parentBellId ${parentBellId} - anchor is not a period start/end.`);
+                    }
+                } else {
+                    console.warn(`Could not find anchor period for parentBellId ${parentBellId}`);
                 }
                 
                 // NEW in 4.57: If a stable anchor was assigned above, remove the parentBellId to prevent conflicting logic.
@@ -5839,6 +6288,7 @@
                 let bellSound = multiAddRelativeBellSound.value;
                 const parentAnchorType = multiAddRelativeParentAnchor.value; // 'period_start' or 'period_end'
                 const direction = multiAddRelativeDirection.value;
+                const hours = parseInt(document.getElementById('multi-add-relative-hours')?.value) || 0;
                 const minutes = parseInt(multiAddRelativeMinutes.value) || 0;
                 const seconds = parseInt(multiAddRelativeSeconds.value) || 0;
                 
@@ -5863,8 +6313,8 @@
                     bellSound = 'ellisBell.mp3';
                 }
                 
-                // 3. Calculate offset
-                let totalOffsetSeconds = (minutes * 60) + seconds;
+                // 3. Calculate offset - V5.44.2: Include hours
+                let totalOffsetSeconds = (hours * 3600) + (minutes * 60) + seconds;
                 if (direction === 'before') {
                     totalOffsetSeconds = -totalOffsetSeconds;
                 }
@@ -6552,7 +7002,7 @@
                     bgColor: 'bg-gray-200',     // FIX V5.43.0: Match icon background for previews
                     customTextFontSize: {
                         short: 80,              // Font size for 1-2 chars (getVisualHtml)
-                        long: 55                // Font size for 3+ chars (getVisualHtml)
+                        long: 45                // V5.44.4: Reduced from 55 to prevent cropping
                     }
                 },
                 // Icon display (small circle next to period name)
@@ -7363,9 +7813,13 @@
                 }
                 
                 // 2. Populate relative anchor period dropdowns
-                // Only use the BASE shared periods for anchoring
-                const basePeriodNames = localSchedulePeriods.map(p => p.name);
-                const periodOptionsHtml = basePeriodNames.map(name => `<option value="${name}">${name}</option>`).join('');
+                // FIX V5.44.1: Include ALL periods with bells (shared AND custom/fluke)
+                // Use calculatedPeriodsList which contains merged periods from both sources
+                const anchorPeriodNames = calculatedPeriodsList
+                    .filter(p => p.name !== 'Orphaned Bells' && p.bells && p.bells.length > 0)
+                    .map(p => p.name);
+                
+                const periodOptionsHtml = anchorPeriodNames.map(name => `<option value="${name}">${name}</option>`).join('');
                 
                 newPeriodStartParent.innerHTML = periodOptionsHtml;
                 newPeriodEndParent.innerHTML = periodOptionsHtml;
@@ -7379,9 +7833,9 @@
                 newPeriodEndAnchorType.value = 'period_start'; // Default end anchor to Period Start
 
                 // Add an empty option if no periods exist
-                if (basePeriodNames.length === 0) {
-                     newPeriodStartParent.innerHTML = '<option value="" disabled selected>No Base Periods Available</option>';
-                     newPeriodEndParent.innerHTML = '<option value="" disabled selected>No Base Periods Available</option>';
+                if (anchorPeriodNames.length === 0) {
+                     newPeriodStartParent.innerHTML = '<option value="" disabled selected>No periods with bells available</option>';
+                     newPeriodEndParent.innerHTML = '<option value="" disabled selected>No periods with bells available</option>';
                 }
 
 
@@ -7415,7 +7869,9 @@
                     newPeriodEndStaticDiv.classList.remove('hidden');
                     newPeriodStartRelativeDiv.classList.add('hidden');
                     newPeriodEndRelativeDiv.classList.add('hidden');
-                    // Mark static inputs as required
+                    // V5.44.7: Re-enable and mark static inputs as required
+                    newPeriodStartTime.disabled = false;
+                    newPeriodEndTime.disabled = false;
                     newPeriodStartTime.required = true;
                     newPeriodEndTime.required = true;
                 } else {
@@ -7452,7 +7908,10 @@
                 
                 // 1. Create the bells array and validate inputs
                 const newBells = [];
-                const basePeriodNames = localSchedulePeriods.map(p => p.name);
+                // V5.44.1: Use all calculated periods (including flukes) for anchor validation
+                const validAnchorPeriodNames = calculatedPeriodsList
+                    .filter(p => p.name !== 'Orphaned Bells' && p.bells && p.bells.length > 0)
+                    .map(p => p.name);
                 
                 // Helper to validate and build bell data
                 const buildBellData = (type, prefix) => {
@@ -7488,12 +7947,15 @@
                         const parentName = document.getElementById(`${prefix}-parent`).value;
                         const anchorType = document.getElementById(`${prefix}-anchor-type`).value;
                         const direction = document.getElementById(`${prefix}-direction`).value;
+                        const hours = parseInt(document.getElementById(`${prefix}-hours`)?.value) || 0;
                         const minutes = parseInt(document.getElementById(`${prefix}-minutes`).value) || 0;
                         const seconds = parseInt(document.getElementById(`${prefix}-seconds`).value) || 0;
                         
-                        if (!parentName || !basePeriodNames.includes(parentName)) throw new Error(`Invalid anchor period for ${prefix.split('-')[1]}.`);
+                        // V5.44.1: Validate against all periods including flukes
+                        if (!parentName || !validAnchorPeriodNames.includes(parentName)) throw new Error(`Invalid anchor period for ${prefix.split('-')[1]}.`);
 
-                        let offsetSeconds = (minutes * 60) + seconds;
+                        // V5.44.6: Include hours in offset calculation
+                        let offsetSeconds = (hours * 3600) + (minutes * 60) + seconds;
                         if (direction === 'before') offsetSeconds = -offsetSeconds;
                         
                         return {
@@ -7513,18 +7975,18 @@
                     const startBellData = buildBellData(mode, 'new-period-start');
                     newBells.push({
                         ...startBellData,
-                        name: 'Period Start', // Critical for anchoring/fluke logic
-                        // sound: 'ellisBell.mp3', // DELETED V4.81: Sound is now in startBellData
-                        bellId: generateBellId()
+                        name: 'Period Start',
+                        bellId: generateBellId(),
+                        anchorRole: 'start' // V5.44.1: Explicit anchor identification
                     });
 
                     // --- End Bell ---
                     const endBellData = buildBellData(mode, 'new-period-end');
                     newBells.push({
                         ...endBellData,
-                        name: 'Period End', // Critical for anchoring/fluke logic
-                        // sound: 'ellisBell.mp3', // DELETED V4.81: Sound is now in endBellData
-                        bellId: generateBellId()
+                        name: 'Period End',
+                        bellId: generateBellId(),
+                        anchorRole: 'end' // V5.44.1: Explicit anchor identification
                     });
 
                     // 2. Create the new period object
@@ -7550,15 +8012,16 @@
                         return;
                     }
 
-                    const updatedPeriods = [...existingPeriods, newPeriod];
-                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
-
-                    // 4. Save visual cue override if selected
+                    // V5.44.4: Save visual cue override BEFORE Firestore update
+                    // This ensures the visual is available when the listener re-renders the list
                     if (visualCue) {
                         const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
                         periodVisualOverrides[visualKey] = visualCue;
                         saveVisualOverrides();
                     }
+
+                    const updatedPeriods = [...existingPeriods, newPeriod];
+                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
 
                     showUserMessage(`New period "${periodName}" created successfully!`);
                     closeNewPeriodModal();
@@ -8659,7 +9122,7 @@
                 });
     
                 // NEW: v3.09 - Add click-to-refresh for Audio Manager
-                const audioManagerHeader = document.querySelector('#audio-manager-panel h2');
+                const audioManagerHeader = document.querySelector('#audio-manager-panel h3');
                 if (audioManagerHeader) {
                     audioManagerHeader.addEventListener('click', () => {
                         console.log("User clicked audio manager header, refreshing file lists...");
@@ -8774,7 +9237,8 @@
                             if (!slotData.name || slotData.name.trim() === '') {
                                 return null; // No name = empty slot
                             }
-                            if (slotData.minutes === '0' && slotData.seconds === '0') {
+                            // V5.44.9: Include hours in time validation
+                            if (slotData.hours === '0' && slotData.minutes === '0' && slotData.seconds === '0') {
                                 return null; // No time = invalid bell
                             }
 
@@ -8786,6 +9250,7 @@
                             return {
                                 id: id,
                                 name: slotData.name.trim(),
+                                hours: parseInt(slotData.hours) || 0, // V5.44.9: Include hours
                                 minutes: parseInt(slotData.minutes) || 0,
                                 seconds: parseInt(slotData.seconds) || 0,
                                 
@@ -8806,6 +9271,7 @@
                                 console.log(`  Bell ${bell.id}:`, {
                                     name: bell.name,
                                     sound: bell.sound,
+                                    hours: bell.hours,
                                     minutes: bell.minutes,
                                     seconds: bell.seconds
                                 });
@@ -8903,6 +9369,11 @@
                             
                             customTextVisualModal.style.zIndex = '60';
                             customTextVisualModal.classList.remove('hidden');
+                            
+                            // V5.44.10: Set up live preview with square icon shape for quick bells
+                            setupCustomTextModalPreviews(true);
+                            
+                            setTimeout(() => customTextInput.select(), 50);
                         } else if (supportsBackgroundColor(visualCue)) {
                             // Open background color picker
                             currentCustomBellIconSlot = bellId;
@@ -9082,6 +9553,11 @@
                             
                             customTextVisualModal.style.zIndex = '60';
                             customTextVisualModal.classList.remove('hidden');
+                            
+                            // V5.44.10: Set up live preview with square icon shape for quick bells
+                            setupCustomTextModalPreviews(true);
+                            
+                            setTimeout(() => customTextInput.select(), 50);
                             return;
                         }
                         
@@ -9133,11 +9609,12 @@
                 quickBellControls.addEventListener('click', (e) => {
                     const customBtn = e.target.closest('.custom-quick-launch-btn');
                     if (customBtn) {
-                        const minutes = parseInt(customBtn.dataset.minutes, 10);
-                        const seconds = parseInt(customBtn.dataset.seconds, 10);
+                        const hours = parseInt(customBtn.dataset.hours, 10) || 0;
+                        const minutes = parseInt(customBtn.dataset.minutes, 10) || 0;
+                        const seconds = parseInt(customBtn.dataset.seconds, 10) || 0;
                         const sound = customBtn.dataset.sound;
                         const name = customBtn.dataset.name;
-                        startQuickBell(minutes, seconds, sound, name);
+                        startQuickBell(hours, minutes, seconds, sound, name);
                     }
                 });
                 
@@ -9202,6 +9679,55 @@
                         createPersonalScheduleStatus.textContent = "Error creating schedule.";
                     } finally {
                         setTimeout(() => createPersonalScheduleStatus.classList.add('hidden'), 2000);
+                    }
+                });
+                
+                // V5.44: Standalone Schedule Modal Events
+                createStandaloneScheduleBtn.addEventListener('click', () => {
+                    createStandaloneScheduleModal.classList.remove('hidden');
+                    standaloneScheduleNameInput.value = '';
+                    createStandaloneStatus.classList.add('hidden');
+                });
+                createStandaloneCancelBtn.addEventListener('click', () => {
+                    createStandaloneScheduleModal.classList.add('hidden');
+                    createStandaloneScheduleForm.reset();
+                });
+                createStandaloneScheduleForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const name = standaloneScheduleNameInput.value.trim();
+                    if (!name) return;
+                    
+                    createStandaloneStatus.textContent = "Creating...";
+                    createStandaloneStatus.classList.remove('hidden');
+                    createStandaloneStatus.classList.remove('text-red-600');
+                    createStandaloneStatus.classList.add('text-blue-600');
+                    
+                    try {
+                        const personalSchedulesRef = collection(db, 'artifacts', appId, 'users', userId, 'personal_schedules');
+                        const newDocRef = await addDoc(personalSchedulesRef, {
+                            name: name,
+                            baseScheduleId: null,       // Key differentiator - no base
+                            isStandalone: true,         // Explicit flag
+                            periods: [],                // Starts empty
+                            passingPeriodVisual: '',
+                            createdAt: new Date()
+                        });
+                        
+                        console.log("Standalone schedule created with ID:", newDocRef.id);
+                        
+                        // Automatically select the new schedule
+                        scheduleSelector.value = `personal-${newDocRef.id}`;
+                        setActiveSchedule(scheduleSelector.value);
+                        
+                        createStandaloneScheduleModal.classList.add('hidden');
+                        createStandaloneScheduleForm.reset();
+                        
+                        showUserMessage(`Standalone schedule "${name}" created!`);
+                    } catch (error) {
+                        console.error("Error creating standalone schedule:", error);
+                        createStandaloneStatus.textContent = "Error: " + error.message;
+                        createStandaloneStatus.classList.remove('text-blue-600');
+                        createStandaloneStatus.classList.add('text-red-600');
                     }
                 });
     
@@ -9320,7 +9846,7 @@
                 quickBellControls.addEventListener('click', (e) => {
                     if (e.target.matches('.quick-bell-btn')) {
                         const minutes = parseInt(e.target.dataset.minutes, 10);
-                        startQuickBell(minutes);
+                        startQuickBell(0, minutes, 0); // V5.44.8: hours=0, minutes, seconds=0
                     }
                 });
                 quickBellSoundSelect.addEventListener('change', () => {
@@ -9384,6 +9910,7 @@
                 // MODIFIED: v4.10.2a - Use the new variable name
                 relativeAnchorBellSelect.addEventListener('change', updateCalculatedTime);
                 relativeDirection.addEventListener('change', updateCalculatedTime);
+                if (relativeHoursInput) relativeHoursInput.addEventListener('input', updateCalculatedTime);
                 relativeMinutesInput.addEventListener('input', updateCalculatedTime);
                 relativeSecondsInput.addEventListener('input', updateCalculatedTime);
 
@@ -9502,7 +10029,7 @@
                 document.getElementById('visual-manager-panel').addEventListener('click', handleVisualListClick);
                 
                 // NEW in 4.44: Add click-to-refresh for Visual Manager header
-                document.querySelector('#visual-manager-panel h2').addEventListener('click', () => {
+                document.querySelector('#visual-manager-panel h3').addEventListener('click', () => {
                     visualUploadStatus.textContent = "Refreshing file lists...";
                     visualUploadStatus.classList.remove('hidden');
                     loadAllVisualFiles().then(() => {
@@ -9763,6 +10290,8 @@
                     // MODIFIED V4.75: Do not reset the select, just close.
                     // The original value is preserved by the change handler.
                     currentVisualSelectTarget = null;
+                    // V5.44.9: Also clear custom bell slot
+                    currentCustomBellIconSlot = null;
                 });
 
                 document.getElementById('cancel-quick-bell-btn').addEventListener('click', () => {
@@ -9837,6 +10366,13 @@
                         updateMultiBellVisualPreview();
                     } else if (targetId === 'multi-relative-bell-visual') {
                         updateMultiRelativeBellVisualPreview();
+                    } else if (targetId === 'new-period-image-select') {
+                        // FIX V5.44.1: Update new period modal preview for custom text
+                        document.getElementById('new-period-image-preview-full').innerHTML = getVisualHtml(storedValue, 'New Period');
+                        document.getElementById('new-period-image-preview-icon').innerHTML = getVisualIconHtml(storedValue, 'New Period');
+                        const previewFull = document.getElementById('new-period-image-preview-full');
+                        makePreviewClickableForCustomText(previewFull, document.getElementById('new-period-image-select'));
+                        console.log('Updated new period modal preview');
                     } else if (targetId === 'edit-period-image-select' && currentRenamingPeriod) {
                         const periodName = currentRenamingPeriod.name;
                         const previewFull = document.getElementById('edit-period-image-preview-full');
@@ -9935,72 +10471,14 @@
                         customTextVisualModal.classList.remove('hidden');
                         customTextVisualModal.style.zIndex = '80'; // NEW in 5.25.?: Make sure it's on top of everything
                         
-                        // FIX V5.42: Set context-aware labels and icon preview shape
-                        const fullLabel = document.getElementById('custom-text-preview-full-label');
-                        const iconLabel = document.getElementById('custom-text-preview-icon-label');
-                        const iconInner = document.getElementById('quick-bell-visual-preview-icon-inner');
-                        
                         // Determine context from the target select ID
                         const isQuickBell = e.target.id.includes('quick-bell') || e.target.closest('#custom-quick-bell-manager-modal');
-                        const isPeriod = e.target.id === 'edit-period-image-select';
                         
-                        if (fullLabel && iconLabel) {
-                            if (isQuickBell) {
-                                fullLabel.textContent = 'Full Size Preview';
-                                iconLabel.textContent = 'Button Preview';
-                            } else if (isPeriod) {
-                                fullLabel.textContent = 'Full Size Preview';
-                                iconLabel.textContent = 'Period Icon Preview';
-                            } else {
-                                fullLabel.textContent = 'Full Size Preview';
-                                iconLabel.textContent = 'Icon Preview';
-                            }
-                        }
-                        
-                        // Set icon preview shape based on context
-                        if (iconInner) {
-                            if (isQuickBell) {
-                                // Square button shape
-                                iconInner.className = 'w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden bg-gray-200';
-                            } else {
-                                // Circle icon shape (for periods)
-                                iconInner.className = 'visual-preview-icon-circle bg-gray-200';
-                            }
-                        }
-
-                        // NEW 5.30.2: Add live preview updates
-                        customTextInput.addEventListener('input', updateCustomTextPreviews);
-                        customTextColorInput.addEventListener('input', updateCustomTextPreviews);
-                        customTextBgColorInput.addEventListener('input', updateCustomTextPreviews);
-                        
-                        // FIX V5.42: Updated preview function to use inner element for proper icon shape
-                        function updateCustomTextPreviews() {
-                            const text = customTextInput.value.trim().substring(0, 3) || '?';
-                            const fgColor = customTextColorInput.value;
-                            const bgColor = customTextBgColorInput.value;
-                            
-                            // Update live preview (large)
-                            const livePreview = document.getElementById('quick-bell-visual-preview-full');
-                            livePreview.innerHTML = `<div class="w-full h-full flex items-center justify-center" style="background-color: ${bgColor};">
-                                <span class="text-6xl font-bold" style="color: ${fgColor};">${text}</span>
-                            </div>`;
-                            
-                            // Update icon preview (small) - use inner element for proper shape
-                            const iconInner = document.getElementById('quick-bell-visual-preview-icon-inner');
-                            if (iconInner) {
-                                iconInner.innerHTML = `<span class="text-lg font-bold" style="color: ${fgColor};">${text}</span>`;
-                                iconInner.style.backgroundColor = bgColor;
-                            }
-                        }
-                        
-                        // Trigger initial preview update
-                        updateCustomTextPreviews();
+                        // V5.44.10: Use the centralized helper function for preview setup
+                        setupCustomTextModalPreviews(isQuickBell);
                             
                         // 5.25.7: More console logging
                         console.log('After removing hidden:', customTextVisualModal.classList.contains('hidden'));
-                            
-                        // Set focus and select current text
-                        setTimeout(() => customTextInput.select(), 50);
                             
                         // Set focus and select current text
                         setTimeout(() => customTextInput.select(), 50);
