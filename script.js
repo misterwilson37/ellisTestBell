@@ -1,4 +1,21 @@
-        const APP_VERSION = "5.45.4"
+        const APP_VERSION = "5.46.4"
+        // V5.46.4: Three Important Fixes
+        // - Fixed "Duplicate as Another Personal Schedule" to copy ALL data (periods, bellOverrides, passingPeriodVisual, isStandalone)
+        // - Restore from backup now allows editing the schedule name (pre-filled with backup's name)
+        // - Added global ESC key handler to close any open modal without saving
+        // V5.46.1: Fix Shared Bell Visual Overrides Persistence
+        // - Added personalBellOverrides variable to store shared bell customizations
+        // - Load bellOverrides from Firestore when personal schedule loads
+        // - Apply visual overrides, sound overrides, and nicknames to shared bells during rendering
+        // - Visual overrides for shared bells now persist across page refreshes
+        // V5.46.0: Bulk Edit for Audio and Visual Cues
+        // - Added "Bulk Edit" button to schedule list controls (visible when personal schedule is active)
+        // - Click to enter selection mode, checkboxes appear next to each bell
+        // - Select bells, click button again to open bulk edit modal
+        // - Change audio and/or visual cue for all selected bells at once
+        // - Custom bells: Updated directly in Firestore periods
+        // - Shared bells: Sound overrides saved to localStorage, visual overrides saved to bellOverrides
+        // - Purple themed UI to distinguish from other edit modes
         // V5.45.4: Remove inconsistent "Override:" prefix from sound display
         // - The sound name alone is sufficient information
         // - Removes confusing inconsistency where some overridden bells showed it and others didn't
@@ -596,6 +613,13 @@
         // NEW V5.42.0: Passing Period Visual State
         let personalPassingPeriodVisual = null;  // From personal schedule
         let sharedPassingPeriodVisual = null;    // From shared schedule (admin-set default)
+
+        // NEW V5.46.0: Bulk Edit State
+        let bulkEditMode = false;
+        let bulkSelectedBells = new Set(); // Set of bell IDs
+        
+        // NEW V5.46.1: Personal Bell Overrides (for shared bell customizations)
+        let personalBellOverrides = {}; // { bellId: { sound, visualCue, visualMode, nickname } }
 
         let currentSoundSelectTarget = null; // NEW V4.76: Stores <select> for audio modal
 
@@ -1938,6 +1962,12 @@
                 // NEW V5.05: Update header buttons state before rendering bell list
                 updateMuteButtonsUI(); 
                 
+                // NEW V5.46.0: Update bulk edit button visibility
+                const bulkEditBtn = document.getElementById('bulk-edit-toggle-btn');
+                if (bulkEditBtn) {
+                    bulkEditBtn.classList.toggle('hidden', !activePersonalScheduleId);
+                }
+                
                 // Use the calculated, merged, and time-resolved periods passed from the engine
                 const combinedPeriods = calculatedPeriods || [];
             
@@ -2148,6 +2178,12 @@
                                 data-is-relative="${!!bell.relative}"
                                 data-visual-cue="${bell.visualCue || ''}"
                                 data-visual-mode="${bell.visualMode || 'none'}">
+                                
+                                <!-- V5.46.0: Bulk Edit Checkbox (hidden by default) -->
+                                <input type="checkbox" 
+                                    class="bulk-edit-checkbox h-5 w-5 text-purple-600 rounded focus:ring-purple-500 mr-3 flex-shrink-0 ${bulkEditMode ? '' : 'hidden'}"
+                                    data-bell-id="${bell.bellId || getBellId(bell)}"
+                                    ${bulkSelectedBells.has(bell.bellId || getBellId(bell)) ? 'checked' : ''}>
                                 
                                 <!-- Bell Info (Time, Name, Sound) (left) -->
                                 <div class="flex items-center space-x-4 min-w-0 flex-grow">
@@ -2690,15 +2726,37 @@
                             // 'bell.sound' *is* the original sound at this point.
                             bell.originalSound = bell.sound; 
                             
-                            // 2. Check for an override.
+                            // 2. Check for a sound override (localStorage system).
                             const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
                             const overrideSound = bellSoundOverrides[overrideKey];
                             
-                            // 3. Apply the override *if it exists*.
+                            // 3. Apply the sound override *if it exists*.
                             if (overrideSound) {
                                 bell.sound = overrideSound;
                             }
                             // If no override, 'bell.sound' remains the original sound.
+                            
+                            // V5.46.1: Apply personal bell overrides (visual, nickname, etc.)
+                            const bellId = bell.bellId || getBellId(bell);
+                            const personalOverride = personalBellOverrides[bellId];
+                            if (personalOverride) {
+                                // Apply visual override
+                                if (personalOverride.visualCue !== undefined) {
+                                    bell.visualCue = personalOverride.visualCue;
+                                }
+                                if (personalOverride.visualMode !== undefined) {
+                                    bell.visualMode = personalOverride.visualMode;
+                                }
+                                // Apply sound override from Firestore (if not already overridden by localStorage)
+                                if (personalOverride.sound && !overrideSound) {
+                                    bell.sound = personalOverride.sound;
+                                }
+                                // Apply nickname
+                                if (personalOverride.nickname) {
+                                    bell.originalName = bell.name;
+                                    bell.name = personalOverride.nickname;
+                                }
+                            }
                         }
                         // For custom bells, bell.sound is just bell.sound.
                         // We set originalSound to null (or it's undefined)
@@ -3789,6 +3847,9 @@
                 personalPassingPeriodVisual = null;
                 sharedPassingPeriodVisual = null;
                 
+                // NEW V5.46.1: Reset personal bell overrides
+                personalBellOverrides = {};
+                
                 // v3.05: Disable manager buttons
                 renamePersonalScheduleBtn.disabled = true;
                 backupPersonalScheduleBtn.disabled = true;
@@ -4010,12 +4071,15 @@
                                 
                                 personalBellsPeriods = periodsToUse;
                                 personalPassingPeriodVisual = personalData.passingPeriodVisual || null;
+                                // V5.46.1: Load bell overrides (standalone schedules typically don't use these)
+                                personalBellOverrides = personalData.bellOverrides || {};
                                 
                                 console.log("Standalone schedule updated:", periodsToUse.length, "periods");
                             } else {
                                 console.warn("Standalone schedule removed.");
                                 personalBellsPeriods = [];
                                 personalPassingPeriodVisual = null;
+                                personalBellOverrides = {};
                             }
                             recalculateAndRenderAll();
                         });
@@ -4165,6 +4229,9 @@
                                 // NEW V5.42.0: Load passing period visual from personal schedule
                                 personalPassingPeriodVisual = personalData.passingPeriodVisual || null;
                                 
+                                // NEW V5.46.1: Load bell overrides for shared bell customizations
+                                personalBellOverrides = personalData.bellOverrides || {};
+                                
                                 console.log("Personal schedule bells updated.");
                             } else {
                                 console.warn("Personal schedule removed.");
@@ -4172,6 +4239,8 @@
                                 personalBells = [];
                                 // NEW V5.42.0: Clear passing period visual when schedule is removed
                                 personalPassingPeriodVisual = null;
+                                // NEW V5.46.1: Clear bell overrides
+                                personalBellOverrides = {};
                             }
                             // NEW: v4.10.3 - Run the master calculation engine
                             recalculateAndRenderAll();
@@ -5654,6 +5723,13 @@
                         
                         confirmRestoreText.textContent = confirmMsg;
                         confirmRestoreText.style.whiteSpace = 'pre-line'; // Allow line breaks
+                        
+                        // V5.46.4: Pre-fill name input with backup's name
+                        const restoreNameInput = document.getElementById('restore-schedule-name');
+                        if (restoreNameInput) {
+                            restoreNameInput.value = pendingRestoreData.name;
+                        }
+                        
                         confirmRestoreModal.classList.remove('hidden');
     
                     } catch (error) {
@@ -5669,7 +5745,12 @@
             async function confirmRestorePersonalSchedule() {
                 if (!pendingRestoreData || !activePersonalScheduleId) return;
     
-                const { version, name, baseScheduleId, isStandalone, periods, bells, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
+                const { version, baseScheduleId, isStandalone, periods, bells, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
+                
+                // V5.46.4: Use name from input field instead of backup
+                const restoreNameInput = document.getElementById('restore-schedule-name');
+                const name = restoreNameInput?.value.trim() || pendingRestoreData.name;
+                
                 const docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 
                 try {
@@ -9911,24 +9992,37 @@
                     let newSchedule;
                     
                     // v3.05: Check if we are duplicating or copying
+                    // V5.46.4: Fixed to copy ALL data including periods, bellOverrides, etc.
                     if (activePersonalScheduleId) {
-                        // DUPLICATING
+                        // DUPLICATING - copy everything from the source schedule
                         const scheduleToDupe = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
                         if (!scheduleToDupe) {
                              createPersonalScheduleStatus.textContent = "Error: Source schedule not found.";
                              return;
                         }
+                        
+                        // Deep copy all the important data
                         newSchedule = {
                             name: name,
-                            baseScheduleId: scheduleToDupe.baseScheduleId, // Use the dupe's base
-                            bells: [...scheduleToDupe.bells] // CRITICAL: new array copy of bells
+                            baseScheduleId: scheduleToDupe.baseScheduleId || null,
+                            isStandalone: scheduleToDupe.isStandalone || false,
+                            // Deep copy periods (includes all custom bells)
+                            periods: scheduleToDupe.periods ? JSON.parse(JSON.stringify(scheduleToDupe.periods)) : [],
+                            // Deep copy bell overrides (shared bell customizations)
+                            bellOverrides: scheduleToDupe.bellOverrides ? JSON.parse(JSON.stringify(scheduleToDupe.bellOverrides)) : {},
+                            // Copy passing period visual
+                            passingPeriodVisual: scheduleToDupe.passingPeriodVisual || null,
+                            // Legacy bells array (for backward compatibility)
+                            bells: scheduleToDupe.bells ? [...scheduleToDupe.bells] : []
                         };
                     } else if (activeBaseScheduleId) {
-                        // COPYING (existing logic)
+                        // COPYING (creating new personal schedule from shared)
                         newSchedule = {
                             name: name,
                             baseScheduleId: activeBaseScheduleId,
-                            bells: [] // Starts empty
+                            periods: [], // Starts empty
+                            bellOverrides: {},
+                            bells: [] // Legacy, starts empty
                         };
                     } else {
                         createPersonalScheduleStatus.textContent = "Error: No base schedule selected.";
@@ -10946,6 +11040,359 @@
                     recalculateAndRenderAll();
                     updateClock();
                 });
+
+                // ============================================
+                // V5.46.0: BULK EDIT FUNCTIONALITY
+                // ============================================
+                const bulkEditToggleBtn = document.getElementById('bulk-edit-toggle-btn');
+                const bulkEditModal = document.getElementById('bulk-edit-modal');
+                const bulkEditCount = document.getElementById('bulk-edit-count');
+                const bulkEditSound = document.getElementById('bulk-edit-sound');
+                const bulkEditVisual = document.getElementById('bulk-edit-visual');
+                const bulkVisualModeContainer = document.getElementById('bulk-visual-mode-container');
+                const bulkEditApply = document.getElementById('bulk-edit-apply');
+                const bulkEditCancel = document.getElementById('bulk-edit-cancel');
+                const bulkPreviewSound = document.getElementById('bulk-preview-sound');
+                const bulkEditStatus = document.getElementById('bulk-edit-status');
+
+                // Show bulk edit button when user has a personal schedule
+                function updateBulkEditButtonVisibility() {
+                    if (bulkEditToggleBtn) {
+                        bulkEditToggleBtn.classList.toggle('hidden', !activePersonalScheduleId);
+                    }
+                }
+
+                // Toggle bulk edit mode
+                bulkEditToggleBtn?.addEventListener('click', () => {
+                    if (!bulkEditMode) {
+                        // Enter bulk edit mode
+                        bulkEditMode = true;
+                        bulkSelectedBells.clear();
+                        bulkEditToggleBtn.textContent = 'Done Selecting';
+                        bulkEditToggleBtn.classList.remove('bg-purple-100', 'text-purple-700');
+                        bulkEditToggleBtn.classList.add('bg-purple-600', 'text-white');
+                        recalculateAndRenderAll();
+                    } else if (bulkSelectedBells.size > 0) {
+                        // In bulk edit mode with selections - open modal
+                        openBulkEditModal();
+                    } else {
+                        // In bulk edit mode with no selections - exit
+                        bulkEditMode = false;
+                        bulkEditToggleBtn.textContent = 'Bulk Edit';
+                        bulkEditToggleBtn.classList.remove('bg-purple-600', 'text-white');
+                        bulkEditToggleBtn.classList.add('bg-purple-100', 'text-purple-700');
+                        recalculateAndRenderAll();
+                    }
+                });
+
+                // Handle checkbox changes via delegation
+                combinedBellListElement.addEventListener('change', (e) => {
+                    if (e.target.classList.contains('bulk-edit-checkbox')) {
+                        const bellId = e.target.dataset.bellId;
+                        if (e.target.checked) {
+                            bulkSelectedBells.add(bellId);
+                        } else {
+                            bulkSelectedBells.delete(bellId);
+                        }
+                        updateBulkEditUI();
+                    }
+                });
+
+                // Update UI based on selections
+                function updateBulkEditUI() {
+                    const count = bulkSelectedBells.size;
+                    
+                    // Update button text to show count
+                    if (bulkEditMode && count > 0) {
+                        bulkEditToggleBtn.textContent = `Edit ${count} Bell${count > 1 ? 's' : ''}`;
+                    } else if (bulkEditMode) {
+                        bulkEditToggleBtn.textContent = 'Done Selecting';
+                    }
+                }
+
+                function openBulkEditModal() {
+                    if (bulkSelectedBells.size === 0) return;
+                    
+                    // Populate dropdowns
+                    populateBulkEditDropdowns();
+                    
+                    // Update count
+                    bulkEditCount.textContent = `${bulkSelectedBells.size} bell${bulkSelectedBells.size > 1 ? 's' : ''} selected`;
+                    
+                    // Reset selections
+                    bulkEditSound.value = '[NO_CHANGE]';
+                    bulkEditVisual.value = '[NO_CHANGE]';
+                    bulkVisualModeContainer.classList.add('hidden');
+                    bulkEditStatus.classList.add('hidden');
+                    
+                    bulkEditModal.classList.remove('hidden');
+                }
+
+                function populateBulkEditDropdowns() {
+                    // Populate sound dropdown
+                    const bulkMySounds = document.getElementById('bulk-my-sounds-optgroup');
+                    const bulkSharedSounds = document.getElementById('bulk-shared-sounds-optgroup');
+                    
+                    if (bulkMySounds) {
+                        bulkMySounds.innerHTML = '';
+                        userAudioFiles.forEach(file => {
+                            const opt = document.createElement('option');
+                            opt.value = file.url;
+                            opt.textContent = file.nickname || file.name;
+                            bulkMySounds.appendChild(opt);
+                        });
+                    }
+                    
+                    if (bulkSharedSounds) {
+                        bulkSharedSounds.innerHTML = '';
+                        sharedAudioFiles.forEach(file => {
+                            const opt = document.createElement('option');
+                            opt.value = file.url;
+                            opt.textContent = file.nickname || file.name;
+                            bulkSharedSounds.appendChild(opt);
+                        });
+                    }
+                    
+                    // Populate visual dropdown
+                    const bulkMyVisuals = document.getElementById('bulk-my-visuals-optgroup');
+                    const bulkSharedVisuals = document.getElementById('bulk-shared-visuals-optgroup');
+                    
+                    if (bulkMyVisuals) {
+                        bulkMyVisuals.innerHTML = '';
+                        userVisualFiles.forEach(file => {
+                            const opt = document.createElement('option');
+                            opt.value = file.url;
+                            opt.textContent = file.nickname || file.name;
+                            bulkMyVisuals.appendChild(opt);
+                        });
+                    }
+                    
+                    if (bulkSharedVisuals) {
+                        bulkSharedVisuals.innerHTML = '';
+                        sharedVisualFiles.forEach(file => {
+                            const opt = document.createElement('option');
+                            opt.value = file.url;
+                            opt.textContent = file.nickname || file.name;
+                            bulkSharedVisuals.appendChild(opt);
+                        });
+                    }
+                }
+
+                // Show visual mode options when visual is selected
+                bulkEditVisual?.addEventListener('change', () => {
+                    const val = bulkEditVisual.value;
+                    const showMode = val && val !== '[NO_CHANGE]' && val !== '';
+                    bulkVisualModeContainer.classList.toggle('hidden', !showMode);
+                    
+                    // Handle custom text selection
+                    if (val === '[CUSTOM_TEXT]') {
+                        // Open custom text modal, then return value
+                        openCustomTextModal('bulk');
+                    }
+                });
+
+                // Preview sound
+                bulkPreviewSound?.addEventListener('click', () => {
+                    const sound = bulkEditSound.value;
+                    if (sound && sound !== '[NO_CHANGE]') {
+                        playBell(sound);
+                    }
+                });
+
+                // Cancel
+                bulkEditCancel?.addEventListener('click', () => {
+                    bulkEditModal.classList.add('hidden');
+                });
+
+                // Apply bulk edits
+                bulkEditApply?.addEventListener('click', async () => {
+                    if (bulkSelectedBells.size === 0 || !activePersonalScheduleId) return;
+                    
+                    const newSound = bulkEditSound.value;
+                    const newVisual = bulkEditVisual.value;
+                    const newVisualMode = document.querySelector('input[name="bulk-visual-mode"]:checked')?.value || 'before';
+                    
+                    // Nothing to change
+                    if (newSound === '[NO_CHANGE]' && newVisual === '[NO_CHANGE]') {
+                        bulkEditStatus.textContent = 'Please select at least one change.';
+                        bulkEditStatus.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    try {
+                        bulkEditStatus.textContent = 'Applying changes...';
+                        bulkEditStatus.classList.remove('hidden');
+                        
+                        let updatedCustomCount = 0;
+                        let updatedSharedCount = 0;
+                        
+                        // --- Identify which bells are custom vs shared ---
+                        const allCalculatedBells = [...localSchedule, ...personalBells];
+                        const customBellIds = new Set();
+                        const sharedBellsToUpdate = []; // Store actual bell objects for shared bells
+                        
+                        allCalculatedBells.forEach(bell => {
+                            const bellId = bell.bellId || getBellId(bell);
+                            if (bulkSelectedBells.has(bellId)) {
+                                if (bell.type === 'custom') {
+                                    customBellIds.add(bellId);
+                                } else if (bell.type === 'shared') {
+                                    sharedBellsToUpdate.push(bell);
+                                }
+                            }
+                        });
+                        
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        
+                        // --- Handle CUSTOM bells (update periods in Firestore) ---
+                        let updatedPeriods = [...personalBellsPeriods];
+                        if (customBellIds.size > 0) {
+                            updatedPeriods = updatedPeriods.map(period => {
+                                const updatedBells = period.bells.map(bell => {
+                                    const bellId = bell.bellId || getBellId(bell);
+                                    if (customBellIds.has(bellId)) {
+                                        const updatedBell = { ...bell };
+                                        
+                                        if (newSound !== '[NO_CHANGE]') {
+                                            updatedBell.sound = newSound;
+                                        }
+                                        
+                                        if (newVisual !== '[NO_CHANGE]') {
+                                            updatedBell.visualCue = newVisual === '' ? '' : newVisual;
+                                            updatedBell.visualMode = newVisual === '' ? 'none' : newVisualMode;
+                                        }
+                                        
+                                        updatedCustomCount++;
+                                        return updatedBell;
+                                    }
+                                    return bell;
+                                });
+                                return { ...period, bells: updatedBells };
+                            });
+                        }
+                        
+                        // --- Handle SHARED bells ---
+                        // Get current bellOverrides from Firestore
+                        const docSnap = await getDoc(personalScheduleRef);
+                        const currentData = docSnap.exists() ? docSnap.data() : {};
+                        const bellOverrides = currentData.bellOverrides || {};
+                        
+                        sharedBellsToUpdate.forEach(bell => {
+                            const bellId = bell.bellId || getBellId(bell);
+                            
+                            // Initialize override object if needed
+                            if (!bellOverrides[bellId]) {
+                                bellOverrides[bellId] = {};
+                            }
+                            
+                            // Handle sound override (uses localStorage system)
+                            if (newSound !== '[NO_CHANGE]') {
+                                const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
+                                if (overrideKey) {
+                                    bellSoundOverrides[overrideKey] = newSound;
+                                }
+                                // Also store in bellOverrides for consistency
+                                bellOverrides[bellId].sound = newSound;
+                            }
+                            
+                            // Handle visual override (uses Firestore bellOverrides)
+                            if (newVisual !== '[NO_CHANGE]') {
+                                if (newVisual === '') {
+                                    // Clear visual
+                                    delete bellOverrides[bellId].visualCue;
+                                    delete bellOverrides[bellId].visualMode;
+                                } else {
+                                    bellOverrides[bellId].visualCue = newVisual;
+                                    bellOverrides[bellId].visualMode = newVisualMode;
+                                }
+                            }
+                            
+                            // Clean up empty override objects
+                            if (Object.keys(bellOverrides[bellId]).length === 0) {
+                                delete bellOverrides[bellId];
+                            }
+                            
+                            updatedSharedCount++;
+                        });
+                        
+                        // Save sound overrides to localStorage
+                        if (newSound !== '[NO_CHANGE]' && sharedBellsToUpdate.length > 0) {
+                            saveSoundOverrides();
+                        }
+                        
+                        // Save everything to Firestore
+                        await updateDoc(personalScheduleRef, { 
+                            periods: updatedPeriods,
+                            bellOverrides: bellOverrides
+                        });
+                        
+                        const totalUpdated = updatedCustomCount + updatedSharedCount;
+                        bulkEditStatus.textContent = `Updated ${totalUpdated} bell${totalUpdated !== 1 ? 's' : ''}!`;
+                        
+                        // Exit bulk edit mode
+                        setTimeout(() => {
+                            bulkEditModal.classList.add('hidden');
+                            bulkEditMode = false;
+                            bulkSelectedBells.clear();
+                            bulkEditToggleBtn.textContent = 'Bulk Edit';
+                            bulkEditToggleBtn.classList.remove('bg-purple-600', 'text-white');
+                            bulkEditToggleBtn.classList.add('bg-purple-100', 'text-purple-700');
+                            recalculateAndRenderAll();
+                        }, 1000);
+                        
+                    } catch (error) {
+                        console.error('Bulk edit error:', error);
+                        bulkEditStatus.textContent = 'Error: ' + error.message;
+                    }
+                });
+                // ============================================
+                // END V5.46.0: BULK EDIT FUNCTIONALITY
+                // ============================================
+
+                // ============================================
+                // V5.46.4: GLOBAL ESC KEY HANDLER FOR MODALS
+                // ============================================
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        // List of all modal IDs and their cancel/close actions
+                        const modals = [
+                            { id: 'edit-bell-modal', close: () => editBellModal.classList.add('hidden') },
+                            { id: 'change-sound-modal', close: () => changeSoundModal.classList.add('hidden') },
+                            { id: 'upload-audio-modal', close: () => uploadAudioModal.classList.add('hidden') },
+                            { id: 'upload-visual-modal', close: () => uploadVisualModal.classList.add('hidden') },
+                            { id: 'create-personal-schedule-modal', close: () => { createPersonalScheduleModal.classList.add('hidden'); createPersonalScheduleForm.reset(); } },
+                            { id: 'create-standalone-schedule-modal', close: () => { createStandaloneScheduleModal.classList.add('hidden'); createStandaloneScheduleForm.reset(); } },
+                            { id: 'rename-personal-schedule-modal', close: () => { renamePersonalScheduleModal.classList.add('hidden'); renamePersonalScheduleForm.reset(); } },
+                            { id: 'rename-shared-schedule-modal', close: () => renameSharedScheduleModal.classList.add('hidden') },
+                            { id: 'confirm-restore-modal', close: () => confirmRestoreModal.classList.add('hidden') },
+                            { id: 'confirm-delete-modal', close: () => confirmDeleteModal.classList.add('hidden') },
+                            { id: 'rename-period-modal', close: () => renamePeriodModal.classList.add('hidden') },
+                            { id: 'add-period-modal', close: () => addPeriodModal?.classList.add('hidden') },
+                            { id: 'add-static-bell-modal', close: () => document.getElementById('add-static-bell-modal')?.classList.add('hidden') },
+                            { id: 'relative-bell-modal', close: () => document.getElementById('relative-bell-modal')?.classList.add('hidden') },
+                            { id: 'multi-add-relative-bell-modal', close: () => document.getElementById('multi-add-relative-bell-modal')?.classList.add('hidden') },
+                            { id: 'custom-text-visual-modal', close: () => customTextVisualModal?.classList.add('hidden') },
+                            { id: 'bg-color-picker-modal', close: () => document.getElementById('bg-color-picker-modal')?.classList.add('hidden') },
+                            { id: 'bulk-edit-modal', close: () => bulkEditModal.classList.add('hidden') },
+                            { id: 'custom-quick-bell-manager-modal', close: () => document.getElementById('custom-quick-bell-manager-modal')?.classList.add('hidden') },
+                            { id: 'passing-period-visual-modal', close: () => document.getElementById('passing-period-visual-modal')?.classList.add('hidden') },
+                        ];
+                        
+                        // Find the first visible modal and close it
+                        for (const modal of modals) {
+                            const el = document.getElementById(modal.id);
+                            if (el && !el.classList.contains('hidden')) {
+                                e.preventDefault();
+                                modal.close();
+                                console.log(`ESC closed: ${modal.id}`);
+                                break; // Only close one modal at a time
+                            }
+                        }
+                    }
+                });
+                // ============================================
+                // END V5.46.4: GLOBAL ESC KEY HANDLER
+                // ============================================
     
                 // Import/Export
                 exportSchedulesBtn.addEventListener('click', handleExportSchedules);
