@@ -1,4 +1,25 @@
-        const APP_VERSION = "5.44.12"
+        const APP_VERSION = "5.45.4"
+        // V5.45.4: Remove inconsistent "Override:" prefix from sound display
+        // - The sound name alone is sufficient information
+        // - Removes confusing inconsistency where some overridden bells showed it and others didn't
+        // V5.45.3: Fix background color picker preview for [DEFAULT] SVGs
+        // - getVisualHtmlWithBg now properly handles [DEFAULT] SVGs and empty values
+        // - "New" preview now updates in real-time when changing the color
+        // V5.45.2: Custom background colors for default SVGs (pedestrian, lunch, numbers)
+        // - [BG:#hexcolor] prefix now works with [DEFAULT] SVGs, not just images
+        // - Uses raw SVG content to avoid nested backgrounds
+        // - Both full-size and icon previews support custom backgrounds
+        // V5.45.1: Fix period visual override backup/restore
+        // - Fixed key format: uses hyphen (-) not colon (:)
+        // - Fixed ID: uses activePersonalScheduleId, not baseScheduleId
+        // - Restore now remaps keys to current schedule ID (so backups work across schedules)
+        // - Also checks baseScheduleId for linked schedule compatibility
+        // V5.45.0: Comprehensive personal schedule backup/restore
+        // - Backup now saves: periods (v4 structure), period visual overrides, custom quick bells
+        // - Backup includes references to custom audio/visual files (URLs)
+        // - Restore supports both v1 (legacy bells) and v2 (full) formats
+        // - Restore prompts to optionally restore quick bells
+        // - Backup filename now includes date
         // V5.44.11: Consistent icon/text sizing across all quick bell previews
         // - Modal previews, manager previews, and actual buttons now all use SVG text
         // - SVG text scales proportionally to container, ensuring consistent appearance
@@ -1736,7 +1757,7 @@
                             // Constantly updating in 5.25 to get the appearance right.
                             visualContent = `<img src="${visualCue}" alt="${bell.name}" class="absolute inset-0 w-full h-full object-contain p-1">`;
                         } else if (visualCue.startsWith('[CUSTOM_TEXT]')) {
-                            // V5.44.12: Use SVG text with absolute positioning to fill button (ignoring padding)
+                            // V5.44.11: Use SVG text with absolute positioning to fill button (ignoring padding)
                             const parts = visualCue.replace('[CUSTOM_TEXT] ', '').split('|');
                             const text = parts[0] || bell.iconText || bell.id;
                             const fontSize = text.length > 2 ? 50 : 70;  // Match getCustomBellIconHtml
@@ -2115,11 +2136,8 @@
                             soundDisplay = "No Sound";
                         }
                         
-                        // NEW V4.62.3: Reapply the override flag AFTER naming convention is resolved
-                        // MODIFIED V4.86: Only show "Override" for SHARED bells
-                        if (isOverridden && bell.type === 'shared') {
-                            soundDisplay = `Override: ${soundDisplay}`;
-                        }
+                        // V5.45.4: Removed "Override:" prefix for cleaner, more consistent display
+                        // The sound name alone is sufficient - users can see what's playing
     
                         return `
                             <div class="bell-item flex items-center justify-between p-4 border-t border-gray-100 hover:bg-gray-50 transition-colors"
@@ -5444,12 +5462,90 @@
                 const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
                 if (!schedule) return;
     
-                // Create a clean backup object
+                // V5.45.0: Comprehensive backup including all user customizations
+                
+                // 1. Collect period visual overrides for this schedule
+                // V5.45.1 FIX: Keys use format "{personalScheduleId}-{periodName}" with hyphen
+                const relevantVisualOverrides = {};
+                const scheduleIdPrefix = `${activePersonalScheduleId}-`;
+                for (const key in periodVisualOverrides) {
+                    if (key.startsWith(scheduleIdPrefix)) {
+                        relevantVisualOverrides[key] = periodVisualOverrides[key];
+                    }
+                }
+                
+                // Also check with baseScheduleId for linked schedules (older format compatibility)
+                if (schedule.baseScheduleId) {
+                    const baseIdPrefix = `${schedule.baseScheduleId}-`;
+                    for (const key in periodVisualOverrides) {
+                        if (key.startsWith(baseIdPrefix) && !relevantVisualOverrides[key]) {
+                            relevantVisualOverrides[key] = periodVisualOverrides[key];
+                        }
+                    }
+                }
+                
+                // 2. Get custom quick bells (if any)
+                const quickBellsBackup = customQuickBells.filter(b => b !== null);
+                
+                // 3. Collect all referenced audio/visual URLs from the schedule
+                const referencedMedia = {
+                    audio: new Set(),
+                    visuals: new Set()
+                };
+                
+                // Scan periods for custom sounds and visuals
+                const periods = schedule.periods || [];
+                periods.forEach(period => {
+                    if (period.bells) {
+                        period.bells.forEach(bell => {
+                            // Check for custom audio (URLs start with http)
+                            if (bell.sound && bell.sound.startsWith('http')) {
+                                referencedMedia.audio.add(bell.sound);
+                            }
+                            // Check for custom visuals
+                            if (bell.visualCue && bell.visualCue.startsWith('http')) {
+                                referencedMedia.visuals.add(bell.visualCue);
+                            }
+                        });
+                    }
+                });
+                
+                // Scan visual overrides for custom visuals
+                for (const key in relevantVisualOverrides) {
+                    const value = relevantVisualOverrides[key];
+                    if (value && value.startsWith('http')) {
+                        referencedMedia.visuals.add(value);
+                    }
+                }
+                
+                // Scan quick bells for custom media
+                quickBellsBackup.forEach(bell => {
+                    if (bell.sound && bell.sound.startsWith('http')) {
+                        referencedMedia.audio.add(bell.sound);
+                    }
+                    if (bell.visualCue && bell.visualCue.startsWith('http')) {
+                        referencedMedia.visuals.add(bell.visualCue);
+                    }
+                });
+                
+                // Create comprehensive backup object
                 const backupData = {
-                    type: "EllisWebBell_PersonalSchedule_v1",
-                    name: schedule.name,
-                    baseScheduleId: schedule.baseScheduleId,
-                    bells: schedule.bells
+                    type: "EllisWebBell_PersonalSchedule_v2",  // NEW version!
+                    exportedAt: new Date().toISOString(),
+                    schedule: {
+                        name: schedule.name,
+                        baseScheduleId: schedule.baseScheduleId || null,
+                        isStandalone: schedule.isStandalone || false,
+                        periods: periods  // The full v4 structure
+                    },
+                    periodVisualOverrides: relevantVisualOverrides,
+                    customQuickBells: quickBellsBackup,
+                    referencedMedia: {
+                        audio: Array.from(referencedMedia.audio),
+                        visuals: Array.from(referencedMedia.visuals)
+                    },
+                    // Legacy compatibility - flatten to bells array
+                    _legacyBells: flattenPeriodsToLegacyBells(periods)
                 };
     
                 try {
@@ -5459,13 +5555,25 @@
                     const a = document.createElement('a');
                     a.href = url;
                     const filename = (schedule.name || 'personal_schedule').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                    a.download = `ellisbell_backup_${filename}.json`;
+                    const dateStr = new Date().toISOString().split('T')[0];
+                    a.download = `ellisbell_backup_${filename}_${dateStr}.json`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
+                    
+                    // Show confirmation with media count
+                    const audioCount = referencedMedia.audio.size;
+                    const visualCount = referencedMedia.visuals.size;
+                    let message = `Backup saved! Includes ${periods.length} periods`;
+                    if (audioCount > 0 || visualCount > 0) {
+                        message += ` and references to ${audioCount} audio + ${visualCount} visual files`;
+                    }
+                    showUserMessage(message);
+                    
                 } catch (error) {
                      console.error("Error backing up schedule:", error);
+                     showUserMessage("Error creating backup: " + error.message);
                 }
             }
             
@@ -5476,19 +5584,81 @@
                 reader.onload = (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
-                        // Validate
-                        if (data.type !== "EllisWebBell_PersonalSchedule_v1" || data.name === undefined || data.baseScheduleId === undefined || !Array.isArray(data.bells)) {
-                            throw new Error("Invalid or corrupt backup file.");
+                        
+                        // V5.45.0: Support both v1 and v2 formats
+                        const isV2 = data.type === "EllisWebBell_PersonalSchedule_v2";
+                        const isV1 = data.type === "EllisWebBell_PersonalSchedule_v1";
+                        
+                        if (!isV1 && !isV2) {
+                            throw new Error("Invalid backup file type. Expected EllisWebBell_PersonalSchedule_v1 or v2.");
                         }
-                        pendingRestoreData = data; // Store data
+                        
+                        // Validate based on version
+                        if (isV1) {
+                            if (data.name === undefined || data.baseScheduleId === undefined || !Array.isArray(data.bells)) {
+                                throw new Error("Invalid or corrupt v1 backup file.");
+                            }
+                            // Convert v1 to internal format
+                            pendingRestoreData = {
+                                version: 1,
+                                name: data.name,
+                                baseScheduleId: data.baseScheduleId,
+                                periods: [], // V1 didn't have periods, will use bells
+                                bells: data.bells,
+                                periodVisualOverrides: {},
+                                customQuickBells: [],
+                                referencedMedia: { audio: [], visuals: [] }
+                            };
+                        } else {
+                            // V2 format
+                            if (!data.schedule || data.schedule.name === undefined || !Array.isArray(data.schedule.periods)) {
+                                throw new Error("Invalid or corrupt v2 backup file.");
+                            }
+                            pendingRestoreData = {
+                                version: 2,
+                                name: data.schedule.name,
+                                baseScheduleId: data.schedule.baseScheduleId,
+                                isStandalone: data.schedule.isStandalone || false,
+                                periods: data.schedule.periods,
+                                periodVisualOverrides: data.periodVisualOverrides || {},
+                                customQuickBells: data.customQuickBells || [],
+                                referencedMedia: data.referencedMedia || { audio: [], visuals: [] }
+                            };
+                        }
                         
                         const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
                         
-                        confirmRestoreText.textContent = `Overwrite "${schedule.name}" with data from "${data.name}" (from file ${file.name})? This cannot be undone.`;
+                        // Build confirmation message
+                        let confirmMsg = `Overwrite "${schedule.name}" with data from "${pendingRestoreData.name}" (from file ${file.name})?`;
+                        
+                        if (pendingRestoreData.version === 2) {
+                            const periodCount = pendingRestoreData.periods.length;
+                            const audioCount = pendingRestoreData.referencedMedia.audio.length;
+                            const visualCount = pendingRestoreData.referencedMedia.visuals.length;
+                            const quickBellCount = pendingRestoreData.customQuickBells.length;
+                            const overrideCount = Object.keys(pendingRestoreData.periodVisualOverrides).length;
+                            
+                            confirmMsg += `\n\nThis backup includes:`;
+                            confirmMsg += `\n• ${periodCount} periods`;
+                            if (overrideCount > 0) confirmMsg += `\n• ${overrideCount} visual customizations`;
+                            if (quickBellCount > 0) confirmMsg += `\n• ${quickBellCount} quick bells`;
+                            if (audioCount > 0 || visualCount > 0) {
+                                confirmMsg += `\n• References to ${audioCount} audio + ${visualCount} visual files`;
+                                confirmMsg += `\n  (Files must exist in your account or they'll fall back to defaults)`;
+                            }
+                        } else {
+                            confirmMsg += `\n\n⚠️ This is an older v1 backup with limited data.`;
+                        }
+                        
+                        confirmMsg += `\n\nThis cannot be undone.`;
+                        
+                        confirmRestoreText.textContent = confirmMsg;
+                        confirmRestoreText.style.whiteSpace = 'pre-line'; // Allow line breaks
                         confirmRestoreModal.classList.remove('hidden');
     
                     } catch (error) {
                         console.error("Restore file read failed:", error);
+                        showUserMessage("Error reading backup: " + error.message);
                     } finally {
                         restoreFileInput.value = ''; // Clear input
                     }
@@ -5499,21 +5669,71 @@
             async function confirmRestorePersonalSchedule() {
                 if (!pendingRestoreData || !activePersonalScheduleId) return;
     
-                const { name, baseScheduleId, bells } = pendingRestoreData;
+                const { version, name, baseScheduleId, isStandalone, periods, bells, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
                 const docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 
                 try {
-                    // setDoc will overwrite
-                    await setDoc(docRef, { name, baseScheduleId, bells });
-                    console.log("Schedule restored.");
+                    if (version === 2) {
+                        // V5.45.0: Full v2 restore
+                        
+                        // 1. Restore schedule data
+                        const scheduleData = { 
+                            name, 
+                            baseScheduleId: baseScheduleId || null,
+                            periods 
+                        };
+                        if (isStandalone) {
+                            scheduleData.isStandalone = true;
+                        }
+                        await setDoc(docRef, scheduleData);
+                        
+                        // 2. Restore period visual overrides to localStorage
+                        // V5.45.1 FIX: Remap keys to use current schedule ID
+                        if (backupOverrides && Object.keys(backupOverrides).length > 0) {
+                            let restoredCount = 0;
+                            for (const oldKey in backupOverrides) {
+                                // Extract period name from key (format: "scheduleId-periodName")
+                                const hyphenIndex = oldKey.indexOf('-');
+                                if (hyphenIndex > -1) {
+                                    const periodName = oldKey.substring(hyphenIndex + 1);
+                                    // Create new key with current schedule ID
+                                    const newKey = `${activePersonalScheduleId}-${periodName}`;
+                                    periodVisualOverrides[newKey] = backupOverrides[oldKey];
+                                    restoredCount++;
+                                }
+                            }
+                            saveVisualOverrides();
+                            console.log(`Restored ${restoredCount} period visual overrides.`);
+                        }
+                        
+                        // 3. Restore custom quick bells (if any)
+                        if (backupQuickBells && backupQuickBells.length > 0) {
+                            // Ask user if they want to overwrite quick bells
+                            const restoreQuickBells = confirm(`This backup includes ${backupQuickBells.length} custom quick bells. Do you want to restore them?\n\n(This will replace your current quick bells.)`);
+                            
+                            if (restoreQuickBells) {
+                                await saveCustomQuickBells(backupQuickBells);
+                                console.log(`Restored ${backupQuickBells.length} custom quick bells.`);
+                            }
+                        }
+                        
+                        console.log("V2 schedule restored successfully.");
+                        showUserMessage(`Restored "${name}" with ${periods.length} periods.`);
+                        
+                    } else {
+                        // V1 legacy restore (bells array only)
+                        await setDoc(docRef, { name, baseScheduleId, bells });
+                        console.log("V1 schedule restored (legacy format).");
+                        showUserMessage(`Restored "${name}" (legacy format).`);
+                    }
                     
-                    // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
-                    // The listener will handle the update.
+                    // Refresh the UI
                     scheduleSelector.value = `personal-${activePersonalScheduleId}`;
                     setActiveSchedule(scheduleSelector.value);
     
                 } catch (error) {
                     console.error("Error restoring schedule:", error);
+                    showUserMessage("Error restoring: " + error.message);
                 } finally {
                     pendingRestoreData = null;
                     confirmRestoreModal.classList.add('hidden');
@@ -7157,6 +7377,7 @@
             /**
              * NEW: v4.44 - Gets the HTML for a given visual cue value.
              * MODIFIED V5.29.0: Support [BG:#hexcolor] prefix for custom backgrounds
+             * MODIFIED V5.45.2: Proper support for [BG:] with [DEFAULT] SVGs
              */
             function getVisualHtml(value, periodName) {
                 // V5.29.0: Check for background color prefix
@@ -7180,6 +7401,11 @@
                         return getVisualHtml(periodOverride, periodName);
                     }
                     // No override - use generated default
+                    // V5.45.2: If custom bg, use raw SVG to avoid nested backgrounds
+                    if (customBgColor) {
+                        const rawSvg = getRawDefaultVisualCueSvg(periodName);
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${customBgColor};">${rawSvg}</div>`;
+                    }
                     baseHtml = getDefaultVisualCue(periodName);
                 } else if (value.startsWith('[CUSTOM_TEXT]')) {
                     // MODIFIED V5.41: Use centralized config
@@ -7200,6 +7426,11 @@
                     </div>`;
                 } else if (value.startsWith('[DEFAULT]')) {
                     // Case 2: It's a default SVG key
+                    // V5.45.2: If custom bg, use raw SVG to avoid nested backgrounds
+                    if (customBgColor) {
+                        const rawSvg = getRawDefaultVisualCueSvg(value.replace('[DEFAULT] ', ''));
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${customBgColor};">${rawSvg}</div>`;
+                    }
                     baseHtml = getDefaultVisualCue(value.replace('[DEFAULT] ', ''));
                 } else if (value.startsWith('http')) {
                     // Case 3: It's an uploaded image URL
@@ -7215,13 +7446,21 @@
                     // NEW V4.89: Add default visual for standard Quick Bell
                     // FIX V5.43.0: Use matching background color
                     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM11 15h2v2h-2v-2zm0-8h2v6h-2V7z"/></svg>`;
+                    if (customBgColor) {
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${customBgColor};">${svgContent}</div>`;
+                    }
                     baseHtml = `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.bgColor} ${VISUAL_CONFIG.full.textColor}">${svgContent}</div>`;
                 } else {
                     // Fallback
+                    // V5.45.2: If custom bg, use raw SVG
+                    if (customBgColor) {
+                        const rawSvg = getRawDefaultVisualCueSvg(periodName);
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${customBgColor};">${rawSvg}</div>`;
+                    }
                     baseHtml = getDefaultVisualCue(periodName);
                 }
                 
-                // V5.29.0: Apply custom background color if specified
+                // V5.29.0: Apply custom background color if specified (shouldn't reach here now with V5.45.2 changes)
                 if (customBgColor && baseHtml) {
                     // Wrap the content with a background div
                     return `<div class="w-full h-full flex items-center justify-center" style="background-color:${customBgColor};">${baseHtml}</div>`;
@@ -7264,14 +7503,26 @@
             /**
              * NEW: v4.45 - Gets the HTML for a *small icon* visual cue.
              * MODIFIED V5.41: Uses centralized config for consistency
+             * MODIFIED V5.45.2: Support [BG:] prefix for custom backgrounds on all icon types
              */
             function getVisualIconHtml(value, periodName) {
+                // V5.45.2: Check for background color prefix
+                let customBgColor = null;
+                if (value && value.startsWith('[BG:')) {
+                    const parsed = parseVisualBgColor(value);
+                    customBgColor = parsed.bgColor;
+                    value = parsed.baseValue;
+                }
+                
                 // Use centralized config for all icon classes
                 const sharedClasses = `${VISUAL_CONFIG.icon.size} ${VISUAL_CONFIG.icon.shape} ${VISUAL_CONFIG.icon.shadow} flex items-center justify-center overflow-hidden`; 
                 
                 if (!value) {
                     // If no image, return the default SVG, styled for the icon size/shape
                     const defaultSvgHtml = getRawDefaultVisualCueSvg(periodName);
+                    if (customBgColor) {
+                        return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}" style="background-color:${customBgColor};">${defaultSvgHtml}</div>`;
+                    }
                     return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.bgColor} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('[CUSTOM_TEXT]')) {
@@ -7293,14 +7544,23 @@
                 if (value.startsWith('[DEFAULT]')) {
                     // Case 2: It's a default SVG key
                     const defaultSvgHtml = getRawDefaultVisualCueSvg(value.replace('[DEFAULT] ', ''));
+                    if (customBgColor) {
+                        return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}" style="background-color:${customBgColor};">${defaultSvgHtml}</div>`;
+                    }
                     return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.bgColor} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('http')) {
                     // If uploaded image, use the URL and the shared classes (using object-cover for full circle fill)
+                    if (customBgColor) {
+                        return `<div class="${sharedClasses}" style="background-color:${customBgColor};"><img src="${value}" alt="Icon" class="max-w-full max-h-full object-contain"></div>`;
+                    }
                     return `<img src="${value}" alt="Icon" class="w-full h-full object-cover ${VISUAL_CONFIG.icon.shape} ${VISUAL_CONFIG.icon.bgColor}">`;
                 }
                 // Fallback
                 const defaultSvgHtml = getRawDefaultVisualCueSvg(periodName);
+                if (customBgColor) {
+                    return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}" style="background-color:${customBgColor};">${defaultSvgHtml}</div>`;
+                }
                 return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.bgColor} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}">${defaultSvgHtml}</div>`;
             }
 
@@ -7587,11 +7847,9 @@
 
             /**
              * V5.29.0: Get visual HTML with a specific background color
+             * MODIFIED V5.45.3: Properly handle [DEFAULT] SVGs with custom backgrounds
              */
             function getVisualHtmlWithBg(value, periodName, bgColor) {
-                // Get the base HTML
-                let html = getVisualHtml(value, periodName);
-                
                 // For images, wrap with background
                 if (value && value.startsWith('http')) {
                     return `<div class="w-full h-full flex items-center justify-center" style="background-color:${bgColor};">
@@ -7599,10 +7857,26 @@
                     </div>`;
                 }
                 
-                // For default SVGs, the text color needs to be visible on the bg
-                // The default uses text-gray-400 which works on dark bg
-                // If user chooses light bg, we might need to adjust - but let's keep it simple for now
-                return html;
+                // V5.45.3: For [DEFAULT] SVGs, render with the specified background
+                if (value && value.startsWith('[DEFAULT]')) {
+                    const rawSvg = getRawDefaultVisualCueSvg(value.replace('[DEFAULT] ', ''));
+                    return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${bgColor};">${rawSvg}</div>`;
+                }
+                
+                // V5.45.3: For empty value (auto-generated default), also use raw SVG with custom bg
+                if (!value || value === '') {
+                    const rawSvg = getRawDefaultVisualCueSvg(periodName);
+                    return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${bgColor};">${rawSvg}</div>`;
+                }
+                
+                // For custom text, it has its own background - just return as-is
+                if (value && value.startsWith('[CUSTOM_TEXT]')) {
+                    return getVisualHtml(value, periodName);
+                }
+                
+                // Fallback - use default SVG with custom background
+                const rawSvg = getRawDefaultVisualCueSvg(periodName);
+                return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${bgColor};">${rawSvg}</div>`;
             }
 
             /**
