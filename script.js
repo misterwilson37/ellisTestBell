@@ -1,5 +1,8 @@
-        const APP_VERSION = "5.46.4"
-        // V5.46.4: Three Important Fixes
+        const APP_VERSION = "5.46.5"
+        // V5.46.5: Fix ESC Key Handler Reference Error
+        // - Fixed reference to deleted 'renamePeriodModal' that was causing JavaScript errors
+        // - Changed to correct 'edit-period-details-modal' with proper form reset
+        // V5.46.2: Three Important Fixes
         // - Fixed "Duplicate as Another Personal Schedule" to copy ALL data (periods, bellOverrides, passingPeriodVisual, isStandalone)
         // - Restore from backup now allows editing the schedule name (pre-filled with backup's name)
         // - Added global ESC key handler to close any open modal without saving
@@ -5724,7 +5727,7 @@
                         confirmRestoreText.textContent = confirmMsg;
                         confirmRestoreText.style.whiteSpace = 'pre-line'; // Allow line breaks
                         
-                        // V5.46.4: Pre-fill name input with backup's name
+                        // V5.46.2: Pre-fill name input with backup's name
                         const restoreNameInput = document.getElementById('restore-schedule-name');
                         if (restoreNameInput) {
                             restoreNameInput.value = pendingRestoreData.name;
@@ -5747,7 +5750,7 @@
     
                 const { version, baseScheduleId, isStandalone, periods, bells, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
                 
-                // V5.46.4: Use name from input field instead of backup
+                // V5.46.2: Use name from input field instead of backup
                 const restoreNameInput = document.getElementById('restore-schedule-name');
                 const name = restoreNameInput?.value.trim() || pendingRestoreData.name;
                 
@@ -9992,7 +9995,7 @@
                     let newSchedule;
                     
                     // v3.05: Check if we are duplicating or copying
-                    // V5.46.4: Fixed to copy ALL data including periods, bellOverrides, etc.
+                    // V5.46.2: Fixed to copy ALL data including periods, bellOverrides, etc.
                     if (activePersonalScheduleId) {
                         // DUPLICATING - copy everything from the source schedule
                         const scheduleToDupe = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
@@ -11350,7 +11353,7 @@
                 // ============================================
 
                 // ============================================
-                // V5.46.4: GLOBAL ESC KEY HANDLER FOR MODALS
+                // V5.46.2: GLOBAL ESC KEY HANDLER FOR MODALS
                 // ============================================
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
@@ -11366,7 +11369,7 @@
                             { id: 'rename-shared-schedule-modal', close: () => renameSharedScheduleModal.classList.add('hidden') },
                             { id: 'confirm-restore-modal', close: () => confirmRestoreModal.classList.add('hidden') },
                             { id: 'confirm-delete-modal', close: () => confirmDeleteModal.classList.add('hidden') },
-                            { id: 'rename-period-modal', close: () => renamePeriodModal.classList.add('hidden') },
+                            { id: 'edit-period-details-modal', close: () => { editPeriodModal.classList.add('hidden'); editPeriodForm.reset(); } },
                             { id: 'add-period-modal', close: () => addPeriodModal?.classList.add('hidden') },
                             { id: 'add-static-bell-modal', close: () => document.getElementById('add-static-bell-modal')?.classList.add('hidden') },
                             { id: 'relative-bell-modal', close: () => document.getElementById('relative-bell-modal')?.classList.add('hidden') },
@@ -11391,7 +11394,7 @@
                     }
                 });
                 // ============================================
-                // END V5.46.4: GLOBAL ESC KEY HANDLER
+                // END V5.46.2: GLOBAL ESC KEY HANDLER
                 // ============================================
     
                 // Import/Export
