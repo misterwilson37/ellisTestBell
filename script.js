@@ -1,5 +1,15 @@
-        const APP_VERSION = "5.46.5"
-        // V5.46.5: Fix ESC Key Handler Reference Error
+        const APP_VERSION = "5.46.7"
+        // V5.46.7: Fix Individual Edit Bell + Backup/Restore for bellOverrides
+        // - BUG FIX: Non-admin Edit Bell was checking hidden checkbox for sound save - now checks if sound changed
+        // - BUG FIX: Edit Bell modal now shows the CURRENT sound (including overrides) not originalSound
+        // - BUG FIX: Added recalculateAndRenderAll() after non-admin shared bell save for immediate UI update
+        // - Backup now includes bellOverrides (shared bell customizations)
+        // - Restore now restores bellOverrides and shows count in confirmation
+        // V5.46.4: Fix Shared Bell Sound Overrides to Sync Across Devices
+        // - Sound overrides for shared bells now save to Firestore (bellOverrides) instead of localStorage
+        // - Firestore overrides now take priority over localStorage during rendering
+        // - This ensures changes to shared bell sounds sync across all your devices
+        // V5.46.3: Fix ESC Key Handler Reference Error
         // - Fixed reference to deleted 'renamePeriodModal' that was causing JavaScript errors
         // - Changed to correct 'edit-period-details-modal' with proper form reset
         // V5.46.2: Three Important Fixes
@@ -2729,20 +2739,17 @@
                             // 'bell.sound' *is* the original sound at this point.
                             bell.originalSound = bell.sound; 
                             
-                            // 2. Check for a sound override (localStorage system).
-                            const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
-                            const overrideSound = bellSoundOverrides[overrideKey];
-                            
-                            // 3. Apply the sound override *if it exists*.
-                            if (overrideSound) {
-                                bell.sound = overrideSound;
-                            }
-                            // If no override, 'bell.sound' remains the original sound.
-                            
-                            // V5.46.1: Apply personal bell overrides (visual, nickname, etc.)
+                            // V5.46.4: Firestore overrides take priority over localStorage
+                            // This ensures changes sync across devices
                             const bellId = bell.bellId || getBellId(bell);
                             const personalOverride = personalBellOverrides[bellId];
+                            
+                            // 2. Check for Firestore override FIRST (syncs across devices)
                             if (personalOverride) {
+                                // Apply sound override from Firestore
+                                if (personalOverride.sound) {
+                                    bell.sound = personalOverride.sound;
+                                }
                                 // Apply visual override
                                 if (personalOverride.visualCue !== undefined) {
                                     bell.visualCue = personalOverride.visualCue;
@@ -2750,14 +2757,20 @@
                                 if (personalOverride.visualMode !== undefined) {
                                     bell.visualMode = personalOverride.visualMode;
                                 }
-                                // Apply sound override from Firestore (if not already overridden by localStorage)
-                                if (personalOverride.sound && !overrideSound) {
-                                    bell.sound = personalOverride.sound;
-                                }
                                 // Apply nickname
                                 if (personalOverride.nickname) {
                                     bell.originalName = bell.name;
                                     bell.name = personalOverride.nickname;
+                                }
+                            }
+                            
+                            // 3. Fall back to localStorage override (legacy, device-specific)
+                            // Only if Firestore didn't have a sound override
+                            if (!personalOverride?.sound) {
+                                const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
+                                const localStorageSound = bellSoundOverrides[overrideKey];
+                                if (localStorageSound) {
+                                    bell.sound = localStorageSound;
                                 }
                             }
                         }
@@ -3249,6 +3262,7 @@
              * NEW: v3.19 (4.03?) - Handles saving the new sound URL as a local override.
              * MODIFIED: v4.85 - Now handles BOTH shared bell overrides (localStorage)
              * AND custom bell sound edits (Firestore).
+             * MODIFIED: V5.46.4 - Shared bell overrides now save to Firestore for cross-device sync
              */
             async function handleChangeSoundSubmit(e) {
                 e.preventDefault();
@@ -3258,31 +3272,52 @@
                 const newSound = changeSoundSelect.value;
                 const oldBell = currentChangingSoundBell;
     
-                // --- CASE 1: SHARED BELL (Save override to localStorage) ---
+                // --- CASE 1: SHARED BELL (Save to Firestore for cross-device sync) ---
                 if (oldBell.type === 'shared') {
-                    if (!activeBaseScheduleId) {
-                        console.error("No activeBaseScheduleId to save shared override.");
-                        return;
-                    }
-                    
-                    const overrideKey = getBellOverrideKey(activeBaseScheduleId, oldBell);
-                    if (!overrideKey) {
-                        console.error("Cannot create override key for shared bell.");
+                    // V5.46.4: Save to Firestore bellOverrides instead of localStorage
+                    if (!activePersonalScheduleId) {
+                        console.error("No activePersonalScheduleId to save shared bell override.");
+                        showUserMessage("Please select a personal schedule to customize shared bells.");
                         closeChangeSoundModal();
                         return;
                     }
-        
-                    if (newSound === oldBell.originalSound) {
-                        // If the user selected the original shared sound, delete the override
-                        delete bellSoundOverrides[overrideKey];
-                        console.log("Deleted sound override.");
-                    } else {
-                        // Store the new sound override
-                        bellSoundOverrides[overrideKey] = newSound;
-                        console.log(`Saved sound override: ${newSound}`);
+                    
+                    try {
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        const docSnap = await getDoc(personalScheduleRef);
+                        const currentData = docSnap.exists() ? docSnap.data() : {};
+                        const bellOverrides = currentData.bellOverrides || {};
+                        
+                        const bellId = oldBell.bellId || getBellId(oldBell);
+                        
+                        if (newSound === oldBell.originalSound) {
+                            // If user selected the original sound, remove the override
+                            if (bellOverrides[bellId]) {
+                                delete bellOverrides[bellId].sound;
+                                // Clean up empty object
+                                if (Object.keys(bellOverrides[bellId]).length === 0) {
+                                    delete bellOverrides[bellId];
+                                }
+                            }
+                            console.log("Deleted sound override from Firestore.");
+                        } else {
+                            // Store the new sound override
+                            if (!bellOverrides[bellId]) {
+                                bellOverrides[bellId] = {};
+                            }
+                            bellOverrides[bellId].sound = newSound;
+                            console.log(`Saved sound override to Firestore: ${newSound}`);
+                        }
+                        
+                        await updateDoc(personalScheduleRef, { bellOverrides });
+                        
+                        // Also update local state immediately
+                        personalBellOverrides = bellOverrides;
+                        
+                    } catch (error) {
+                        console.error("Error saving sound override:", error);
+                        showUserMessage("Error saving sound: " + error.message);
                     }
-        
-                    saveSoundOverrides();
                     
                 // --- CASE 2: CUSTOM BELL (Save directly to Firestore) ---
                 } else if (oldBell.type === 'custom') {
@@ -4729,14 +4764,15 @@
                         }
                     }
                     
-                    // FIX 5.19: Use the bell's actual sound for custom bells, originalSound for shared bells
-                    const soundToShow = bell.type === 'custom' ? bell.sound : bell.originalSound;
-                    editBellSoundInput.value = soundToShow || 'ellisBell.mp3';
+                    // FIX V5.46.7: For shared bells, show the CURRENT sound (which may be overridden)
+                    // not originalSound. The user wants to see what's actually playing.
+                    const soundToShow = bell.sound || 'ellisBell.mp3';
+                    editBellSoundInput.value = soundToShow;
                     
                     editBellStatus.classList.add('hidden');
                     
                     updateSoundDropdowns();
-                    editBellSoundInput.value = soundToShow || 'ellisBell.mp3'; // Set again after dropdown update
+                    editBellSoundInput.value = soundToShow; // Set again after dropdown update
                     
                     // NEW 5.32.3: Handle anchor bells (shared type) - lock time but allow visual/sound/name
                     if (bell.type === 'shared') {
@@ -5020,15 +5056,21 @@
 
                 // NEW in 4.21: Check if we should override the sound
                 // FIX V5.42: Add null check for checkbox
-                if (oldBell.type === 'shared' && editBellOverrideCheckbox?.checked) {
-                    // The override box is checked, so take the new sound
-                    newBell.sound = editBellSoundInput.value;
+                // FIX V5.46.7: For non-admin users, always take the sound (checkbox is hidden for them)
+                const isAdmin = document.body.classList.contains('admin-mode');
+                if (oldBell.type === 'shared') {
+                    if (isAdmin && editBellOverrideCheckbox?.checked) {
+                        // Admin with checkbox checked - take the new sound
+                        newBell.sound = editBellSoundInput.value;
+                    } else if (!isAdmin) {
+                        // Non-admin always overrides (checkbox is hidden)
+                        newBell.sound = editBellSoundInput.value;
+                    }
+                    // If admin and checkbox NOT checked, newBell.sound stays as oldBell.sound
                 } else if (oldBell.type === 'custom') {
                     // It's a custom bell, so always take the new sound
                     newBell.sound = editBellSoundInput.value;
                 }
-                // If it's a shared bell and the box is NOT checked,
-                // newBell.sound remains set to oldBell.sound, protecting it.
                 
                 if (!newBell.time || !newBell.name) {
                     editBellStatus.textContent = "Time and Name are required.";
@@ -5071,11 +5113,15 @@
                             const bellOverrides = currentData.bellOverrides || {};
                             
                             // Save the override for this bell
+                            // V5.46.7 FIX: For non-admins, always save the sound if it differs from original
+                            // (checkbox is hidden for non-admins, so we can't rely on it)
+                            const soundChanged = editBellSoundInput.value !== oldBell.originalSound;
+                            
                             bellOverrides[oldBell.bellId] = {
                                 nickname: newBell.name !== oldBell.originalName ? newBell.name : null,
                                 visualCue: visualCue || null,
                                 visualMode: visualMode !== 'none' ? visualMode : null,
-                                sound: editBellOverrideCheckbox?.checked ? editBellSoundInput.value : null
+                                sound: soundChanged ? editBellSoundInput.value : null
                             };
                             
                             // Clean up null values
@@ -5092,7 +5138,14 @@
                             
                             await updateDoc(personalScheduleRef, { bellOverrides });
                             
+                            // V5.46.4: Update local state immediately for instant UI feedback
+                            personalBellOverrides = bellOverrides;
+                            
                             editBellStatus.textContent = "Personal customization saved.";
+                            
+                            // V5.46.7: Trigger re-render to show updated bell
+                            recalculateAndRenderAll();
+                            
                             closeEditBellModal();
                             return;
                         }
@@ -5610,6 +5663,8 @@
                         isStandalone: schedule.isStandalone || false,
                         periods: periods  // The full v4 structure
                     },
+                    // V5.46.7: Include bell overrides (shared bell customizations)
+                    bellOverrides: schedule.bellOverrides || {},
                     periodVisualOverrides: relevantVisualOverrides,
                     customQuickBells: quickBellsBackup,
                     referencedMedia: {
@@ -5692,6 +5747,8 @@
                                 baseScheduleId: data.schedule.baseScheduleId,
                                 isStandalone: data.schedule.isStandalone || false,
                                 periods: data.schedule.periods,
+                                // V5.46.7: Include bell overrides (shared bell customizations)
+                                bellOverrides: data.bellOverrides || {},
                                 periodVisualOverrides: data.periodVisualOverrides || {},
                                 customQuickBells: data.customQuickBells || [],
                                 referencedMedia: data.referencedMedia || { audio: [], visuals: [] }
@@ -5709,10 +5766,13 @@
                             const visualCount = pendingRestoreData.referencedMedia.visuals.length;
                             const quickBellCount = pendingRestoreData.customQuickBells.length;
                             const overrideCount = Object.keys(pendingRestoreData.periodVisualOverrides).length;
+                            // V5.46.7: Count bell overrides
+                            const bellOverrideCount = Object.keys(pendingRestoreData.bellOverrides || {}).length;
                             
                             confirmMsg += `\n\nThis backup includes:`;
                             confirmMsg += `\n• ${periodCount} periods`;
-                            if (overrideCount > 0) confirmMsg += `\n• ${overrideCount} visual customizations`;
+                            if (bellOverrideCount > 0) confirmMsg += `\n• ${bellOverrideCount} shared bell customizations`;
+                            if (overrideCount > 0) confirmMsg += `\n• ${overrideCount} period visual customizations`;
                             if (quickBellCount > 0) confirmMsg += `\n• ${quickBellCount} quick bells`;
                             if (audioCount > 0 || visualCount > 0) {
                                 confirmMsg += `\n• References to ${audioCount} audio + ${visualCount} visual files`;
@@ -5748,7 +5808,8 @@
             async function confirmRestorePersonalSchedule() {
                 if (!pendingRestoreData || !activePersonalScheduleId) return;
     
-                const { version, baseScheduleId, isStandalone, periods, bells, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
+                // V5.46.7: Extract bellOverrides from pending data
+                const { version, baseScheduleId, isStandalone, periods, bells, bellOverrides: backupBellOverrides, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
                 
                 // V5.46.2: Use name from input field instead of backup
                 const restoreNameInput = document.getElementById('restore-schedule-name');
@@ -5760,16 +5821,21 @@
                     if (version === 2) {
                         // V5.45.0: Full v2 restore
                         
-                        // 1. Restore schedule data
+                        // 1. Restore schedule data including bellOverrides
                         const scheduleData = { 
                             name, 
                             baseScheduleId: baseScheduleId || null,
-                            periods 
+                            periods,
+                            // V5.46.7: Include bell overrides
+                            bellOverrides: backupBellOverrides || {}
                         };
                         if (isStandalone) {
                             scheduleData.isStandalone = true;
                         }
                         await setDoc(docRef, scheduleData);
+                        
+                        // V5.46.7: Update local state immediately
+                        personalBellOverrides = backupBellOverrides || {};
                         
                         // 2. Restore period visual overrides to localStorage
                         // V5.45.1 FIX: Remap keys to use current schedule ID
@@ -11288,13 +11354,8 @@
                                 bellOverrides[bellId] = {};
                             }
                             
-                            // Handle sound override (uses localStorage system)
+                            // V5.46.4: Handle sound override (Firestore only for cross-device sync)
                             if (newSound !== '[NO_CHANGE]') {
-                                const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
-                                if (overrideKey) {
-                                    bellSoundOverrides[overrideKey] = newSound;
-                                }
-                                // Also store in bellOverrides for consistency
                                 bellOverrides[bellId].sound = newSound;
                             }
                             
@@ -11318,16 +11379,14 @@
                             updatedSharedCount++;
                         });
                         
-                        // Save sound overrides to localStorage
-                        if (newSound !== '[NO_CHANGE]' && sharedBellsToUpdate.length > 0) {
-                            saveSoundOverrides();
-                        }
-                        
                         // Save everything to Firestore
                         await updateDoc(personalScheduleRef, { 
                             periods: updatedPeriods,
                             bellOverrides: bellOverrides
                         });
+                        
+                        // V5.46.4: Update local state immediately
+                        personalBellOverrides = bellOverrides;
                         
                         const totalUpdated = updatedCustomCount + updatedSharedCount;
                         bulkEditStatus.textContent = `Updated ${totalUpdated} bell${totalUpdated !== 1 ? 's' : ''}!`;
