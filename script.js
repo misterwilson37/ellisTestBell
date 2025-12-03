@@ -1,10 +1,11 @@
-        const APP_VERSION = "5.49.2"
+        const APP_VERSION = "5.51.0"
+        // V5.51.0: PWA Support (Progressive Web App)
+        // - Added manifest.json for installability
+        // - Added service-worker.js for offline caching
+        // - Added PWA icons (192x192 and 512x512)
+        // - Added iOS PWA meta tags
+        // - Users can now install the app from browser address bar
         // V5.49.2: Kiosk Mode Tweaks + CSS Version Display
-        // - PiP kiosk: Keeps horizontal layout (just hides clock/next bell lines)
-        // - Main page kiosk: Stacked with ALL text centered
-        // - Added CSS version display in footer (reads from --css-version)
-        // - Updated HTML comment version format
-        // V5.49.1: Kiosk Mode Layout Fixes
         // - Now clones entire quickBellControls from main page instead of recreating
         // - Copies main page stylesheets (Tailwind) for consistent styling
         // - Custom quick bells work by cloning already-rendered buttons
@@ -10207,6 +10208,31 @@
                 // Optional: Also update the Browser Tab Title automatically
                 document.title = `Ellis Web Bell ${APP_VERSION}`;
                 console.log(`App Version Loaded: ${APP_VERSION}`);
+                
+                // V5.51.0: Register Service Worker for PWA support
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('/service-worker.js')
+                        .then((registration) => {
+                            console.log('[PWA] Service Worker registered:', registration.scope);
+                            
+                            // Check for updates
+                            registration.addEventListener('updatefound', () => {
+                                const newWorker = registration.installing;
+                                console.log('[PWA] New Service Worker installing...');
+                                
+                                newWorker.addEventListener('statechange', () => {
+                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        // New content available, show update notification
+                                        console.log('[PWA] New version available!');
+                                        showUserMessage('New version available! Refresh to update.');
+                                    }
+                                });
+                            });
+                        })
+                        .catch((error) => {
+                            console.warn('[PWA] Service Worker registration failed:', error);
+                        });
+                }
                 
                 // MODIFIED V4.74: All local storage loads
                 // are now handled inside onAuthStateChanged
