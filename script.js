@@ -1,11 +1,10 @@
-        const APP_VERSION = "5.48.0"
-        // V5.48.0: Tab Sleep Recovery & Skip Button Visibility
-        // - Fixed cacophony bug: Tab waking from sleep no longer plays all missed bells
-        // - If tab was asleep 2+ minutes and missed multiple bells, shows message instead
-        // - Only rings most recent bell if 3 or fewer were missed
-        // - Skip Bell button now hidden when no bells remain today
-        // - Both main page and PiP window skip buttons update visibility
-        // V5.47.13: Skip Bell on Main Page
+        const APP_VERSION = "5.49.2"
+        // V5.49.2: Kiosk Mode Tweaks + CSS Version Display
+        // - PiP kiosk: Keeps horizontal layout (just hides clock/next bell lines)
+        // - Main page kiosk: Stacked with ALL text centered
+        // - Added CSS version display in footer (reads from --css-version)
+        // - Updated HTML comment version format
+        // V5.49.1: Kiosk Mode Layout Fixes
         // - Now clones entire quickBellControls from main page instead of recreating
         // - Copies main page stylesheets (Tailwind) for consistent styling
         // - Custom quick bells work by cloning already-rendered buttons
@@ -652,6 +651,9 @@
 
         // NEW V5.47.0: Picture-in-Picture state
         let pipWindow = null; // Reference to the PiP window
+        
+        // NEW V5.49.0: Kiosk Mode state
+        let kioskModeEnabled = false;
 
         let currentSoundSelectTarget = null; // NEW V4.76: Stores <select> for audio modal
 
@@ -1370,6 +1372,107 @@
             }
 
             // ============================================
+            // V5.49.0: KIOSK MODE FUNCTIONALITY
+            // ============================================
+            
+            /**
+             * Load kiosk mode preference from localStorage
+             */
+            function loadKioskModePreference() {
+                try {
+                    const stored = localStorage.getItem('kioskModeEnabled');
+                    if (stored === 'true') {
+                        kioskModeEnabled = true;
+                        applyKioskMode(true);
+                    }
+                } catch (e) {
+                    console.error('Error loading kiosk mode preference:', e);
+                }
+            }
+            
+            /**
+             * Save kiosk mode preference to localStorage
+             */
+            function saveKioskModePreference() {
+                try {
+                    localStorage.setItem('kioskModeEnabled', kioskModeEnabled ? 'true' : 'false');
+                } catch (e) {
+                    console.error('Error saving kiosk mode preference:', e);
+                }
+            }
+            
+            /**
+             * Apply or remove kiosk mode styling
+             * @param {boolean} enabled - Whether to enable kiosk mode
+             */
+            function applyKioskMode(enabled) {
+                const body = document.body;
+                const enterIcon = document.getElementById('kiosk-enter-icon');
+                const exitIcon = document.getElementById('kiosk-exit-icon');
+                const toggleBtn = document.getElementById('kiosk-toggle-btn');
+                
+                if (enabled) {
+                    body.classList.add('kiosk-mode');
+                    if (enterIcon) enterIcon.classList.add('hidden');
+                    if (exitIcon) exitIcon.classList.remove('hidden');
+                    if (toggleBtn) toggleBtn.title = 'Exit Kiosk Mode';
+                } else {
+                    body.classList.remove('kiosk-mode');
+                    if (enterIcon) enterIcon.classList.remove('hidden');
+                    if (exitIcon) exitIcon.classList.add('hidden');
+                    if (toggleBtn) toggleBtn.title = 'Enter Kiosk Mode';
+                }
+            }
+            
+            /**
+             * Toggle kiosk mode on/off
+             */
+            function toggleKioskMode() {
+                kioskModeEnabled = !kioskModeEnabled;
+                applyKioskMode(kioskModeEnabled);
+                saveKioskModePreference();
+                
+                // Also update PiP window if open
+                if (pipWindow && !pipWindow.closed) {
+                    applyPipKioskMode(pipWindow.document, kioskModeEnabled);
+                }
+                
+                console.log(`Kiosk mode: ${kioskModeEnabled ? 'enabled' : 'disabled'}`);
+            }
+            
+            /**
+             * Apply kiosk mode to PiP window
+             * @param {Document} pipDoc - The PiP window document
+             * @param {boolean} enabled - Whether kiosk mode is enabled
+             */
+            function applyPipKioskMode(pipDoc, enabled) {
+                if (!pipDoc) return;
+                
+                const pipBody = pipDoc.body;
+                const quickBellsRow = pipDoc.getElementById('pip-quick-bells');
+                const actionButtons = pipDoc.querySelector('.pip-action-buttons');
+                const enterIcon = pipDoc.getElementById('pip-kiosk-enter-icon');
+                const exitIcon = pipDoc.getElementById('pip-kiosk-exit-icon');
+                const toggleBtn = pipDoc.getElementById('pip-kiosk-toggle-btn');
+                
+                if (enabled) {
+                    if (pipBody) pipBody.classList.add('pip-kiosk-mode');
+                    if (quickBellsRow) quickBellsRow.style.display = 'none';
+                    if (actionButtons) actionButtons.style.display = 'none';
+                    if (enterIcon) enterIcon.classList.add('hidden');
+                    if (exitIcon) exitIcon.classList.remove('hidden');
+                    if (toggleBtn) toggleBtn.title = 'Exit Kiosk Mode';
+                } else {
+                    if (pipBody) pipBody.classList.remove('pip-kiosk-mode');
+                    if (quickBellsRow) quickBellsRow.style.display = '';
+                    if (actionButtons) actionButtons.style.display = '';
+                    if (enterIcon) enterIcon.classList.remove('hidden');
+                    if (exitIcon) exitIcon.classList.add('hidden');
+                    if (toggleBtn) toggleBtn.title = 'Enter Kiosk Mode';
+                }
+            }
+
+            // ============================================
             // V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
             // ============================================
             
@@ -1449,6 +1552,29 @@
                         }
                         .pip-action-buttons button:not(.hidden) {
                             flex: 1;
+                        }
+                        /* V5.49.0: Kiosk mode toggle button */
+                        #pip-kiosk-toggle-btn {
+                            position: fixed;
+                            top: 8px;
+                            right: 8px;
+                            padding: 6px;
+                            background: #1f2937;
+                            color: white;
+                            border: none;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            z-index: 100;
+                        }
+                        #pip-kiosk-toggle-btn:hover {
+                            background: #374151;
+                        }
+                        /* V5.49.2: PiP kiosk mode - keep horizontal, just hide extras */
+                        body.pip-kiosk-mode #pip-clock {
+                            display: none !important;
+                        }
+                        body.pip-kiosk-mode #pip-next-bell {
+                            display: none !important;
                         }
                     `;
                     pipDoc.head.appendChild(pipStyle);
@@ -1539,6 +1665,34 @@
                     container.appendChild(quickBellsClone);
                     
                     pipDoc.body.appendChild(container);
+                    
+                    // V5.49.0: Add kiosk toggle button to PiP
+                    const pipKioskBtn = pipDoc.createElement('button');
+                    pipKioskBtn.id = 'pip-kiosk-toggle-btn';
+                    pipKioskBtn.title = kioskModeEnabled ? 'Exit Kiosk Mode' : 'Enter Kiosk Mode';
+                    pipKioskBtn.innerHTML = `
+                        <svg id="pip-kiosk-enter-icon" ${kioskModeEnabled ? 'class="hidden"' : ''} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <polyline points="9 21 3 21 3 15"></polyline>
+                            <line x1="21" y1="3" x2="14" y2="10"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                        <svg id="pip-kiosk-exit-icon" ${kioskModeEnabled ? '' : 'class="hidden"'} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="4 14 10 14 10 20"></polyline>
+                            <polyline points="20 10 14 10 14 4"></polyline>
+                            <line x1="14" y1="10" x2="21" y2="3"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                    `;
+                    pipKioskBtn.addEventListener('click', () => {
+                        toggleKioskMode();
+                    });
+                    pipDoc.body.appendChild(pipKioskBtn);
+                    
+                    // Apply current kiosk mode state to PiP
+                    if (kioskModeEnabled) {
+                        applyPipKioskMode(pipDoc, true);
+                    }
                     
                     // Set up click handlers - delegate to main page buttons
                     quickBellsClone.addEventListener('click', (e) => {
@@ -10043,6 +10197,13 @@
                     versionElement.textContent = `v${APP_VERSION}`;
                 }
                 
+                // V5.49.2: CSS version display - read from CSS custom property
+                const cssVersionElement = document.getElementById('css-version-display');
+                if (cssVersionElement) {
+                    const cssVersion = getComputedStyle(document.documentElement).getPropertyValue('--css-version').trim().replace(/"/g, '');
+                    cssVersionElement.textContent = `v${cssVersion || '?.?.?'}`;
+                }
+                
                 // Optional: Also update the Browser Tab Title automatically
                 document.title = `Ellis Web Bell ${APP_VERSION}`;
                 console.log(`App Version Loaded: ${APP_VERSION}`);
@@ -10856,6 +11017,32 @@
                     }
                 });
                 
+                // V5.49.0: Sound Preview Buttons - Added to all sound dropdowns
+                document.getElementById('preview-quick-bell-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('quickBellSoundSelect').value);
+                });
+                document.getElementById('preview-multi-bell-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('multi-bell-sound').value);
+                });
+                document.getElementById('preview-relative-bell-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('relative-bell-sound').value);
+                });
+                document.getElementById('preview-multi-relative-bell-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('multi-add-relative-bell-sound').value);
+                });
+                document.getElementById('preview-new-period-start-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('new-period-start-sound').value);
+                });
+                document.getElementById('preview-new-period-start-sound-relative')?.addEventListener('click', () => {
+                    playBell(document.getElementById('new-period-start-sound-relative').value);
+                });
+                document.getElementById('preview-new-period-end-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('new-period-end-sound').value);
+                });
+                document.getElementById('preview-new-period-end-sound-relative')?.addEventListener('click', () => {
+                    playBell(document.getElementById('new-period-end-sound-relative').value);
+                });
+                
                 // Modals (Linked Edit)
                 linkedEditCancel.addEventListener('click', closeLinkedEditModal);
                 linkedEditThisOnly.addEventListener('click', () => handleLinkedEdit(false));
@@ -11296,6 +11483,15 @@
                         pipToggleBtn.style.display = 'none';
                     }
                 }
+                
+                // V5.49.0: Kiosk Mode toggle button
+                const kioskToggleBtn = document.getElementById('kiosk-toggle-btn');
+                if (kioskToggleBtn) {
+                    kioskToggleBtn.addEventListener('click', toggleKioskMode);
+                }
+                
+                // V5.49.0: Load kiosk mode preference on startup
+                loadKioskModePreference();
                     
                 customTextVisualForm.addEventListener('submit', (e) => {
                     e.preventDefault();
