@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.32.1</title>
+    <title>Ellis Web Bell 5.35.3</title>
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <!-- Using Tailwind CSS for styling -->
@@ -80,19 +80,24 @@
             </div>
             <div>
                 <label for="multi-bell-sound" class="block text-sm font-medium text-gray-700">Sound</label>
-
-                <select id="multi-bell-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <optgroup label="Default Sounds">
-                        <option value="Bell">Bell</option>
-                        <option value="Chime">Chime</option>
-                        <option value="Beep">Beep</option>
-                        <option value="Alarm">Alarm</option>
-                        <!-- MODIFIED: Made Ellis Bell selected by default -->
-                        <option value="ellisBell.mp3" selected>Ellis Bell</option>
-                    </optgroup>
-                    <optgroup label="My Sounds" id="multi-my-sounds-optgroup"></optgroup>
-                    <optgroup label="Shared Sounds" id="multi-shared-sounds-optgroup"></optgroup>
-                </select>
+                <!-- V5.49: Added preview button -->
+                <div class="flex items-center gap-2 mt-1">
+                    <select id="multi-bell-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <optgroup label="Default Sounds">
+                            <option value="Bell">Bell</option>
+                            <option value="Chime">Chime</option>
+                            <option value="Beep">Beep</option>
+                            <option value="Alarm">Alarm</option>
+                            <!-- MODIFIED: Made Ellis Bell selected by default -->
+                            <option value="ellisBell.mp3" selected>Ellis Bell</option>
+                        </optgroup>
+                        <optgroup label="My Sounds" id="multi-my-sounds-optgroup"></optgroup>
+                        <optgroup label="Shared Sounds" id="multi-shared-sounds-optgroup"></optgroup>
+                    </select>
+                    <button type="button" id="preview-multi-bell-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                        ▶
+                    </button>
+                </div>
             </div>
 
 			<!-- NEW 5.19 Visual Cue Picker -->
@@ -694,11 +699,31 @@
         </form>
     </div>
     <!-- END: Moved Modals (v3.08) -->
+    <!-- V5.49.0: Kiosk Mode Toggle Button (fixed position) -->
+    <button id="kiosk-toggle-btn" 
+        class="fixed top-4 right-4 z-50 p-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-lg"
+        title="Enter Kiosk Mode">
+        <!-- Enter Kiosk Icon (monitor/fullscreen) -->
+        <svg id="kiosk-enter-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+        <!-- Exit Kiosk Icon (X) - hidden by default -->
+        <svg id="kiosk-exit-icon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 14 10 14 10 20"></polyline>
+            <polyline points="20 10 14 10 14 4"></polyline>
+            <line x1="14" y1="10" x2="21" y2="3"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+    </button>
+    
     <!-- Main Application -->
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.32.1</h1>
+        <header class="text-center mb-8 kiosk-hide">
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.35.3</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
 
 
@@ -721,11 +746,23 @@
             <div class="grid grid-cols-1 md:grid-cols-5 items-center gap-4 md:gap-6">
                 <!-- Column 1: Visual Cue (md:col-span-2 = 40%) -->
 
-                <div id="visual-cue-container" class="md:col-span-2 bg-gray-800 flex items-center justify-center min-h-[150px] aspect-square rounded-lg overflow-hidden w-full mx-auto">
-                    <!-- Default SVG or Image will be injected here by JS -->
-                    <svg id="default-visual-cue" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-gray-500">
-                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-                    </svg>
+                <!-- V5.47.0: Added wrapper for PiP button positioning (button must be outside container that gets innerHTML replaced) -->
+                <div id="visual-cue-wrapper" class="md:col-span-2 relative group w-full mx-auto">
+                    <!-- V5.47.0: Pop Out Button (Document PiP) - positioned relative to wrapper -->
+                    <button id="pip-toggle-btn" 
+                        class="absolute top-2 right-2 p-2 bg-black bg-opacity-50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-opacity-70"
+                        title="Pop out timer (Picture-in-Picture)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 3h6v6M14 10l6.1-6.1M9 21H3v-6M10 14l-6.1 6.1"/>
+                        </svg>
+                    </button>
+                    <!-- Inner container - this is what gets updated by JS -->
+                    <div id="visual-cue-container" class="bg-gray-800 flex items-center justify-center min-h-[150px] aspect-square rounded-lg overflow-hidden">
+                        <!-- Default SVG or Image will be injected here by JS -->
+                        <svg id="default-visual-cue" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-gray-500">
+                            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                        </svg>
+                    </div>
                 </div>
 
                 <!-- Column 2: Countdown / Clock (md:col-span-3 = 75%) -->
@@ -752,14 +789,24 @@
 
                     <!-- MOVED V4.98: Status Footer -->
                     <!-- MODIFIED V5.42: Added Cancel Timer button to status row -->
-                    <div class="flex justify-between items-center text-gray-500 text-lg mt-4 pt-4 border-t border-gray-100">
+                    <!-- MODIFIED V5.47.13: Added Skip Bell and Unskip buttons -->
+                    <!-- V5.49: Hidden in kiosk mode -->
+                    <div class="flex justify-between items-center text-gray-500 text-lg mt-4 pt-4 border-t border-gray-100 kiosk-hide">
                         <div class="text-center md:text-left">
                             Status: <span id="status-message" class="font-medium text-gray-700">Initializing...</span>
                         </div>
-                        <!-- Cancel Quick Bell Button - right aligned in status row -->
-                        <button id="cancel-quick-bell-btn" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 hidden">
-                            Cancel Timer
-                        </button>
+                        <!-- Action buttons - right aligned in status row -->
+                        <div class="flex gap-2">
+                            <button id="skip-bell-btn" class="px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 hidden" title="Skip the next scheduled bell (just this once)">
+                                Skip Bell
+                            </button>
+                            <button id="unskip-bell-btn" class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 hidden">
+                                Unskip
+                            </button>
+                            <button id="cancel-quick-bell-btn" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 hidden">
+                                Cancel Timer
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -768,16 +815,17 @@
         </div>
 
         <!-- **** NEW: Quick Bell Section **** -->
-
-        <div id="quickBellControls" class="p-4 bg-white rounded-xl shadow-md mb-8 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+        <!-- V5.49: Hidden in kiosk mode -->
+        <div id="quickBellControls" class="p-4 bg-white rounded-xl shadow-md mb-8 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 kiosk-hide">
             <!-- 1. Label -->
             <span class="font-semibold text-gray-700 flex-shrink-0">Quick Bell:</span>
 
-            <!-- 2. Sound Dropdown -->
+            <!-- 2. Sound Dropdown with Preview -->
             <!-- 5.14: Dynamically change size to factor in quick bells -->
-			<div class="w-full sm:flex-1">
+            <!-- V5.49: Added preview button -->
+			<div class="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:min-w-0">
                 <!-- This select will be populated by JS to match the others -->
-                <select id="quickBellSoundSelect" class="w-full truncate px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-11">
+                <select id="quickBellSoundSelect" class="flex-1 min-w-0 truncate px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-11">
                     <optgroup label="Default Sounds">
                         <option value="Bell">Bell</option>
                         <option value="Chime">Chime</option>
@@ -785,10 +833,13 @@
                         <optgroup label="My Sounds" id="quick-my-sounds-optgroup"></optgroup>
                     <optgroup label="Shared Sounds" id="quick-shared-sounds-optgroup"></optgroup>
                 </select>
+                <button type="button" id="preview-quick-bell-sound" class="w-11 h-11 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                    ▶
+                </button>
             </div>
 
             <!-- 3. Button Container -->
-            <div class="flex flex-wrap gap-2 items-center">
+            <div class="flex flex-wrap gap-2 items-center flex-shrink-0">
                 <!-- ADDED: The 'quick-bell-btn' class as a JS hook -->
                 <button data-minutes="1" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">1</button>
                 <button data-minutes="2" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">2</button>
@@ -808,7 +859,8 @@
         <!-- **** END NEW: Quick Bell Section **** -->
 
         <!-- Combined Bell Schedule List -->
-        <div>
+        <!-- V5.49: Hidden in kiosk mode -->
+        <div class="kiosk-hide">
             <!-- NEW: Mute & Collapse Controls added -->
             <div class="flex justify-between items-center mb-4">
                  <h2 id="schedule-title" class="text-2xl font-semibold">Current Schedule</h2>
@@ -832,7 +884,8 @@
         </div>
 
         <!-- Schedule Selector -->
-        <div class="bg-white p-6 rounded-xl shadow-md mb-8">
+        <!-- V5.49: Hidden in kiosk mode -->
+        <div class="bg-white p-6 rounded-xl shadow-md mb-8 kiosk-hide">
             <!-- V5.44.8: Standardized header format -->
             <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Active Schedule</h3>
             
@@ -872,7 +925,8 @@
 
 
         <!-- NEW: Admin Zone for creating schedules and adding bells -->
-        <div class="admin-control bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
+        <!-- V5.49: Hidden in kiosk mode -->
+        <div class="admin-control bg-white p-6 rounded-xl shadow-md mb-8 space-y-6 kiosk-hide">
             <h3 class="text-xl font-semibold text-gray-800 border-b pb-2">Admin Zone</h3>
 
             <!-- Create New Schedule Form -->
@@ -992,7 +1046,8 @@
 
         </div>
 
-        <div class="auth-required mt-12"> <!-- Hidden for anonymous users -->
+        <!-- V5.49: Hidden in kiosk mode -->
+        <div class="auth-required mt-12 kiosk-hide"> <!-- Hidden for anonymous users -->
             <!-- DELETED in 4.40: Removed the old H2 and 'add-personal-bell-form'. -->
             <!-- This functionality is replaced by the in-period '+ Bell' button -->
             <!-- and the new 'Multi-Add' feature. -->
@@ -1106,9 +1161,15 @@
                     </div>
                     <div>
                         <label for="relative-bell-sound" class="block text-sm font-medium text-gray-700 mb-1">Sound</label>
-                        <select id="relative-bell-sound" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <!-- Options will be populated by JS -->
-                        </select>
+                        <!-- V5.49: Added preview button -->
+                        <div class="flex items-center gap-2">
+                            <select id="relative-bell-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <!-- Options will be populated by JS -->
+                            </select>
+                            <button type="button" id="preview-relative-bell-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                                ▶
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1426,9 +1487,15 @@
                         </div>
                         <div class="sm:col-span-2">
                             <label for="new-period-start-sound" class="block text-sm font-medium text-gray-700">Sound</label>
-                            <select id="new-period-start-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <!-- Populated by JS -->
-                            </select>
+                            <!-- V5.49: Added preview button -->
+                            <div class="flex items-center gap-2 mt-1">
+                                <select id="new-period-start-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <!-- Populated by JS -->
+                                </select>
+                                <button type="button" id="preview-new-period-start-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                                    ▶
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <!-- Relative Inputs - V5.44.7: Three-row layout with aligned pairs -->
@@ -1477,9 +1544,15 @@
 
                         <div>
                             <label for="new-period-start-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
-                            <select id="new-period-start-sound-relative" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                <!-- Populated by JS -->
-                            </select>
+                            <!-- V5.49: Added preview button -->
+                            <div class="flex items-center gap-2 mt-1">
+                                <select id="new-period-start-sound-relative" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <!-- Populated by JS -->
+                                </select>
+                                <button type="button" id="preview-new-period-start-sound-relative" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                                    ▶
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1496,9 +1569,15 @@
                         </div>
                         <div class="sm:col-span-2">
                             <label for="new-period-end-sound" class="block text-sm font-medium text-gray-700">Sound</label>
-                            <select id="new-period-end-sound" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <!-- Populated by JS -->
-                            </select>
+                            <!-- V5.49: Added preview button -->
+                            <div class="flex items-center gap-2 mt-1">
+                                <select id="new-period-end-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <!-- Populated by JS -->
+                                </select>
+                                <button type="button" id="preview-new-period-end-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                                    ▶
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <!-- Relative Inputs - V5.44.7: Three-row layout with aligned pairs -->
@@ -1547,9 +1626,15 @@
 
                         <div>
                             <label for="new-period-end-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
-                            <select id="new-period-end-sound-relative" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                <!-- Populated by JS -->
-                            </select>
+                            <!-- V5.49: Added preview button -->
+                            <div class="flex items-center gap-2 mt-1">
+                                <select id="new-period-end-sound-relative" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <!-- Populated by JS -->
+                                </select>
+                                <button type="button" id="preview-new-period-end-sound-relative" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                                    ▶
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1709,9 +1794,15 @@
                     </div>
                     <div>
                         <label for="multi-add-relative-bell-sound" class="block text-sm font-medium text-gray-700 mb-1">Sound</label>
-                        <select id="multi-add-relative-bell-sound" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <!-- Options will be populated by JS -->
-                        </select>
+                        <!-- V5.49: Added preview button -->
+                        <div class="flex items-center gap-2">
+                            <select id="multi-add-relative-bell-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <!-- Options will be populated by JS -->
+                            </select>
+                            <button type="button" id="preview-multi-relative-bell-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                                ▶
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1922,7 +2013,8 @@
         </div>
 
 
-        <div id="audio-manager-panel" class="auth-required mt-12 max-w-4xl mx-auto">
+        <!-- V5.49: Hidden in kiosk mode -->
+        <div id="audio-manager-panel" class="auth-required mt-12 max-w-4xl mx-auto kiosk-hide">
             <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
                 <!-- V5.44.8: Standardized header format -->
                 <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 cursor-pointer" title="Click to refresh file lists">My Audio Manager</h3>
@@ -1954,7 +2046,8 @@
         </div>
 
         <!-- **** NEW: v4.44 - Visual Manager Panel **** -->
-        <div id="visual-manager-panel" class="auth-required mt-12 max-w-4xl mx-auto">
+        <!-- V5.49: Hidden in kiosk mode -->
+        <div id="visual-manager-panel" class="auth-required mt-12 max-w-4xl mx-auto kiosk-hide">
             <div class="bg-white p-6 rounded-xl shadow-md mb-8 space-y-6">
                 <!-- V5.44.8: Standardized header format -->
                 <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 cursor-pointer" title="Click to refresh file lists">My Visual Manager</h3>
@@ -1993,6 +2086,8 @@
             </p>
 			<div class="text-center mt-2 text-xs text-gray-400">
    		 		App Version: <span id="app-version-display" class="font-bold text-gray-600">Loading...</span>
+   		 		&nbsp;|&nbsp;
+   		 		CSS Version: <span id="css-version-display" class="font-bold text-gray-600">Loading...</span>
 			</div>
         </footer>
 
@@ -2028,4 +2123,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.32.1 - V5.44.8: Icon fixes, UI reorganization, hours for quick bells -->
+<!-- Version 5.35.3 -->
