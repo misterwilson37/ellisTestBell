@@ -1,5 +1,20 @@
-        const APP_VERSION = "5.46.7"
-        // V5.46.7: Fix Individual Edit Bell + Backup/Restore for bellOverrides
+        const APP_VERSION = "5.48.0"
+        // V5.48.0: Tab Sleep Recovery & Skip Button Visibility
+        // - Fixed cacophony bug: Tab waking from sleep no longer plays all missed bells
+        // - If tab was asleep 2+ minutes and missed multiple bells, shows message instead
+        // - Only rings most recent bell if 3 or fewer were missed
+        // - Skip Bell button now hidden when no bells remain today
+        // - Both main page and PiP window skip buttons update visibility
+        // V5.47.13: Skip Bell on Main Page
+        // - Now clones entire quickBellControls from main page instead of recreating
+        // - Copies main page stylesheets (Tailwind) for consistent styling
+        // - Custom quick bells work by cloning already-rendered buttons
+        // - Click handlers delegate to main page buttons for reliable behavior
+        // V5.47.0: Picture-in-Picture Pop-Out Mode
+        // - Added Document PiP support for always-on-top floating timer window
+        // - Pop-out button appears on hover over the visual cue (top-right corner)
+        // - Button is in a wrapper div so it doesn't get wiped when visual updates
+        // V5.46.5: Fix Individual Edit Bell + Backup/Restore for bellOverrides
         // - BUG FIX: Non-admin Edit Bell was checking hidden checkbox for sound save - now checks if sound changed
         // - BUG FIX: Edit Bell modal now shows the CURRENT sound (including overrides) not originalSound
         // - BUG FIX: Added recalculateAndRenderAll() after non-admin shared bell save for immediate UI update
@@ -559,6 +574,7 @@
         window.customQuickBells = customQuickBells; // 5.30: Make it accessible from console
 
         let mutedBellIds = new Set(); 
+        let skippedBellOccurrences = new Set(); // V5.47.9: Temporarily skipped bells (format: "bellId:YYYY-MM-DD")
         let bellSoundOverrides = {}; // NEW: Store local sound overrides
         let periodNameOverrides = {}; // NEW in 4.22: Store local period nicknames
         
@@ -634,6 +650,9 @@
         // NEW V5.46.1: Personal Bell Overrides (for shared bell customizations)
         let personalBellOverrides = {}; // { bellId: { sound, visualCue, visualMode, nickname } }
 
+        // NEW V5.47.0: Picture-in-Picture state
+        let pipWindow = null; // Reference to the PiP window
+
         let currentSoundSelectTarget = null; // NEW V4.76: Stores <select> for audio modal
 
         const MAX_FILE_SIZE = 1024 * 1024; // 1MB
@@ -676,6 +695,143 @@
                 localStorage.setItem('mutedBellIds', JSON.stringify([...mutedBellIds]));
             } catch (e) {
                 console.error("Failed to save muted bells", e);
+            }
+        }
+
+        // --- V5.47.9: Skip Bell Helper Functions ---
+        // Skipped bells are temporary (for today only) and not persisted
+        
+        function getSkipKey(bell) {
+            // Use time + name as a reliable identifier (works for all bell types)
+            // Format: "HH:MM:SS|BellName|YYYY-MM-DD"
+            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            const bellTime = bell.time || '00:00:00';
+            const bellName = (bell.name || 'Unknown').replace(/\|/g, '-'); // Escape pipe chars
+            return `${bellTime}|${bellName}|${today}`;
+        }
+        
+        function isBellSkipped(bell) {
+            if (!bell) return false;
+            return skippedBellOccurrences.has(getSkipKey(bell));
+        }
+        
+        function skipNextBell() {
+            // Find the next scheduled bell (not quick bell)
+            const now = new Date();
+            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            
+            const allBells = [...localSchedule, ...personalBells];
+            
+            if (allBells.length === 0) {
+                showUserMessage("No bells in schedule to skip.");
+                return;
+            }
+            
+            const upcomingBells = allBells
+                .filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell))
+                .sort((a, b) => a.time.localeCompare(b.time));
+            
+            if (upcomingBells.length === 0) {
+                showUserMessage("No upcoming bells to skip today.");
+                return;
+            }
+            
+            const bellToSkip = upcomingBells[0];
+            const skipKey = getSkipKey(bellToSkip);
+            skippedBellOccurrences.add(skipKey);
+            
+            console.log(`Skipped bell: ${bellToSkip.name} at ${bellToSkip.time} (key: ${skipKey})`);
+            showUserMessage(`Skipped: ${bellToSkip.name} at ${formatTime12Hour(bellToSkip.time, true)}`);
+            
+            // Force immediate UI update
+            updateClock();
+            updatePipWindow();
+            updateMainPageSkipButtons();
+        }
+        
+        function clearOldSkippedBells() {
+            // Clear any skipped bells from previous days
+            // Key format: "HH:MM:SS|BellName|YYYY-MM-DD"
+            const today = new Date().toISOString().split('T')[0];
+            const toRemove = [];
+            
+            skippedBellOccurrences.forEach(key => {
+                const datePart = key.split('|').pop(); // Get date from end of key
+                if (datePart !== today) {
+                    toRemove.push(key);
+                }
+            });
+            
+            toRemove.forEach(key => skippedBellOccurrences.delete(key));
+            
+            if (toRemove.length > 0) {
+                console.log(`Cleared ${toRemove.length} old skipped bell(s)`);
+            }
+        }
+        
+        function getNextSkippedBell() {
+            // Find the earliest skipped bell that's still upcoming
+            const now = new Date();
+            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            const today = now.toISOString().split('T')[0];
+            
+            const allBells = [...localSchedule, ...personalBells];
+            const skippedBells = allBells
+                .filter(bell => {
+                    const skipKey = getSkipKey(bell);
+                    return skippedBellOccurrences.has(skipKey) && bell.time > currentTimeHHMMSS;
+                })
+                .sort((a, b) => a.time.localeCompare(b.time));
+            
+            return skippedBells.length > 0 ? skippedBells[0] : null;
+        }
+        
+        function unskipBell(bell) {
+            if (!bell) return;
+            
+            const skipKey = getSkipKey(bell);
+            skippedBellOccurrences.delete(skipKey);
+            
+            console.log(`Unskipped bell: ${bell.name} at ${bell.time}`);
+            showUserMessage(`Restored: ${bell.name} at ${formatTime12Hour(bell.time, true)}`);
+            
+            // Force immediate UI update
+            updateClock();
+            updatePipWindow();
+            updateMainPageSkipButtons();
+        }
+        
+        /**
+         * V5.47.13: Update Skip/Unskip buttons on main page
+         * V5.48: Also hide Skip Bell when no upcoming bells today
+         */
+        function updateMainPageSkipButtons() {
+            const skipBtn = document.getElementById('skip-bell-btn');
+            const unskipBtn = document.getElementById('unskip-bell-btn');
+            if (!skipBtn || !unskipBtn) return;
+            
+            // Check for upcoming bells
+            const now = new Date();
+            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            const allBells = [...localSchedule, ...personalBells];
+            const upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell));
+            
+            // Show/hide Skip Bell based on whether there are upcoming bells
+            if (upcomingBells.length === 0) {
+                skipBtn.classList.add('hidden');
+            } else {
+                skipBtn.classList.remove('hidden');
+            }
+            
+            // Show/hide Unskip based on whether there's a skipped bell
+            const skippedBell = getNextSkippedBell();
+            if (skippedBell) {
+                unskipBtn.classList.remove('hidden');
+                const timeStr = formatTime12Hour(skippedBell.time, true);
+                unskipBtn.textContent = `Unskip (${timeStr})`;
+                unskipBtn.title = `Restore: ${skippedBell.name} at ${timeStr}`;
+            } else {
+                unskipBtn.classList.add('hidden');
             }
         }
 
@@ -1153,16 +1309,22 @@
     
             function findNextBell(currentTimeHHMMSS) {
                 // MODIFIED: v3.03 - Merges base schedule and personal schedule bells
+                // MODIFIED: v5.47.9 - Skip over temporarily skipped bells
                 const allBells = [...localSchedule, ...personalBells];
                 if (allBells.length === 0) return null;
                 
-                let upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS);
+                // Filter to upcoming bells that aren't skipped
+                let upcomingBells = allBells.filter(bell => 
+                    bell.time > currentTimeHHMMSS && !isBellSkipped(bell)
+                );
                 
                 let nextBell;
                 if (upcomingBells.length > 0) {
                     upcomingBells.sort((a, b) => a.time.localeCompare(b.time));
                     nextBell = upcomingBells[0];
                 } else {
+                    // No upcoming bells today - find first bell (for tomorrow display)
+                    // Don't filter by skipped here since skips are day-specific
                     allBells.sort((a, b) => a.time.localeCompare(b.time));
                     nextBell = allBells[0];
                 }
@@ -1185,11 +1347,13 @@
                 
                 if (currentIndex === -1) return null; // Bell not found
                 
-                if (currentIndex + 1 < sortedBells.length) {
-                    return sortedBells[currentIndex + 1]; // Return the next bell
-                } else {
-                    return null; // This was the last bell of the day
+                // V5.47.9: Find next bell that isn't skipped
+                for (let i = currentIndex + 1; i < sortedBells.length; i++) {
+                    if (!isBellSkipped(sortedBells[i])) {
+                        return sortedBells[i];
+                    }
                 }
+                return null; // No unskipped bells after this one
             }
     
             /**
@@ -1204,6 +1368,331 @@
                 bellDate.setHours(h, m, s, 0); // Set time, clear milliseconds
                 return bellDate;
             }
+
+            // ============================================
+            // V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
+            // ============================================
+            
+            /**
+             * Toggle Picture-in-Picture mode - clones elements from main page
+             */
+            async function togglePictureInPicture() {
+                // Check if Document PiP is supported
+                if (!('documentPictureInPicture' in window)) {
+                    showUserMessage("Picture-in-Picture is not supported in this browser. Try Chrome, Edge, or another Chromium-based browser.");
+                    return;
+                }
+                
+                // If PiP is already open, close it
+                if (pipWindow && !pipWindow.closed) {
+                    pipWindow.close();
+                    pipWindow = null;
+                    return;
+                }
+                
+                try {
+                    // Request PiP window
+                    pipWindow = await documentPictureInPicture.requestWindow({
+                        width: 800,
+                        height: 420
+                    });
+                    
+                    const pipDoc = pipWindow.document;
+                    
+                    // Copy stylesheets from main page (for Tailwind)
+                    [...document.styleSheets].forEach((styleSheet) => {
+                        try {
+                            const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
+                            const style = document.createElement('style');
+                            style.textContent = cssRules;
+                            pipDoc.head.appendChild(style);
+                        } catch (e) {
+                            if (styleSheet.href) {
+                                const link = document.createElement('link');
+                                link.rel = 'stylesheet';
+                                link.href = styleSheet.href;
+                                pipDoc.head.appendChild(link);
+                            }
+                        }
+                    });
+                    
+                    // Add PiP-specific styles
+                    const pipStyle = pipDoc.createElement('style');
+                    pipStyle.textContent = `
+                        body {
+                            background: #f3f4f6;
+                            padding: 16px;
+                            margin: 0;
+                            overflow: hidden;
+                        }
+                        .pip-layout {
+                            display: grid;
+                            grid-template-columns: 250px 1fr;
+                            gap: 16px;
+                            align-items: center;
+                        }
+                        #pip-visual {
+                            width: 250px !important;
+                            height: 250px !important;
+                            min-height: 250px !important;
+                            aspect-ratio: 1 !important;
+                        }
+                        #pip-quick-bells {
+                            margin-top: 12px;
+                            padding-top: 12px;
+                            border-top: 1px solid #e5e7eb;
+                        }
+                        .pip-action-buttons {
+                            display: flex;
+                            gap: 8px;
+                            margin-top: 12px;
+                        }
+                        .pip-action-buttons button:not(.hidden) {
+                            flex: 1;
+                        }
+                    `;
+                    pipDoc.head.appendChild(pipStyle);
+                    
+                    // Build the layout
+                    const container = pipDoc.createElement('div');
+                    
+                    // Main section - two column layout
+                    const mainSection = pipDoc.createElement('div');
+                    mainSection.className = 'pip-layout';
+                    
+                    // Clone visual cue container
+                    const visualClone = document.getElementById('visual-cue-container').cloneNode(true);
+                    visualClone.id = 'pip-visual';
+                    mainSection.appendChild(visualClone);
+                    
+                    // Clone the countdown column
+                    const countdownCol = pipDoc.createElement('div');
+                    countdownCol.className = 'p-2 flex flex-col justify-center';
+                    
+                    const clockClone = document.getElementById('live-clock-sentence').cloneNode(true);
+                    clockClone.id = 'pip-clock';
+                    countdownCol.appendChild(clockClone);
+                    
+                    const countdownClone = document.getElementById('countdown-display').cloneNode(true);
+                    countdownClone.id = 'pip-countdown';
+                    countdownCol.appendChild(countdownClone);
+                    
+                    const bellNameClone = document.getElementById('next-bell-sentence').cloneNode(true);
+                    bellNameClone.id = 'pip-bell-name';
+                    countdownCol.appendChild(bellNameClone);
+                    
+                    const nextBellClone = document.getElementById('next-bell-info').cloneNode(true);
+                    nextBellClone.id = 'pip-next-bell';
+                    countdownCol.appendChild(nextBellClone);
+                    
+                    // Add action buttons row (Skip Bell, Unskip, Cancel Timer)
+                    const actionButtonsRow = pipDoc.createElement('div');
+                    actionButtonsRow.className = 'pip-action-buttons';
+                    
+                    // Skip Bell button - starts hidden, shown if bells exist
+                    const skipBtn = pipDoc.createElement('button');
+                    skipBtn.id = 'pip-skip-bell';
+                    skipBtn.className = 'px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 hidden';
+                    skipBtn.textContent = 'Skip Bell';
+                    skipBtn.title = 'Skip the next scheduled bell (just this once)';
+                    skipBtn.addEventListener('click', () => {
+                        skipNextBell();
+                        updatePipActionButtons(pipDoc);
+                    });
+                    actionButtonsRow.appendChild(skipBtn);
+                    
+                    // Unskip button - shows when a bell has been skipped
+                    const unskipBtn = pipDoc.createElement('button');
+                    unskipBtn.id = 'pip-unskip-bell';
+                    unskipBtn.className = 'px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 hidden';
+                    unskipBtn.textContent = 'Unskip';
+                    unskipBtn.addEventListener('click', () => {
+                        const skippedBell = getNextSkippedBell();
+                        if (skippedBell) {
+                            unskipBell(skippedBell);
+                            updatePipActionButtons(pipDoc);
+                        }
+                    });
+                    actionButtonsRow.appendChild(unskipBtn);
+                    
+                    // Cancel Timer button - hidden until timer active
+                    const cancelBtn = pipDoc.createElement('button');
+                    cancelBtn.id = 'pip-cancel-timer';
+                    cancelBtn.className = 'px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 hidden';
+                    cancelBtn.textContent = 'Cancel Timer';
+                    cancelBtn.addEventListener('click', () => {
+                        document.getElementById('cancel-quick-bell-btn')?.click();
+                    });
+                    actionButtonsRow.appendChild(cancelBtn);
+                    
+                    countdownCol.appendChild(actionButtonsRow);
+                    
+                    mainSection.appendChild(countdownCol);
+                    container.appendChild(mainSection);
+                    
+                    // Clone quick bells section
+                    const quickBellsClone = document.getElementById('quickBellControls').cloneNode(true);
+                    quickBellsClone.id = 'pip-quick-bells';
+                    // Remove the cancel button from quick bells (we have it in the countdown column now)
+                    const oldCancelBtn = quickBellsClone.querySelector('#cancel-quick-bell-btn');
+                    if (oldCancelBtn) oldCancelBtn.remove();
+                    container.appendChild(quickBellsClone);
+                    
+                    pipDoc.body.appendChild(container);
+                    
+                    // Set up click handlers - delegate to main page buttons
+                    quickBellsClone.addEventListener('click', (e) => {
+                        const btn = e.target.closest('button');
+                        if (!btn) return;
+                        
+                        // Find the equivalent button on main page and click it
+                        if (btn.classList.contains('quick-bell-btn')) {
+                            const minutes = btn.dataset.minutes;
+                            const mainBtn = document.querySelector(`#quickBellControls .quick-bell-btn[data-minutes="${minutes}"]`);
+                            if (mainBtn) mainBtn.click();
+                        } else if (btn.classList.contains('custom-quick-launch-btn')) {
+                            const customId = btn.dataset.customId;
+                            const mainBtn = document.querySelector(`#custom-quick-bells-container [data-custom-id="${customId}"]`);
+                            if (mainBtn) mainBtn.click();
+                        }
+                    });
+                    
+                    // Sync sound select changes back to main page
+                    const pipSoundSelect = quickBellsClone.querySelector('#quickBellSoundSelect');
+                    if (pipSoundSelect) {
+                        pipSoundSelect.addEventListener('change', () => {
+                            document.getElementById('quickBellSoundSelect').value = pipSoundSelect.value;
+                        });
+                    }
+                    
+                    // Initial sync
+                    updatePipWindow();
+                    
+                    // Handle close
+                    pipWindow.addEventListener('pagehide', () => {
+                        pipWindow = null;
+                    });
+                    
+                } catch (error) {
+                    console.error("Error opening Picture-in-Picture:", error);
+                    showUserMessage("Could not open Picture-in-Picture: " + error.message);
+                }
+            }
+            
+            /**
+             * Update the PiP window (called from updateClock)
+             */
+            function updatePipWindow() {
+                if (!pipWindow || pipWindow.closed) return;
+                
+                const pipDoc = pipWindow.document;
+                
+                // Sync visual cue
+                const mainVisual = document.getElementById('visual-cue-container');
+                const pipVisual = pipDoc.getElementById('pip-visual');
+                if (mainVisual && pipVisual) {
+                    pipVisual.innerHTML = mainVisual.innerHTML;
+                }
+                
+                // Sync text elements
+                const syncElement = (mainId, pipId) => {
+                    const main = document.getElementById(mainId);
+                    const pip = pipDoc.getElementById(pipId);
+                    if (main && pip) {
+                        pip.textContent = main.textContent;
+                    }
+                };
+                
+                syncElement('live-clock-sentence', 'pip-clock');
+                syncElement('countdown-display', 'pip-countdown');
+                syncElement('next-bell-sentence', 'pip-bell-name');
+                syncElement('next-bell-info', 'pip-next-bell');
+                
+                // Update action buttons (Skip, Unskip, Cancel)
+                updatePipActionButtons(pipDoc);
+                
+                // Sync custom quick bells container
+                const mainCustom = document.getElementById('custom-quick-bells-container');
+                const pipCustom = pipDoc.querySelector('#pip-quick-bells #custom-quick-bells-container');
+                if (mainCustom && pipCustom && mainCustom.innerHTML !== pipCustom.innerHTML) {
+                    pipCustom.innerHTML = mainCustom.innerHTML;
+                }
+                
+                // Sync separator visibility  
+                const mainSep = document.getElementById('custom-quick-bell-separator');
+                const pipSep = pipDoc.querySelector('#pip-quick-bells #custom-quick-bell-separator');
+                if (mainSep && pipSep) {
+                    if (mainSep.classList.contains('hidden')) {
+                        pipSep.classList.add('hidden');
+                    } else {
+                        pipSep.classList.remove('hidden');
+                    }
+                }
+            }
+            
+            /**
+             * Stub for compatibility - actual sync handled in updatePipWindow
+             */
+            function updatePipCustomQuickBells() {
+                updatePipWindow();
+            }
+            
+            /**
+             * Update PiP action buttons visibility based on state
+             * - Quick timer active: Show Cancel Timer only
+             * - No upcoming bells: Hide Skip Bell
+             * - No quick timer, has skipped bell: Show Skip Bell + Unskip
+             */
+            function updatePipActionButtons(pipDoc) {
+                if (!pipDoc) return;
+                
+                const skipBtn = pipDoc.getElementById('pip-skip-bell');
+                const unskipBtn = pipDoc.getElementById('pip-unskip-bell');
+                const cancelBtn = pipDoc.getElementById('pip-cancel-timer');
+                
+                if (!skipBtn || !unskipBtn || !cancelBtn) return;
+                
+                const hasQuickTimer = quickBellEndTime !== null;
+                const skippedBell = getNextSkippedBell();
+                const hasSkippedBell = skippedBell !== null;
+                
+                // V5.48: Check for upcoming bells
+                const now = new Date();
+                const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                const allBells = [...localSchedule, ...personalBells];
+                const upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell));
+                const hasUpcomingBells = upcomingBells.length > 0;
+                
+                if (hasQuickTimer) {
+                    // Quick timer active: Show only Cancel Timer
+                    skipBtn.classList.add('hidden');
+                    unskipBtn.classList.add('hidden');
+                    cancelBtn.classList.remove('hidden');
+                } else {
+                    // No quick timer: Hide Cancel
+                    cancelBtn.classList.add('hidden');
+                    
+                    // Show/hide Skip Bell based on upcoming bells
+                    if (hasUpcomingBells) {
+                        skipBtn.classList.remove('hidden');
+                    } else {
+                        skipBtn.classList.add('hidden');
+                    }
+                    
+                    // Show/hide Unskip based on skipped bell
+                    if (hasSkippedBell) {
+                        unskipBtn.classList.remove('hidden');
+                        const timeStr = formatTime12Hour(skippedBell.time, true);
+                        unskipBtn.textContent = `Unskip (${timeStr})`;
+                        unskipBtn.title = `Restore: ${skippedBell.name} at ${timeStr}`;
+                    } else {
+                        unskipBtn.classList.add('hidden');
+                    }
+                }
+            }
+            // ============================================
+            // END V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
+            // ============================================
 
             // MODIFIED: v3.22 -> v3.23 - Grammar changes
             function updateClock() {
@@ -1381,12 +1870,17 @@
                     console.log("Day has changed. Resetting missed bell check.");
                     lastClockCheckTimestamp = 0; // Force reset
                     currentDay = newDay;
+                    clearOldSkippedBells(); // V5.47.9: Clear skipped bells from previous day
                 }
 
                 // B. On first run, just set the timestamp and wait for the next second.
                 if (lastClockCheckTimestamp === 0) {
                     lastClockCheckTimestamp = nowTimestamp;
                 } else if (nowTimestamp > lastClockCheckTimestamp) {
+                    // V5.48: Check if tab was asleep for a long time (more than 2 minutes)
+                    const timeSinceLastCheck = nowTimestamp - lastClockCheckTimestamp;
+                    const wasTabAsleep = timeSinceLastCheck > 120000; // 2 minutes
+                    
                     // C. Find all bells that *should have* rung between the last check and now
                     const bellsToRing = allBells.filter(bell => {
                         const bellDate = getDateForBellTime(bell.time, now);
@@ -1398,23 +1892,52 @@
                     
                     if (bellsToRing.length > 0) {
                         console.log(`Found ${bellsToRing.length} missed bell(s) to ring.`);
-                        // Sort them just in case
+                        // Sort them by time
                         bellsToRing.sort((a, b) => a.time.localeCompare(b.time));
+                        
+                        // V5.48: If tab was asleep and multiple bells missed, show notification
+                        if (wasTabAsleep && bellsToRing.length > 1) {
+                            const missedCount = bellsToRing.length;
+                            const missedNames = bellsToRing.map(b => `${b.name} (${formatTime12Hour(b.time, true)})`);
+                            
+                            // Show user message about missed bells
+                            showUserMessage(`Tab was asleep - ${missedCount} bell${missedCount > 1 ? 's' : ''} missed`);
+                            
+                            // Log details to console
+                            console.log('Missed bells while tab was asleep:', missedNames);
+                            
+                            // Update status to show missed count
+                            statusElement.textContent = `${missedCount} bells missed while tab was asleep`;
+                        }
 
-                        // Ring them all, but only if cooldown has passed
+                        // Ring only the MOST RECENT bell (last in sorted array), and only if cooldown passed
                         if (nowTimestamp - lastRingTimestamp > RING_COOLDOWN) {
-                            // For now, just ring the *last* one if multiple were missed
-                                const bell = bellsToRing[bellsToRing.length - 1];
-                                // FIX 5.17: Use the actual bell.bellId if it exists, otherwise fall back to getBellId()
-                                const bellId = bell.bellId || getBellId(bell);
-                                
-                                if (mutedBellIds.has(String(bellId))) {
-                                    console.log(`Skipping bell (Muted): ${bell.name}`);
+                            const bell = bellsToRing[bellsToRing.length - 1];
+                            const bellId = bell.bellId || getBellId(bell);
+                            
+                            if (mutedBellIds.has(String(bellId))) {
+                                console.log(`Skipping bell (Muted): ${bell.name}`);
+                                if (!wasTabAsleep || bellsToRing.length === 1) {
                                     statusElement.textContent = `Skipped (Muted): ${bell.name}`;
-                                } else {
-                                    ringBell(bell); // fire-and-forget
-                                    lastBellRingTime = currentTimeHHMMSS; // FIX V5.42: Track ring time for status reset
                                 }
+                            } else if (isBellSkipped(bell)) {
+                                // V5.47.9: Skip temporarily skipped bells
+                                console.log(`Skipping bell (Skipped): ${bell.name}`);
+                                if (!wasTabAsleep || bellsToRing.length === 1) {
+                                    statusElement.textContent = `Skipped: ${bell.name}`;
+                                }
+                                // Remove from skipped set since it's now passed
+                                skippedBellOccurrences.delete(getSkipKey(bell));
+                            } else {
+                                // Only ring if tab wasn't asleep for ages, OR if it's a reasonable catch-up
+                                if (!wasTabAsleep || bellsToRing.length <= 3) {
+                                    ringBell(bell);
+                                    lastBellRingTime = currentTimeHHMMSS;
+                                } else {
+                                    // Too many missed - don't ring, just notify
+                                    console.log(`Not ringing ${bell.name} - too many bells missed (${bellsToRing.length})`);
+                                }
+                            }
                             lastRingTimestamp = nowTimestamp; // Set cooldown
                         }
                     }
@@ -1529,6 +2052,12 @@
                 } catch (e) {
                     console.error("Error updating visual cue:", e);
                 }
+                
+                // V5.48: Update Skip/Unskip button visibility
+                updateMainPageSkipButtons();
+                
+                // V5.47.0: Update Picture-in-Picture window if open
+                updatePipWindow();
             }
             
             // --- NEW: Quick Bell Function (MODIFIED V5.00) ---
@@ -1835,6 +2364,9 @@
                     customQuickBellSeparator.classList.add('hidden');
                     customQuickBellsContainer.innerHTML = '';
                 }
+                
+                // V5.47.0: Update PiP window custom quick bells if open
+                updatePipCustomQuickBells();
             }
 
             /**
@@ -4764,7 +5296,7 @@
                         }
                     }
                     
-                    // FIX V5.46.7: For shared bells, show the CURRENT sound (which may be overridden)
+                    // FIX V5.46.5: For shared bells, show the CURRENT sound (which may be overridden)
                     // not originalSound. The user wants to see what's actually playing.
                     const soundToShow = bell.sound || 'ellisBell.mp3';
                     editBellSoundInput.value = soundToShow;
@@ -5056,7 +5588,7 @@
 
                 // NEW in 4.21: Check if we should override the sound
                 // FIX V5.42: Add null check for checkbox
-                // FIX V5.46.7: For non-admin users, always take the sound (checkbox is hidden for them)
+                // FIX V5.46.5: For non-admin users, always take the sound (checkbox is hidden for them)
                 const isAdmin = document.body.classList.contains('admin-mode');
                 if (oldBell.type === 'shared') {
                     if (isAdmin && editBellOverrideCheckbox?.checked) {
@@ -5113,7 +5645,7 @@
                             const bellOverrides = currentData.bellOverrides || {};
                             
                             // Save the override for this bell
-                            // V5.46.7 FIX: For non-admins, always save the sound if it differs from original
+                            // V5.46.5 FIX: For non-admins, always save the sound if it differs from original
                             // (checkbox is hidden for non-admins, so we can't rely on it)
                             const soundChanged = editBellSoundInput.value !== oldBell.originalSound;
                             
@@ -5143,7 +5675,7 @@
                             
                             editBellStatus.textContent = "Personal customization saved.";
                             
-                            // V5.46.7: Trigger re-render to show updated bell
+                            // V5.46.5: Trigger re-render to show updated bell
                             recalculateAndRenderAll();
                             
                             closeEditBellModal();
@@ -5663,7 +6195,7 @@
                         isStandalone: schedule.isStandalone || false,
                         periods: periods  // The full v4 structure
                     },
-                    // V5.46.7: Include bell overrides (shared bell customizations)
+                    // V5.46.5: Include bell overrides (shared bell customizations)
                     bellOverrides: schedule.bellOverrides || {},
                     periodVisualOverrides: relevantVisualOverrides,
                     customQuickBells: quickBellsBackup,
@@ -5747,7 +6279,7 @@
                                 baseScheduleId: data.schedule.baseScheduleId,
                                 isStandalone: data.schedule.isStandalone || false,
                                 periods: data.schedule.periods,
-                                // V5.46.7: Include bell overrides (shared bell customizations)
+                                // V5.46.5: Include bell overrides (shared bell customizations)
                                 bellOverrides: data.bellOverrides || {},
                                 periodVisualOverrides: data.periodVisualOverrides || {},
                                 customQuickBells: data.customQuickBells || [],
@@ -5766,7 +6298,7 @@
                             const visualCount = pendingRestoreData.referencedMedia.visuals.length;
                             const quickBellCount = pendingRestoreData.customQuickBells.length;
                             const overrideCount = Object.keys(pendingRestoreData.periodVisualOverrides).length;
-                            // V5.46.7: Count bell overrides
+                            // V5.46.5: Count bell overrides
                             const bellOverrideCount = Object.keys(pendingRestoreData.bellOverrides || {}).length;
                             
                             confirmMsg += `\n\nThis backup includes:`;
@@ -5808,7 +6340,7 @@
             async function confirmRestorePersonalSchedule() {
                 if (!pendingRestoreData || !activePersonalScheduleId) return;
     
-                // V5.46.7: Extract bellOverrides from pending data
+                // V5.46.5: Extract bellOverrides from pending data
                 const { version, baseScheduleId, isStandalone, periods, bells, bellOverrides: backupBellOverrides, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
                 
                 // V5.46.2: Use name from input field instead of backup
@@ -5826,7 +6358,7 @@
                             name, 
                             baseScheduleId: baseScheduleId || null,
                             periods,
-                            // V5.46.7: Include bell overrides
+                            // V5.46.5: Include bell overrides
                             bellOverrides: backupBellOverrides || {}
                         };
                         if (isStandalone) {
@@ -5834,7 +6366,7 @@
                         }
                         await setDoc(docRef, scheduleData);
                         
-                        // V5.46.7: Update local state immediately
+                        // V5.46.5: Update local state immediately
                         personalBellOverrides = backupBellOverrides || {};
                         
                         // 2. Restore period visual overrides to localStorage
@@ -10737,6 +11269,33 @@
                     document.getElementById('cancel-quick-bell-btn').classList.add('hidden');
                     updateClock(); // Refresh display
                 });
+                
+                // V5.47.13: Skip Bell button handler
+                document.getElementById('skip-bell-btn').addEventListener('click', () => {
+                    skipNextBell();
+                    updateMainPageSkipButtons();
+                });
+                
+                // V5.47.13: Unskip Bell button handler
+                document.getElementById('unskip-bell-btn').addEventListener('click', () => {
+                    const skippedBell = getNextSkippedBell();
+                    if (skippedBell) {
+                        unskipBell(skippedBell);
+                        updateMainPageSkipButtons();
+                    }
+                });
+                
+                // V5.47.0: Picture-in-Picture toggle button
+                const pipToggleBtn = document.getElementById('pip-toggle-btn');
+                if (pipToggleBtn) {
+                    // Check if Document PiP is supported and show/hide button accordingly
+                    if ('documentPictureInPicture' in window) {
+                        pipToggleBtn.addEventListener('click', togglePictureInPicture);
+                    } else {
+                        // Hide button if not supported
+                        pipToggleBtn.style.display = 'none';
+                    }
+                }
                     
                 customTextVisualForm.addEventListener('submit', (e) => {
                     e.preventDefault();
