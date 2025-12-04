@@ -1,29 +1,5 @@
-        const APP_VERSION = "5.49.2"
-        // V5.49.2: Kiosk Mode Tweaks + CSS Version Display
-        // - PiP kiosk: Keeps horizontal layout (just hides clock/next bell lines)
-        // - Main page kiosk: Stacked with ALL text centered
-        // - Added CSS version display in footer (reads from --css-version)
-        // - Updated HTML comment version format
-        // V5.49.1: Kiosk Mode Layout Fixes
-        // - Now clones entire quickBellControls from main page instead of recreating
-        // - Copies main page stylesheets (Tailwind) for consistent styling
-        // - Custom quick bells work by cloning already-rendered buttons
-        // - Click handlers delegate to main page buttons for reliable behavior
-        // V5.47.0: Picture-in-Picture Pop-Out Mode
-        // - Added Document PiP support for always-on-top floating timer window
-        // - Pop-out button appears on hover over the visual cue (top-right corner)
-        // - Button is in a wrapper div so it doesn't get wiped when visual updates
-        // V5.46.5: Fix Individual Edit Bell + Backup/Restore for bellOverrides
-        // - BUG FIX: Non-admin Edit Bell was checking hidden checkbox for sound save - now checks if sound changed
-        // - BUG FIX: Edit Bell modal now shows the CURRENT sound (including overrides) not originalSound
-        // - BUG FIX: Added recalculateAndRenderAll() after non-admin shared bell save for immediate UI update
-        // - Backup now includes bellOverrides (shared bell customizations)
-        // - Restore now restores bellOverrides and shows count in confirmation
-        // V5.46.4: Fix Shared Bell Sound Overrides to Sync Across Devices
-        // - Sound overrides for shared bells now save to Firestore (bellOverrides) instead of localStorage
-        // - Firestore overrides now take priority over localStorage during rendering
-        // - This ensures changes to shared bell sounds sync across all your devices
-        // V5.46.3: Fix ESC Key Handler Reference Error
+        const APP_VERSION = "5.46.5"
+        // V5.46.5: Fix ESC Key Handler Reference Error
         // - Fixed reference to deleted 'renamePeriodModal' that was causing JavaScript errors
         // - Changed to correct 'edit-period-details-modal' with proper form reset
         // V5.46.2: Three Important Fixes
@@ -573,7 +549,6 @@
         window.customQuickBells = customQuickBells; // 5.30: Make it accessible from console
 
         let mutedBellIds = new Set(); 
-        let skippedBellOccurrences = new Set(); // V5.47.9: Temporarily skipped bells (format: "bellId:YYYY-MM-DD")
         let bellSoundOverrides = {}; // NEW: Store local sound overrides
         let periodNameOverrides = {}; // NEW in 4.22: Store local period nicknames
         
@@ -649,12 +624,6 @@
         // NEW V5.46.1: Personal Bell Overrides (for shared bell customizations)
         let personalBellOverrides = {}; // { bellId: { sound, visualCue, visualMode, nickname } }
 
-        // NEW V5.47.0: Picture-in-Picture state
-        let pipWindow = null; // Reference to the PiP window
-        
-        // NEW V5.49.0: Kiosk Mode state
-        let kioskModeEnabled = false;
-
         let currentSoundSelectTarget = null; // NEW V4.76: Stores <select> for audio modal
 
         const MAX_FILE_SIZE = 1024 * 1024; // 1MB
@@ -697,143 +666,6 @@
                 localStorage.setItem('mutedBellIds', JSON.stringify([...mutedBellIds]));
             } catch (e) {
                 console.error("Failed to save muted bells", e);
-            }
-        }
-
-        // --- V5.47.9: Skip Bell Helper Functions ---
-        // Skipped bells are temporary (for today only) and not persisted
-        
-        function getSkipKey(bell) {
-            // Use time + name as a reliable identifier (works for all bell types)
-            // Format: "HH:MM:SS|BellName|YYYY-MM-DD"
-            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-            const bellTime = bell.time || '00:00:00';
-            const bellName = (bell.name || 'Unknown').replace(/\|/g, '-'); // Escape pipe chars
-            return `${bellTime}|${bellName}|${today}`;
-        }
-        
-        function isBellSkipped(bell) {
-            if (!bell) return false;
-            return skippedBellOccurrences.has(getSkipKey(bell));
-        }
-        
-        function skipNextBell() {
-            // Find the next scheduled bell (not quick bell)
-            const now = new Date();
-            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-            
-            const allBells = [...localSchedule, ...personalBells];
-            
-            if (allBells.length === 0) {
-                showUserMessage("No bells in schedule to skip.");
-                return;
-            }
-            
-            const upcomingBells = allBells
-                .filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell))
-                .sort((a, b) => a.time.localeCompare(b.time));
-            
-            if (upcomingBells.length === 0) {
-                showUserMessage("No upcoming bells to skip today.");
-                return;
-            }
-            
-            const bellToSkip = upcomingBells[0];
-            const skipKey = getSkipKey(bellToSkip);
-            skippedBellOccurrences.add(skipKey);
-            
-            console.log(`Skipped bell: ${bellToSkip.name} at ${bellToSkip.time} (key: ${skipKey})`);
-            showUserMessage(`Skipped: ${bellToSkip.name} at ${formatTime12Hour(bellToSkip.time, true)}`);
-            
-            // Force immediate UI update
-            updateClock();
-            updatePipWindow();
-            updateMainPageSkipButtons();
-        }
-        
-        function clearOldSkippedBells() {
-            // Clear any skipped bells from previous days
-            // Key format: "HH:MM:SS|BellName|YYYY-MM-DD"
-            const today = new Date().toISOString().split('T')[0];
-            const toRemove = [];
-            
-            skippedBellOccurrences.forEach(key => {
-                const datePart = key.split('|').pop(); // Get date from end of key
-                if (datePart !== today) {
-                    toRemove.push(key);
-                }
-            });
-            
-            toRemove.forEach(key => skippedBellOccurrences.delete(key));
-            
-            if (toRemove.length > 0) {
-                console.log(`Cleared ${toRemove.length} old skipped bell(s)`);
-            }
-        }
-        
-        function getNextSkippedBell() {
-            // Find the earliest skipped bell that's still upcoming
-            const now = new Date();
-            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-            const today = now.toISOString().split('T')[0];
-            
-            const allBells = [...localSchedule, ...personalBells];
-            const skippedBells = allBells
-                .filter(bell => {
-                    const skipKey = getSkipKey(bell);
-                    return skippedBellOccurrences.has(skipKey) && bell.time > currentTimeHHMMSS;
-                })
-                .sort((a, b) => a.time.localeCompare(b.time));
-            
-            return skippedBells.length > 0 ? skippedBells[0] : null;
-        }
-        
-        function unskipBell(bell) {
-            if (!bell) return;
-            
-            const skipKey = getSkipKey(bell);
-            skippedBellOccurrences.delete(skipKey);
-            
-            console.log(`Unskipped bell: ${bell.name} at ${bell.time}`);
-            showUserMessage(`Restored: ${bell.name} at ${formatTime12Hour(bell.time, true)}`);
-            
-            // Force immediate UI update
-            updateClock();
-            updatePipWindow();
-            updateMainPageSkipButtons();
-        }
-        
-        /**
-         * V5.47.13: Update Skip/Unskip buttons on main page
-         * V5.48: Also hide Skip Bell when no upcoming bells today
-         */
-        function updateMainPageSkipButtons() {
-            const skipBtn = document.getElementById('skip-bell-btn');
-            const unskipBtn = document.getElementById('unskip-bell-btn');
-            if (!skipBtn || !unskipBtn) return;
-            
-            // Check for upcoming bells
-            const now = new Date();
-            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-            const allBells = [...localSchedule, ...personalBells];
-            const upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell));
-            
-            // Show/hide Skip Bell based on whether there are upcoming bells
-            if (upcomingBells.length === 0) {
-                skipBtn.classList.add('hidden');
-            } else {
-                skipBtn.classList.remove('hidden');
-            }
-            
-            // Show/hide Unskip based on whether there's a skipped bell
-            const skippedBell = getNextSkippedBell();
-            if (skippedBell) {
-                unskipBtn.classList.remove('hidden');
-                const timeStr = formatTime12Hour(skippedBell.time, true);
-                unskipBtn.textContent = `Unskip (${timeStr})`;
-                unskipBtn.title = `Restore: ${skippedBell.name} at ${timeStr}`;
-            } else {
-                unskipBtn.classList.add('hidden');
             }
         }
 
@@ -1311,22 +1143,16 @@
     
             function findNextBell(currentTimeHHMMSS) {
                 // MODIFIED: v3.03 - Merges base schedule and personal schedule bells
-                // MODIFIED: v5.47.9 - Skip over temporarily skipped bells
                 const allBells = [...localSchedule, ...personalBells];
                 if (allBells.length === 0) return null;
                 
-                // Filter to upcoming bells that aren't skipped
-                let upcomingBells = allBells.filter(bell => 
-                    bell.time > currentTimeHHMMSS && !isBellSkipped(bell)
-                );
+                let upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS);
                 
                 let nextBell;
                 if (upcomingBells.length > 0) {
                     upcomingBells.sort((a, b) => a.time.localeCompare(b.time));
                     nextBell = upcomingBells[0];
                 } else {
-                    // No upcoming bells today - find first bell (for tomorrow display)
-                    // Don't filter by skipped here since skips are day-specific
                     allBells.sort((a, b) => a.time.localeCompare(b.time));
                     nextBell = allBells[0];
                 }
@@ -1349,13 +1175,11 @@
                 
                 if (currentIndex === -1) return null; // Bell not found
                 
-                // V5.47.9: Find next bell that isn't skipped
-                for (let i = currentIndex + 1; i < sortedBells.length; i++) {
-                    if (!isBellSkipped(sortedBells[i])) {
-                        return sortedBells[i];
-                    }
+                if (currentIndex + 1 < sortedBells.length) {
+                    return sortedBells[currentIndex + 1]; // Return the next bell
+                } else {
+                    return null; // This was the last bell of the day
                 }
-                return null; // No unskipped bells after this one
             }
     
             /**
@@ -1370,483 +1194,6 @@
                 bellDate.setHours(h, m, s, 0); // Set time, clear milliseconds
                 return bellDate;
             }
-
-            // ============================================
-            // V5.49.0: KIOSK MODE FUNCTIONALITY
-            // ============================================
-            
-            /**
-             * Load kiosk mode preference from localStorage
-             */
-            function loadKioskModePreference() {
-                try {
-                    const stored = localStorage.getItem('kioskModeEnabled');
-                    if (stored === 'true') {
-                        kioskModeEnabled = true;
-                        applyKioskMode(true);
-                    }
-                } catch (e) {
-                    console.error('Error loading kiosk mode preference:', e);
-                }
-            }
-            
-            /**
-             * Save kiosk mode preference to localStorage
-             */
-            function saveKioskModePreference() {
-                try {
-                    localStorage.setItem('kioskModeEnabled', kioskModeEnabled ? 'true' : 'false');
-                } catch (e) {
-                    console.error('Error saving kiosk mode preference:', e);
-                }
-            }
-            
-            /**
-             * Apply or remove kiosk mode styling
-             * @param {boolean} enabled - Whether to enable kiosk mode
-             */
-            function applyKioskMode(enabled) {
-                const body = document.body;
-                const enterIcon = document.getElementById('kiosk-enter-icon');
-                const exitIcon = document.getElementById('kiosk-exit-icon');
-                const toggleBtn = document.getElementById('kiosk-toggle-btn');
-                
-                if (enabled) {
-                    body.classList.add('kiosk-mode');
-                    if (enterIcon) enterIcon.classList.add('hidden');
-                    if (exitIcon) exitIcon.classList.remove('hidden');
-                    if (toggleBtn) toggleBtn.title = 'Exit Kiosk Mode';
-                } else {
-                    body.classList.remove('kiosk-mode');
-                    if (enterIcon) enterIcon.classList.remove('hidden');
-                    if (exitIcon) exitIcon.classList.add('hidden');
-                    if (toggleBtn) toggleBtn.title = 'Enter Kiosk Mode';
-                }
-            }
-            
-            /**
-             * Toggle kiosk mode on/off
-             */
-            function toggleKioskMode() {
-                kioskModeEnabled = !kioskModeEnabled;
-                applyKioskMode(kioskModeEnabled);
-                saveKioskModePreference();
-                
-                // Also update PiP window if open
-                if (pipWindow && !pipWindow.closed) {
-                    applyPipKioskMode(pipWindow.document, kioskModeEnabled);
-                }
-                
-                console.log(`Kiosk mode: ${kioskModeEnabled ? 'enabled' : 'disabled'}`);
-            }
-            
-            /**
-             * Apply kiosk mode to PiP window
-             * @param {Document} pipDoc - The PiP window document
-             * @param {boolean} enabled - Whether kiosk mode is enabled
-             */
-            function applyPipKioskMode(pipDoc, enabled) {
-                if (!pipDoc) return;
-                
-                const pipBody = pipDoc.body;
-                const quickBellsRow = pipDoc.getElementById('pip-quick-bells');
-                const actionButtons = pipDoc.querySelector('.pip-action-buttons');
-                const enterIcon = pipDoc.getElementById('pip-kiosk-enter-icon');
-                const exitIcon = pipDoc.getElementById('pip-kiosk-exit-icon');
-                const toggleBtn = pipDoc.getElementById('pip-kiosk-toggle-btn');
-                
-                if (enabled) {
-                    if (pipBody) pipBody.classList.add('pip-kiosk-mode');
-                    if (quickBellsRow) quickBellsRow.style.display = 'none';
-                    if (actionButtons) actionButtons.style.display = 'none';
-                    if (enterIcon) enterIcon.classList.add('hidden');
-                    if (exitIcon) exitIcon.classList.remove('hidden');
-                    if (toggleBtn) toggleBtn.title = 'Exit Kiosk Mode';
-                } else {
-                    if (pipBody) pipBody.classList.remove('pip-kiosk-mode');
-                    if (quickBellsRow) quickBellsRow.style.display = '';
-                    if (actionButtons) actionButtons.style.display = '';
-                    if (enterIcon) enterIcon.classList.remove('hidden');
-                    if (exitIcon) exitIcon.classList.add('hidden');
-                    if (toggleBtn) toggleBtn.title = 'Enter Kiosk Mode';
-                }
-            }
-
-            // ============================================
-            // V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
-            // ============================================
-            
-            /**
-             * Toggle Picture-in-Picture mode - clones elements from main page
-             */
-            async function togglePictureInPicture() {
-                // Check if Document PiP is supported
-                if (!('documentPictureInPicture' in window)) {
-                    showUserMessage("Picture-in-Picture is not supported in this browser. Try Chrome, Edge, or another Chromium-based browser.");
-                    return;
-                }
-                
-                // If PiP is already open, close it
-                if (pipWindow && !pipWindow.closed) {
-                    pipWindow.close();
-                    pipWindow = null;
-                    return;
-                }
-                
-                try {
-                    // Request PiP window
-                    pipWindow = await documentPictureInPicture.requestWindow({
-                        width: 800,
-                        height: 420
-                    });
-                    
-                    const pipDoc = pipWindow.document;
-                    
-                    // Copy stylesheets from main page (for Tailwind)
-                    [...document.styleSheets].forEach((styleSheet) => {
-                        try {
-                            const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
-                            const style = document.createElement('style');
-                            style.textContent = cssRules;
-                            pipDoc.head.appendChild(style);
-                        } catch (e) {
-                            if (styleSheet.href) {
-                                const link = document.createElement('link');
-                                link.rel = 'stylesheet';
-                                link.href = styleSheet.href;
-                                pipDoc.head.appendChild(link);
-                            }
-                        }
-                    });
-                    
-                    // Add PiP-specific styles
-                    const pipStyle = pipDoc.createElement('style');
-                    pipStyle.textContent = `
-                        body {
-                            background: #f3f4f6;
-                            padding: 16px;
-                            margin: 0;
-                            overflow: hidden;
-                        }
-                        .pip-layout {
-                            display: grid;
-                            grid-template-columns: 250px 1fr;
-                            gap: 16px;
-                            align-items: center;
-                        }
-                        #pip-visual {
-                            width: 250px !important;
-                            height: 250px !important;
-                            min-height: 250px !important;
-                            aspect-ratio: 1 !important;
-                        }
-                        #pip-quick-bells {
-                            margin-top: 12px;
-                            padding-top: 12px;
-                            border-top: 1px solid #e5e7eb;
-                        }
-                        .pip-action-buttons {
-                            display: flex;
-                            gap: 8px;
-                            margin-top: 12px;
-                        }
-                        .pip-action-buttons button:not(.hidden) {
-                            flex: 1;
-                        }
-                        /* V5.49.0: Kiosk mode toggle button */
-                        #pip-kiosk-toggle-btn {
-                            position: fixed;
-                            top: 8px;
-                            right: 8px;
-                            padding: 6px;
-                            background: #1f2937;
-                            color: white;
-                            border: none;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            z-index: 100;
-                        }
-                        #pip-kiosk-toggle-btn:hover {
-                            background: #374151;
-                        }
-                        /* V5.49.2: PiP kiosk mode - keep horizontal, just hide extras */
-                        body.pip-kiosk-mode #pip-clock {
-                            display: none !important;
-                        }
-                        body.pip-kiosk-mode #pip-next-bell {
-                            display: none !important;
-                        }
-                    `;
-                    pipDoc.head.appendChild(pipStyle);
-                    
-                    // Build the layout
-                    const container = pipDoc.createElement('div');
-                    
-                    // Main section - two column layout
-                    const mainSection = pipDoc.createElement('div');
-                    mainSection.className = 'pip-layout';
-                    
-                    // Clone visual cue container
-                    const visualClone = document.getElementById('visual-cue-container').cloneNode(true);
-                    visualClone.id = 'pip-visual';
-                    mainSection.appendChild(visualClone);
-                    
-                    // Clone the countdown column
-                    const countdownCol = pipDoc.createElement('div');
-                    countdownCol.className = 'p-2 flex flex-col justify-center';
-                    
-                    const clockClone = document.getElementById('live-clock-sentence').cloneNode(true);
-                    clockClone.id = 'pip-clock';
-                    countdownCol.appendChild(clockClone);
-                    
-                    const countdownClone = document.getElementById('countdown-display').cloneNode(true);
-                    countdownClone.id = 'pip-countdown';
-                    countdownCol.appendChild(countdownClone);
-                    
-                    const bellNameClone = document.getElementById('next-bell-sentence').cloneNode(true);
-                    bellNameClone.id = 'pip-bell-name';
-                    countdownCol.appendChild(bellNameClone);
-                    
-                    const nextBellClone = document.getElementById('next-bell-info').cloneNode(true);
-                    nextBellClone.id = 'pip-next-bell';
-                    countdownCol.appendChild(nextBellClone);
-                    
-                    // Add action buttons row (Skip Bell, Unskip, Cancel Timer)
-                    const actionButtonsRow = pipDoc.createElement('div');
-                    actionButtonsRow.className = 'pip-action-buttons';
-                    
-                    // Skip Bell button - starts hidden, shown if bells exist
-                    const skipBtn = pipDoc.createElement('button');
-                    skipBtn.id = 'pip-skip-bell';
-                    skipBtn.className = 'px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 hidden';
-                    skipBtn.textContent = 'Skip Bell';
-                    skipBtn.title = 'Skip the next scheduled bell (just this once)';
-                    skipBtn.addEventListener('click', () => {
-                        skipNextBell();
-                        updatePipActionButtons(pipDoc);
-                    });
-                    actionButtonsRow.appendChild(skipBtn);
-                    
-                    // Unskip button - shows when a bell has been skipped
-                    const unskipBtn = pipDoc.createElement('button');
-                    unskipBtn.id = 'pip-unskip-bell';
-                    unskipBtn.className = 'px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 hidden';
-                    unskipBtn.textContent = 'Unskip';
-                    unskipBtn.addEventListener('click', () => {
-                        const skippedBell = getNextSkippedBell();
-                        if (skippedBell) {
-                            unskipBell(skippedBell);
-                            updatePipActionButtons(pipDoc);
-                        }
-                    });
-                    actionButtonsRow.appendChild(unskipBtn);
-                    
-                    // Cancel Timer button - hidden until timer active
-                    const cancelBtn = pipDoc.createElement('button');
-                    cancelBtn.id = 'pip-cancel-timer';
-                    cancelBtn.className = 'px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 hidden';
-                    cancelBtn.textContent = 'Cancel Timer';
-                    cancelBtn.addEventListener('click', () => {
-                        document.getElementById('cancel-quick-bell-btn')?.click();
-                    });
-                    actionButtonsRow.appendChild(cancelBtn);
-                    
-                    countdownCol.appendChild(actionButtonsRow);
-                    
-                    mainSection.appendChild(countdownCol);
-                    container.appendChild(mainSection);
-                    
-                    // Clone quick bells section
-                    const quickBellsClone = document.getElementById('quickBellControls').cloneNode(true);
-                    quickBellsClone.id = 'pip-quick-bells';
-                    // Remove the cancel button from quick bells (we have it in the countdown column now)
-                    const oldCancelBtn = quickBellsClone.querySelector('#cancel-quick-bell-btn');
-                    if (oldCancelBtn) oldCancelBtn.remove();
-                    container.appendChild(quickBellsClone);
-                    
-                    pipDoc.body.appendChild(container);
-                    
-                    // V5.49.0: Add kiosk toggle button to PiP
-                    const pipKioskBtn = pipDoc.createElement('button');
-                    pipKioskBtn.id = 'pip-kiosk-toggle-btn';
-                    pipKioskBtn.title = kioskModeEnabled ? 'Exit Kiosk Mode' : 'Enter Kiosk Mode';
-                    pipKioskBtn.innerHTML = `
-                        <svg id="pip-kiosk-enter-icon" ${kioskModeEnabled ? 'class="hidden"' : ''} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <polyline points="9 21 3 21 3 15"></polyline>
-                            <line x1="21" y1="3" x2="14" y2="10"></line>
-                            <line x1="3" y1="21" x2="10" y2="14"></line>
-                        </svg>
-                        <svg id="pip-kiosk-exit-icon" ${kioskModeEnabled ? '' : 'class="hidden"'} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="4 14 10 14 10 20"></polyline>
-                            <polyline points="20 10 14 10 14 4"></polyline>
-                            <line x1="14" y1="10" x2="21" y2="3"></line>
-                            <line x1="3" y1="21" x2="10" y2="14"></line>
-                        </svg>
-                    `;
-                    pipKioskBtn.addEventListener('click', () => {
-                        toggleKioskMode();
-                    });
-                    pipDoc.body.appendChild(pipKioskBtn);
-                    
-                    // Apply current kiosk mode state to PiP
-                    if (kioskModeEnabled) {
-                        applyPipKioskMode(pipDoc, true);
-                    }
-                    
-                    // Set up click handlers - delegate to main page buttons
-                    quickBellsClone.addEventListener('click', (e) => {
-                        const btn = e.target.closest('button');
-                        if (!btn) return;
-                        
-                        // Find the equivalent button on main page and click it
-                        if (btn.classList.contains('quick-bell-btn')) {
-                            const minutes = btn.dataset.minutes;
-                            const mainBtn = document.querySelector(`#quickBellControls .quick-bell-btn[data-minutes="${minutes}"]`);
-                            if (mainBtn) mainBtn.click();
-                        } else if (btn.classList.contains('custom-quick-launch-btn')) {
-                            const customId = btn.dataset.customId;
-                            const mainBtn = document.querySelector(`#custom-quick-bells-container [data-custom-id="${customId}"]`);
-                            if (mainBtn) mainBtn.click();
-                        }
-                    });
-                    
-                    // Sync sound select changes back to main page
-                    const pipSoundSelect = quickBellsClone.querySelector('#quickBellSoundSelect');
-                    if (pipSoundSelect) {
-                        pipSoundSelect.addEventListener('change', () => {
-                            document.getElementById('quickBellSoundSelect').value = pipSoundSelect.value;
-                        });
-                    }
-                    
-                    // Initial sync
-                    updatePipWindow();
-                    
-                    // Handle close
-                    pipWindow.addEventListener('pagehide', () => {
-                        pipWindow = null;
-                    });
-                    
-                } catch (error) {
-                    console.error("Error opening Picture-in-Picture:", error);
-                    showUserMessage("Could not open Picture-in-Picture: " + error.message);
-                }
-            }
-            
-            /**
-             * Update the PiP window (called from updateClock)
-             */
-            function updatePipWindow() {
-                if (!pipWindow || pipWindow.closed) return;
-                
-                const pipDoc = pipWindow.document;
-                
-                // Sync visual cue
-                const mainVisual = document.getElementById('visual-cue-container');
-                const pipVisual = pipDoc.getElementById('pip-visual');
-                if (mainVisual && pipVisual) {
-                    pipVisual.innerHTML = mainVisual.innerHTML;
-                }
-                
-                // Sync text elements
-                const syncElement = (mainId, pipId) => {
-                    const main = document.getElementById(mainId);
-                    const pip = pipDoc.getElementById(pipId);
-                    if (main && pip) {
-                        pip.textContent = main.textContent;
-                    }
-                };
-                
-                syncElement('live-clock-sentence', 'pip-clock');
-                syncElement('countdown-display', 'pip-countdown');
-                syncElement('next-bell-sentence', 'pip-bell-name');
-                syncElement('next-bell-info', 'pip-next-bell');
-                
-                // Update action buttons (Skip, Unskip, Cancel)
-                updatePipActionButtons(pipDoc);
-                
-                // Sync custom quick bells container
-                const mainCustom = document.getElementById('custom-quick-bells-container');
-                const pipCustom = pipDoc.querySelector('#pip-quick-bells #custom-quick-bells-container');
-                if (mainCustom && pipCustom && mainCustom.innerHTML !== pipCustom.innerHTML) {
-                    pipCustom.innerHTML = mainCustom.innerHTML;
-                }
-                
-                // Sync separator visibility  
-                const mainSep = document.getElementById('custom-quick-bell-separator');
-                const pipSep = pipDoc.querySelector('#pip-quick-bells #custom-quick-bell-separator');
-                if (mainSep && pipSep) {
-                    if (mainSep.classList.contains('hidden')) {
-                        pipSep.classList.add('hidden');
-                    } else {
-                        pipSep.classList.remove('hidden');
-                    }
-                }
-            }
-            
-            /**
-             * Stub for compatibility - actual sync handled in updatePipWindow
-             */
-            function updatePipCustomQuickBells() {
-                updatePipWindow();
-            }
-            
-            /**
-             * Update PiP action buttons visibility based on state
-             * - Quick timer active: Show Cancel Timer only
-             * - No upcoming bells: Hide Skip Bell
-             * - No quick timer, has skipped bell: Show Skip Bell + Unskip
-             */
-            function updatePipActionButtons(pipDoc) {
-                if (!pipDoc) return;
-                
-                const skipBtn = pipDoc.getElementById('pip-skip-bell');
-                const unskipBtn = pipDoc.getElementById('pip-unskip-bell');
-                const cancelBtn = pipDoc.getElementById('pip-cancel-timer');
-                
-                if (!skipBtn || !unskipBtn || !cancelBtn) return;
-                
-                const hasQuickTimer = quickBellEndTime !== null;
-                const skippedBell = getNextSkippedBell();
-                const hasSkippedBell = skippedBell !== null;
-                
-                // V5.48: Check for upcoming bells
-                const now = new Date();
-                const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-                const allBells = [...localSchedule, ...personalBells];
-                const upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell));
-                const hasUpcomingBells = upcomingBells.length > 0;
-                
-                if (hasQuickTimer) {
-                    // Quick timer active: Show only Cancel Timer
-                    skipBtn.classList.add('hidden');
-                    unskipBtn.classList.add('hidden');
-                    cancelBtn.classList.remove('hidden');
-                } else {
-                    // No quick timer: Hide Cancel
-                    cancelBtn.classList.add('hidden');
-                    
-                    // Show/hide Skip Bell based on upcoming bells
-                    if (hasUpcomingBells) {
-                        skipBtn.classList.remove('hidden');
-                    } else {
-                        skipBtn.classList.add('hidden');
-                    }
-                    
-                    // Show/hide Unskip based on skipped bell
-                    if (hasSkippedBell) {
-                        unskipBtn.classList.remove('hidden');
-                        const timeStr = formatTime12Hour(skippedBell.time, true);
-                        unskipBtn.textContent = `Unskip (${timeStr})`;
-                        unskipBtn.title = `Restore: ${skippedBell.name} at ${timeStr}`;
-                    } else {
-                        unskipBtn.classList.add('hidden');
-                    }
-                }
-            }
-            // ============================================
-            // END V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
-            // ============================================
 
             // MODIFIED: v3.22 -> v3.23 - Grammar changes
             function updateClock() {
@@ -2024,17 +1371,12 @@
                     console.log("Day has changed. Resetting missed bell check.");
                     lastClockCheckTimestamp = 0; // Force reset
                     currentDay = newDay;
-                    clearOldSkippedBells(); // V5.47.9: Clear skipped bells from previous day
                 }
 
                 // B. On first run, just set the timestamp and wait for the next second.
                 if (lastClockCheckTimestamp === 0) {
                     lastClockCheckTimestamp = nowTimestamp;
                 } else if (nowTimestamp > lastClockCheckTimestamp) {
-                    // V5.48: Check if tab was asleep for a long time (more than 2 minutes)
-                    const timeSinceLastCheck = nowTimestamp - lastClockCheckTimestamp;
-                    const wasTabAsleep = timeSinceLastCheck > 120000; // 2 minutes
-                    
                     // C. Find all bells that *should have* rung between the last check and now
                     const bellsToRing = allBells.filter(bell => {
                         const bellDate = getDateForBellTime(bell.time, now);
@@ -2046,52 +1388,23 @@
                     
                     if (bellsToRing.length > 0) {
                         console.log(`Found ${bellsToRing.length} missed bell(s) to ring.`);
-                        // Sort them by time
+                        // Sort them just in case
                         bellsToRing.sort((a, b) => a.time.localeCompare(b.time));
-                        
-                        // V5.48: If tab was asleep and multiple bells missed, show notification
-                        if (wasTabAsleep && bellsToRing.length > 1) {
-                            const missedCount = bellsToRing.length;
-                            const missedNames = bellsToRing.map(b => `${b.name} (${formatTime12Hour(b.time, true)})`);
-                            
-                            // Show user message about missed bells
-                            showUserMessage(`Tab was asleep - ${missedCount} bell${missedCount > 1 ? 's' : ''} missed`);
-                            
-                            // Log details to console
-                            console.log('Missed bells while tab was asleep:', missedNames);
-                            
-                            // Update status to show missed count
-                            statusElement.textContent = `${missedCount} bells missed while tab was asleep`;
-                        }
 
-                        // Ring only the MOST RECENT bell (last in sorted array), and only if cooldown passed
+                        // Ring them all, but only if cooldown has passed
                         if (nowTimestamp - lastRingTimestamp > RING_COOLDOWN) {
-                            const bell = bellsToRing[bellsToRing.length - 1];
-                            const bellId = bell.bellId || getBellId(bell);
-                            
-                            if (mutedBellIds.has(String(bellId))) {
-                                console.log(`Skipping bell (Muted): ${bell.name}`);
-                                if (!wasTabAsleep || bellsToRing.length === 1) {
+                            // For now, just ring the *last* one if multiple were missed
+                                const bell = bellsToRing[bellsToRing.length - 1];
+                                // FIX 5.17: Use the actual bell.bellId if it exists, otherwise fall back to getBellId()
+                                const bellId = bell.bellId || getBellId(bell);
+                                
+                                if (mutedBellIds.has(String(bellId))) {
+                                    console.log(`Skipping bell (Muted): ${bell.name}`);
                                     statusElement.textContent = `Skipped (Muted): ${bell.name}`;
-                                }
-                            } else if (isBellSkipped(bell)) {
-                                // V5.47.9: Skip temporarily skipped bells
-                                console.log(`Skipping bell (Skipped): ${bell.name}`);
-                                if (!wasTabAsleep || bellsToRing.length === 1) {
-                                    statusElement.textContent = `Skipped: ${bell.name}`;
-                                }
-                                // Remove from skipped set since it's now passed
-                                skippedBellOccurrences.delete(getSkipKey(bell));
-                            } else {
-                                // Only ring if tab wasn't asleep for ages, OR if it's a reasonable catch-up
-                                if (!wasTabAsleep || bellsToRing.length <= 3) {
-                                    ringBell(bell);
-                                    lastBellRingTime = currentTimeHHMMSS;
                                 } else {
-                                    // Too many missed - don't ring, just notify
-                                    console.log(`Not ringing ${bell.name} - too many bells missed (${bellsToRing.length})`);
+                                    ringBell(bell); // fire-and-forget
+                                    lastBellRingTime = currentTimeHHMMSS; // FIX V5.42: Track ring time for status reset
                                 }
-                            }
                             lastRingTimestamp = nowTimestamp; // Set cooldown
                         }
                     }
@@ -2206,12 +1519,6 @@
                 } catch (e) {
                     console.error("Error updating visual cue:", e);
                 }
-                
-                // V5.48: Update Skip/Unskip button visibility
-                updateMainPageSkipButtons();
-                
-                // V5.47.0: Update Picture-in-Picture window if open
-                updatePipWindow();
             }
             
             // --- NEW: Quick Bell Function (MODIFIED V5.00) ---
@@ -2518,9 +1825,6 @@
                     customQuickBellSeparator.classList.add('hidden');
                     customQuickBellsContainer.innerHTML = '';
                 }
-                
-                // V5.47.0: Update PiP window custom quick bells if open
-                updatePipCustomQuickBells();
             }
 
             /**
@@ -3425,17 +2729,20 @@
                             // 'bell.sound' *is* the original sound at this point.
                             bell.originalSound = bell.sound; 
                             
-                            // V5.46.4: Firestore overrides take priority over localStorage
-                            // This ensures changes sync across devices
+                            // 2. Check for a sound override (localStorage system).
+                            const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
+                            const overrideSound = bellSoundOverrides[overrideKey];
+                            
+                            // 3. Apply the sound override *if it exists*.
+                            if (overrideSound) {
+                                bell.sound = overrideSound;
+                            }
+                            // If no override, 'bell.sound' remains the original sound.
+                            
+                            // V5.46.1: Apply personal bell overrides (visual, nickname, etc.)
                             const bellId = bell.bellId || getBellId(bell);
                             const personalOverride = personalBellOverrides[bellId];
-                            
-                            // 2. Check for Firestore override FIRST (syncs across devices)
                             if (personalOverride) {
-                                // Apply sound override from Firestore
-                                if (personalOverride.sound) {
-                                    bell.sound = personalOverride.sound;
-                                }
                                 // Apply visual override
                                 if (personalOverride.visualCue !== undefined) {
                                     bell.visualCue = personalOverride.visualCue;
@@ -3443,20 +2750,14 @@
                                 if (personalOverride.visualMode !== undefined) {
                                     bell.visualMode = personalOverride.visualMode;
                                 }
+                                // Apply sound override from Firestore (if not already overridden by localStorage)
+                                if (personalOverride.sound && !overrideSound) {
+                                    bell.sound = personalOverride.sound;
+                                }
                                 // Apply nickname
                                 if (personalOverride.nickname) {
                                     bell.originalName = bell.name;
                                     bell.name = personalOverride.nickname;
-                                }
-                            }
-                            
-                            // 3. Fall back to localStorage override (legacy, device-specific)
-                            // Only if Firestore didn't have a sound override
-                            if (!personalOverride?.sound) {
-                                const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
-                                const localStorageSound = bellSoundOverrides[overrideKey];
-                                if (localStorageSound) {
-                                    bell.sound = localStorageSound;
                                 }
                             }
                         }
@@ -3948,7 +3249,6 @@
              * NEW: v3.19 (4.03?) - Handles saving the new sound URL as a local override.
              * MODIFIED: v4.85 - Now handles BOTH shared bell overrides (localStorage)
              * AND custom bell sound edits (Firestore).
-             * MODIFIED: V5.46.4 - Shared bell overrides now save to Firestore for cross-device sync
              */
             async function handleChangeSoundSubmit(e) {
                 e.preventDefault();
@@ -3958,52 +3258,31 @@
                 const newSound = changeSoundSelect.value;
                 const oldBell = currentChangingSoundBell;
     
-                // --- CASE 1: SHARED BELL (Save to Firestore for cross-device sync) ---
+                // --- CASE 1: SHARED BELL (Save override to localStorage) ---
                 if (oldBell.type === 'shared') {
-                    // V5.46.4: Save to Firestore bellOverrides instead of localStorage
-                    if (!activePersonalScheduleId) {
-                        console.error("No activePersonalScheduleId to save shared bell override.");
-                        showUserMessage("Please select a personal schedule to customize shared bells.");
-                        closeChangeSoundModal();
+                    if (!activeBaseScheduleId) {
+                        console.error("No activeBaseScheduleId to save shared override.");
                         return;
                     }
                     
-                    try {
-                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-                        const docSnap = await getDoc(personalScheduleRef);
-                        const currentData = docSnap.exists() ? docSnap.data() : {};
-                        const bellOverrides = currentData.bellOverrides || {};
-                        
-                        const bellId = oldBell.bellId || getBellId(oldBell);
-                        
-                        if (newSound === oldBell.originalSound) {
-                            // If user selected the original sound, remove the override
-                            if (bellOverrides[bellId]) {
-                                delete bellOverrides[bellId].sound;
-                                // Clean up empty object
-                                if (Object.keys(bellOverrides[bellId]).length === 0) {
-                                    delete bellOverrides[bellId];
-                                }
-                            }
-                            console.log("Deleted sound override from Firestore.");
-                        } else {
-                            // Store the new sound override
-                            if (!bellOverrides[bellId]) {
-                                bellOverrides[bellId] = {};
-                            }
-                            bellOverrides[bellId].sound = newSound;
-                            console.log(`Saved sound override to Firestore: ${newSound}`);
-                        }
-                        
-                        await updateDoc(personalScheduleRef, { bellOverrides });
-                        
-                        // Also update local state immediately
-                        personalBellOverrides = bellOverrides;
-                        
-                    } catch (error) {
-                        console.error("Error saving sound override:", error);
-                        showUserMessage("Error saving sound: " + error.message);
+                    const overrideKey = getBellOverrideKey(activeBaseScheduleId, oldBell);
+                    if (!overrideKey) {
+                        console.error("Cannot create override key for shared bell.");
+                        closeChangeSoundModal();
+                        return;
                     }
+        
+                    if (newSound === oldBell.originalSound) {
+                        // If the user selected the original shared sound, delete the override
+                        delete bellSoundOverrides[overrideKey];
+                        console.log("Deleted sound override.");
+                    } else {
+                        // Store the new sound override
+                        bellSoundOverrides[overrideKey] = newSound;
+                        console.log(`Saved sound override: ${newSound}`);
+                    }
+        
+                    saveSoundOverrides();
                     
                 // --- CASE 2: CUSTOM BELL (Save directly to Firestore) ---
                 } else if (oldBell.type === 'custom') {
@@ -5450,15 +4729,14 @@
                         }
                     }
                     
-                    // FIX V5.46.5: For shared bells, show the CURRENT sound (which may be overridden)
-                    // not originalSound. The user wants to see what's actually playing.
-                    const soundToShow = bell.sound || 'ellisBell.mp3';
-                    editBellSoundInput.value = soundToShow;
+                    // FIX 5.19: Use the bell's actual sound for custom bells, originalSound for shared bells
+                    const soundToShow = bell.type === 'custom' ? bell.sound : bell.originalSound;
+                    editBellSoundInput.value = soundToShow || 'ellisBell.mp3';
                     
                     editBellStatus.classList.add('hidden');
                     
                     updateSoundDropdowns();
-                    editBellSoundInput.value = soundToShow; // Set again after dropdown update
+                    editBellSoundInput.value = soundToShow || 'ellisBell.mp3'; // Set again after dropdown update
                     
                     // NEW 5.32.3: Handle anchor bells (shared type) - lock time but allow visual/sound/name
                     if (bell.type === 'shared') {
@@ -5742,21 +5020,15 @@
 
                 // NEW in 4.21: Check if we should override the sound
                 // FIX V5.42: Add null check for checkbox
-                // FIX V5.46.5: For non-admin users, always take the sound (checkbox is hidden for them)
-                const isAdmin = document.body.classList.contains('admin-mode');
-                if (oldBell.type === 'shared') {
-                    if (isAdmin && editBellOverrideCheckbox?.checked) {
-                        // Admin with checkbox checked - take the new sound
-                        newBell.sound = editBellSoundInput.value;
-                    } else if (!isAdmin) {
-                        // Non-admin always overrides (checkbox is hidden)
-                        newBell.sound = editBellSoundInput.value;
-                    }
-                    // If admin and checkbox NOT checked, newBell.sound stays as oldBell.sound
+                if (oldBell.type === 'shared' && editBellOverrideCheckbox?.checked) {
+                    // The override box is checked, so take the new sound
+                    newBell.sound = editBellSoundInput.value;
                 } else if (oldBell.type === 'custom') {
                     // It's a custom bell, so always take the new sound
                     newBell.sound = editBellSoundInput.value;
                 }
+                // If it's a shared bell and the box is NOT checked,
+                // newBell.sound remains set to oldBell.sound, protecting it.
                 
                 if (!newBell.time || !newBell.name) {
                     editBellStatus.textContent = "Time and Name are required.";
@@ -5799,15 +5071,11 @@
                             const bellOverrides = currentData.bellOverrides || {};
                             
                             // Save the override for this bell
-                            // V5.46.5 FIX: For non-admins, always save the sound if it differs from original
-                            // (checkbox is hidden for non-admins, so we can't rely on it)
-                            const soundChanged = editBellSoundInput.value !== oldBell.originalSound;
-                            
                             bellOverrides[oldBell.bellId] = {
                                 nickname: newBell.name !== oldBell.originalName ? newBell.name : null,
                                 visualCue: visualCue || null,
                                 visualMode: visualMode !== 'none' ? visualMode : null,
-                                sound: soundChanged ? editBellSoundInput.value : null
+                                sound: editBellOverrideCheckbox?.checked ? editBellSoundInput.value : null
                             };
                             
                             // Clean up null values
@@ -5824,14 +5092,7 @@
                             
                             await updateDoc(personalScheduleRef, { bellOverrides });
                             
-                            // V5.46.4: Update local state immediately for instant UI feedback
-                            personalBellOverrides = bellOverrides;
-                            
                             editBellStatus.textContent = "Personal customization saved.";
-                            
-                            // V5.46.5: Trigger re-render to show updated bell
-                            recalculateAndRenderAll();
-                            
                             closeEditBellModal();
                             return;
                         }
@@ -6349,8 +5610,6 @@
                         isStandalone: schedule.isStandalone || false,
                         periods: periods  // The full v4 structure
                     },
-                    // V5.46.5: Include bell overrides (shared bell customizations)
-                    bellOverrides: schedule.bellOverrides || {},
                     periodVisualOverrides: relevantVisualOverrides,
                     customQuickBells: quickBellsBackup,
                     referencedMedia: {
@@ -6433,8 +5692,6 @@
                                 baseScheduleId: data.schedule.baseScheduleId,
                                 isStandalone: data.schedule.isStandalone || false,
                                 periods: data.schedule.periods,
-                                // V5.46.5: Include bell overrides (shared bell customizations)
-                                bellOverrides: data.bellOverrides || {},
                                 periodVisualOverrides: data.periodVisualOverrides || {},
                                 customQuickBells: data.customQuickBells || [],
                                 referencedMedia: data.referencedMedia || { audio: [], visuals: [] }
@@ -6452,13 +5709,10 @@
                             const visualCount = pendingRestoreData.referencedMedia.visuals.length;
                             const quickBellCount = pendingRestoreData.customQuickBells.length;
                             const overrideCount = Object.keys(pendingRestoreData.periodVisualOverrides).length;
-                            // V5.46.5: Count bell overrides
-                            const bellOverrideCount = Object.keys(pendingRestoreData.bellOverrides || {}).length;
                             
                             confirmMsg += `\n\nThis backup includes:`;
                             confirmMsg += `\n• ${periodCount} periods`;
-                            if (bellOverrideCount > 0) confirmMsg += `\n• ${bellOverrideCount} shared bell customizations`;
-                            if (overrideCount > 0) confirmMsg += `\n• ${overrideCount} period visual customizations`;
+                            if (overrideCount > 0) confirmMsg += `\n• ${overrideCount} visual customizations`;
                             if (quickBellCount > 0) confirmMsg += `\n• ${quickBellCount} quick bells`;
                             if (audioCount > 0 || visualCount > 0) {
                                 confirmMsg += `\n• References to ${audioCount} audio + ${visualCount} visual files`;
@@ -6494,8 +5748,7 @@
             async function confirmRestorePersonalSchedule() {
                 if (!pendingRestoreData || !activePersonalScheduleId) return;
     
-                // V5.46.5: Extract bellOverrides from pending data
-                const { version, baseScheduleId, isStandalone, periods, bells, bellOverrides: backupBellOverrides, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
+                const { version, baseScheduleId, isStandalone, periods, bells, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
                 
                 // V5.46.2: Use name from input field instead of backup
                 const restoreNameInput = document.getElementById('restore-schedule-name');
@@ -6507,21 +5760,16 @@
                     if (version === 2) {
                         // V5.45.0: Full v2 restore
                         
-                        // 1. Restore schedule data including bellOverrides
+                        // 1. Restore schedule data
                         const scheduleData = { 
                             name, 
                             baseScheduleId: baseScheduleId || null,
-                            periods,
-                            // V5.46.5: Include bell overrides
-                            bellOverrides: backupBellOverrides || {}
+                            periods 
                         };
                         if (isStandalone) {
                             scheduleData.isStandalone = true;
                         }
                         await setDoc(docRef, scheduleData);
-                        
-                        // V5.46.5: Update local state immediately
-                        personalBellOverrides = backupBellOverrides || {};
                         
                         // 2. Restore period visual overrides to localStorage
                         // V5.45.1 FIX: Remap keys to use current schedule ID
@@ -10197,13 +9445,6 @@
                     versionElement.textContent = `v${APP_VERSION}`;
                 }
                 
-                // V5.49.2: CSS version display - read from CSS custom property
-                const cssVersionElement = document.getElementById('css-version-display');
-                if (cssVersionElement) {
-                    const cssVersion = getComputedStyle(document.documentElement).getPropertyValue('--css-version').trim().replace(/"/g, '');
-                    cssVersionElement.textContent = `v${cssVersion || '?.?.?'}`;
-                }
-                
                 // Optional: Also update the Browser Tab Title automatically
                 document.title = `Ellis Web Bell ${APP_VERSION}`;
                 console.log(`App Version Loaded: ${APP_VERSION}`);
@@ -11017,32 +10258,6 @@
                     }
                 });
                 
-                // V5.49.0: Sound Preview Buttons - Added to all sound dropdowns
-                document.getElementById('preview-quick-bell-sound')?.addEventListener('click', () => {
-                    playBell(document.getElementById('quickBellSoundSelect').value);
-                });
-                document.getElementById('preview-multi-bell-sound')?.addEventListener('click', () => {
-                    playBell(document.getElementById('multi-bell-sound').value);
-                });
-                document.getElementById('preview-relative-bell-sound')?.addEventListener('click', () => {
-                    playBell(document.getElementById('relative-bell-sound').value);
-                });
-                document.getElementById('preview-multi-relative-bell-sound')?.addEventListener('click', () => {
-                    playBell(document.getElementById('multi-add-relative-bell-sound').value);
-                });
-                document.getElementById('preview-new-period-start-sound')?.addEventListener('click', () => {
-                    playBell(document.getElementById('new-period-start-sound').value);
-                });
-                document.getElementById('preview-new-period-start-sound-relative')?.addEventListener('click', () => {
-                    playBell(document.getElementById('new-period-start-sound-relative').value);
-                });
-                document.getElementById('preview-new-period-end-sound')?.addEventListener('click', () => {
-                    playBell(document.getElementById('new-period-end-sound').value);
-                });
-                document.getElementById('preview-new-period-end-sound-relative')?.addEventListener('click', () => {
-                    playBell(document.getElementById('new-period-end-sound-relative').value);
-                });
-                
                 // Modals (Linked Edit)
                 linkedEditCancel.addEventListener('click', closeLinkedEditModal);
                 linkedEditThisOnly.addEventListener('click', () => handleLinkedEdit(false));
@@ -11456,42 +10671,6 @@
                     document.getElementById('cancel-quick-bell-btn').classList.add('hidden');
                     updateClock(); // Refresh display
                 });
-                
-                // V5.47.13: Skip Bell button handler
-                document.getElementById('skip-bell-btn').addEventListener('click', () => {
-                    skipNextBell();
-                    updateMainPageSkipButtons();
-                });
-                
-                // V5.47.13: Unskip Bell button handler
-                document.getElementById('unskip-bell-btn').addEventListener('click', () => {
-                    const skippedBell = getNextSkippedBell();
-                    if (skippedBell) {
-                        unskipBell(skippedBell);
-                        updateMainPageSkipButtons();
-                    }
-                });
-                
-                // V5.47.0: Picture-in-Picture toggle button
-                const pipToggleBtn = document.getElementById('pip-toggle-btn');
-                if (pipToggleBtn) {
-                    // Check if Document PiP is supported and show/hide button accordingly
-                    if ('documentPictureInPicture' in window) {
-                        pipToggleBtn.addEventListener('click', togglePictureInPicture);
-                    } else {
-                        // Hide button if not supported
-                        pipToggleBtn.style.display = 'none';
-                    }
-                }
-                
-                // V5.49.0: Kiosk Mode toggle button
-                const kioskToggleBtn = document.getElementById('kiosk-toggle-btn');
-                if (kioskToggleBtn) {
-                    kioskToggleBtn.addEventListener('click', toggleKioskMode);
-                }
-                
-                // V5.49.0: Load kiosk mode preference on startup
-                loadKioskModePreference();
                     
                 customTextVisualForm.addEventListener('submit', (e) => {
                     e.preventDefault();
@@ -12109,8 +11288,13 @@
                                 bellOverrides[bellId] = {};
                             }
                             
-                            // V5.46.4: Handle sound override (Firestore only for cross-device sync)
+                            // Handle sound override (uses localStorage system)
                             if (newSound !== '[NO_CHANGE]') {
+                                const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
+                                if (overrideKey) {
+                                    bellSoundOverrides[overrideKey] = newSound;
+                                }
+                                // Also store in bellOverrides for consistency
                                 bellOverrides[bellId].sound = newSound;
                             }
                             
@@ -12134,14 +11318,16 @@
                             updatedSharedCount++;
                         });
                         
+                        // Save sound overrides to localStorage
+                        if (newSound !== '[NO_CHANGE]' && sharedBellsToUpdate.length > 0) {
+                            saveSoundOverrides();
+                        }
+                        
                         // Save everything to Firestore
                         await updateDoc(personalScheduleRef, { 
                             periods: updatedPeriods,
                             bellOverrides: bellOverrides
                         });
-                        
-                        // V5.46.4: Update local state immediately
-                        personalBellOverrides = bellOverrides;
                         
                         const totalUpdated = updatedCustomCount + updatedSharedCount;
                         bulkEditStatus.textContent = `Updated ${totalUpdated} bell${totalUpdated !== 1 ? 's' : ''}!`;
