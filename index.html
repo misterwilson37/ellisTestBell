@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.39.1</title>
+    <title>Ellis Web Bell 5.40.3</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -878,7 +878,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.39.1</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.40.3</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
 
 
@@ -996,6 +996,8 @@
                         <option value="Bell">Bell</option>
                         <option value="Chime">Chime</option>
                         <option value="Beep">Beep</option>
+                        <option value="Alarm">Alarm</option>
+                        <option value="ellisBell.mp3" selected>Ellis Bell</option>
                     </optgroup>
                     <optgroup label="My Sounds" id="quick-my-sounds-optgroup"></optgroup>
                     <optgroup label="Shared Sounds" id="quick-shared-sounds-optgroup"></optgroup>
@@ -1014,6 +1016,8 @@
                 <button data-minutes="5" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">5</button>
                 <button data-minutes="10" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">10</button>
                 <button data-minutes="15" class="quick-bell-btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11">15</button>
+                <!-- NEW V5.55.0: Quick Bell Queue button -->
+                <button id="quick-bell-queue-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11" title="Quick Bell Queue">Q</button>
             	<!-- MOVED 5.12 -->
 
                 <div id="custom-quick-bell-separator" class="hidden h-11 border-l-2 border-gray-300 mx-1"></div>
@@ -1039,7 +1043,7 @@
                      <button id="mute-all-list-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Mute All</button>
                      <button id="unmute-all-list-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Unmute All</button>
                      <!-- V5.46.0: Bulk Edit Toggle -->
-                     <button id="bulk-edit-toggle-btn" class="px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 hidden">Bulk Edit</button>
+                     <button id="bulk-edit-toggle-btn" class="px-3 py-1 text-sm bg-sky-100 text-sky-700 rounded-lg hover:bg-sky-200 hidden">Bulk Edit</button>
                  </div>
             </div>
             <div id="combined-bell-list" class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
@@ -1228,7 +1232,7 @@
                         <span class="font-semibold">Custom Quick Bells</span>
                         <span class="block text-sm opacity-90">Set up to 4 personalized timers with custom icons.</span>
                     </button>
-                    <button type="button" id="multi-add-relative-btn" class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg shadow-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <button type="button" id="multi-add-relative-btn" class="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg shadow-md hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                         <span class="font-semibold">Add Multi-Period Bell</span>
                         <span class="block text-sm opacity-90">Add one relative bell (e.g., "Clean up") to many periods.</span>
                     </button>
@@ -1326,11 +1330,12 @@
                         <label for="relative-bell-name" class="block text-sm font-medium text-gray-700 mb-1">Bell Name</label>
                         <input type="text" id="relative-bell-name" placeholder="e.g. Hamburger Time" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <label for="relative-bell-sound" class="block text-sm font-medium text-gray-700 mb-1">Sound</label>
                         <!-- V5.49: Added preview button -->
-                        <div class="flex items-center gap-2">
-                            <select id="relative-bell-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- V5.54.6: Added min-w-0 and max-w-full to prevent overflow -->
+                        <div class="flex items-center gap-2 min-w-0">
+                            <select id="relative-bell-sound" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <!-- Options will be populated by JS -->
                             </select>
                             <button type="button" id="preview-relative-bell-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
@@ -1405,7 +1410,7 @@
                         <span class="font-semibold">Static Time Bell</span>
                         <span class="block text-sm opacity-90">Set a specific time (e.g., 10:30:00 AM)</span>
                     </button>
-                    <button type="button" id="add-bell-type-relative" class="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                    <button type="button" id="add-bell-type-relative" class="w-full px-4 py-3 bg-sky-600 text-white rounded-lg hover:bg-sky-700">
                         <span class="font-semibold">Relative Time Bell</span>
                         <span class="block text-sm opacity-90">Set time based on another bell (e.g., 5 min before)</span>
                     </button>
@@ -1637,7 +1642,7 @@
                         <span class="ml-2 text-sm font-medium text-gray-700">Static Time Period</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="new-period-type" value="relative" id="new-period-type-relative" class="h-4 w-4 text-purple-600 focus:ring-purple-500">
+                        <input type="radio" name="new-period-type" value="relative" id="new-period-type-relative" class="h-4 w-4 text-sky-600 focus:ring-sky-500">
                         <span class="ml-2 text-sm font-medium text-gray-700">Relative Time Period</span>
                     </label>
                 </div>
@@ -1671,41 +1676,41 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-start-parent" class="block text-sm font-medium text-gray-700">Anchor Period</label>
-                                <select id="new-period-start-parent" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <select id="new-period-start-parent" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <!-- Base Periods populated by JS -->
                                 </select>
                             </div>
                             <div>
                                 <label for="new-period-start-hours" class="block text-sm font-medium text-gray-700">Hours</label>
-                                <input type="number" id="new-period-start-hours" value="0" min="0" max="23" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <input type="number" id="new-period-start-hours" value="0" min="0" max="23" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                             </div>
                         </div>
                         <!-- Row 2: Anchor Bell + Minutes -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-start-anchor-type" class="block text-sm font-medium text-gray-700">Anchor Bell</label>
-                                <select id="new-period-start-anchor-type" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <select id="new-period-start-anchor-type" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <option value="period_start">Period Start</option>
                                     <option value="period_end">Period End</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="new-period-start-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
-                                <input type="number" id="new-period-start-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <input type="number" id="new-period-start-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                             </div>
                         </div>
                         <!-- Row 3: Direction + Seconds -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-start-direction" class="block text-sm font-medium text-gray-700">Direction</label>
-                                <select id="new-period-start-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <select id="new-period-start-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <option value="before">Before</option>
                                     <option value="after">After</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="new-period-start-seconds" class="block text-sm font-medium text-gray-700">Seconds</label>
-                                <input type="number" id="new-period-start-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <input type="number" id="new-period-start-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                             </div>
                         </div>
 
@@ -1713,7 +1718,7 @@
                             <label for="new-period-start-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
                             <!-- V5.49: Added preview button -->
                             <div class="flex items-center gap-2 mt-1">
-                                <select id="new-period-start-sound-relative" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <select id="new-period-start-sound-relative" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <!-- Populated by JS -->
                                 </select>
                                 <button type="button" id="preview-new-period-start-sound-relative" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
@@ -1753,41 +1758,41 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-end-parent" class="block text-sm font-medium text-gray-700">Anchor Period</label>
-                                <select id="new-period-end-parent" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <select id="new-period-end-parent" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <!-- Base Periods populated by JS -->
                                 </select>
                             </div>
                             <div>
                                 <label for="new-period-end-hours" class="block text-sm font-medium text-gray-700">Hours</label>
-                                <input type="number" id="new-period-end-hours" value="0" min="0" max="23" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <input type="number" id="new-period-end-hours" value="0" min="0" max="23" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                             </div>
                         </div>
                         <!-- Row 2: Anchor Bell + Minutes -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-end-anchor-type" class="block text-sm font-medium text-gray-700">Anchor Bell</label>
-                                <select id="new-period-end-anchor-type" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <select id="new-period-end-anchor-type" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <option value="period_start">Period Start</option>
                                     <option value="period_end">Period End</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="new-period-end-minutes" class="block text-sm font-medium text-gray-700">Minutes</label>
-                                <input type="number" id="new-period-end-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <input type="number" id="new-period-end-minutes" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                             </div>
                         </div>
                         <!-- Row 3: Direction + Seconds -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="new-period-end-direction" class="block text-sm font-medium text-gray-700">Direction</label>
-                                <select id="new-period-end-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <select id="new-period-end-direction" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <option value="before">Before</option>
                                     <option value="after">After</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="new-period-end-seconds" class="block text-sm font-medium text-gray-700">Seconds</label>
-                                <input type="number" id="new-period-end-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <input type="number" id="new-period-end-seconds" value="0" min="0" max="59" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                             </div>
                         </div>
 
@@ -1795,7 +1800,7 @@
                             <label for="new-period-end-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
                             <!-- V5.49: Added preview button -->
                             <div class="flex items-center gap-2 mt-1">
-                                <select id="new-period-end-sound-relative" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <select id="new-period-end-sound-relative" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <!-- Populated by JS -->
                                 </select>
                                 <button type="button" id="preview-new-period-end-sound-relative" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
@@ -1959,11 +1964,12 @@
                         <label for="multi-add-relative-bell-name" class="block text-sm font-medium text-gray-700 mb-1">Bell Name</label>
                         <input type="text" id="multi-add-relative-bell-name" placeholder="e.g. 3 Min Clean up" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <label for="multi-add-relative-bell-sound" class="block text-sm font-medium text-gray-700 mb-1">Sound</label>
                         <!-- V5.49: Added preview button -->
-                        <div class="flex items-center gap-2">
-                            <select id="multi-add-relative-bell-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- V5.54.6: Added min-w-0 to prevent overflow -->
+                        <div class="flex items-center gap-2 min-w-0">
+                            <select id="multi-add-relative-bell-sound" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <!-- Options will be populated by JS -->
                             </select>
                             <button type="button" id="preview-multi-relative-bell-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
@@ -2070,7 +2076,7 @@
 
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" id="multi-add-relative-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Add Bells</button>
+                    <button type="submit" class="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700">Add Bells</button>
                 </div>
             </form>
         </div>
@@ -2093,6 +2099,83 @@
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save All Custom Bells</button>
                 </div>
             </form>
+        </div>
+
+        <!-- NEW V5.55.0: Quick Bell Queue Modal -->
+        <div id="quick-bell-queue-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-2xl font-medium">Quick Bell Queue</h3>
+                    <button type="button" id="queue-modal-close-btn" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                </div>
+                <p class="text-gray-600 mb-4 text-sm">Create a sequence of timed bells that play one after another.</p>
+
+                <!-- Timer Rows Container -->
+                <div id="queue-timers-container" class="space-y-3 mb-4">
+                    <!-- Timer rows will be added here dynamically -->
+                </div>
+
+                <!-- Add Timer Button -->
+                <button type="button" id="queue-add-timer-btn" class="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border-2 border-dashed border-gray-300 transition-colors mb-4">
+                    + Add Timer
+                </button>
+
+                <hr class="my-4 border-gray-200">
+
+                <!-- Repeat Options -->
+                <div class="mb-4 space-y-3">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio" name="queue-repeat-mode" value="times" checked class="mr-2 h-4 w-4 text-sky-600 focus:ring-sky-500">
+                        <span class="text-sm text-gray-700">Play queue</span>
+                        <input type="number" id="queue-repeat-times" value="1" min="1" max="99" class="mx-2 w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <span class="text-sm text-gray-700">time(s)</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio" name="queue-repeat-mode" value="until" class="mr-2 h-4 w-4 text-sky-600 focus:ring-sky-500">
+                        <span class="text-sm text-gray-700 mr-2">Repeat until</span>
+                        <select id="queue-until-bell" class="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                            <option value="">Select a bell...</option>
+                            <!-- Options populated by JS -->
+                        </select>
+                    </label>
+                </div>
+
+                <hr class="my-4 border-gray-200">
+
+                <!-- Bell Ignore Options -->
+                <div class="mb-4 space-y-2">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="queue-ignore-personal" class="mr-2 h-4 w-4 text-sky-600 rounded focus:ring-sky-500">
+                        <span class="text-sm text-gray-700">Ignore personal bells while queue active</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="queue-ignore-shared" class="mr-2 h-4 w-4 text-sky-600 rounded focus:ring-sky-500">
+                        <span class="text-sm text-gray-700">Ignore shared bells while queue active</span>
+                    </label>
+                    <p id="queue-ignore-shared-warning" class="hidden text-xs text-amber-600 ml-6">⚠️ This may affect other classes using the same schedule</p>
+                </div>
+
+                <hr class="my-4 border-gray-200">
+
+                <!-- Visual Cue Selection -->
+                <div class="mb-6">
+                    <label for="queue-visual-select" class="block text-sm font-medium text-gray-700 mb-1">Visual Cue</label>
+                    <select id="queue-visual-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <option value="[DEFAULT_Q]">Default "Q" (Queue)</option>
+                        <!-- More options populated by JS -->
+                    </select>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <button type="button" id="queue-cancel-btn" class="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="button" id="queue-start-btn" class="flex-1 py-2 px-4 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors font-medium">
+                        Start Queue
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- NEW V5.29.0 / V5.42.0: Passing Period Visual Modal -->
@@ -2290,4 +2373,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.39.1 -->
+<!-- Version 5.40.3 -->
