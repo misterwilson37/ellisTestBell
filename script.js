@@ -1,5 +1,82 @@
-        const APP_VERSION = "5.40.1"
-        // fixing custom bell audio
+        const APP_VERSION = "5.54.2"
+        // V5.54.2: Bug fix - removed calls to non-existent functions
+        // - Removed updateMuteButtonStates() call (function doesn't exist)
+        // - Fixed renderCombinedBellList() → recalculateAndRenderAll()
+        // V5.54.1: Bulk Time Shift - Improved feedback
+        // - Now clones entire quickBellControls from main page instead of recreating
+        // - Copies main page stylesheets (Tailwind) for consistent styling
+        // - Custom quick bells work by cloning already-rendered buttons
+        // - Click handlers delegate to main page buttons for reliable behavior
+        // V5.47.0: Picture-in-Picture Pop-Out Mode
+        // - Added Document PiP support for always-on-top floating timer window
+        // - Pop-out button appears on hover over the visual cue (top-right corner)
+        // - Button is in a wrapper div so it doesn't get wiped when visual updates
+        // V5.46.5: Fix Individual Edit Bell + Backup/Restore for bellOverrides
+        // - BUG FIX: Non-admin Edit Bell was checking hidden checkbox for sound save - now checks if sound changed
+        // - BUG FIX: Edit Bell modal now shows the CURRENT sound (including overrides) not originalSound
+        // - BUG FIX: Added recalculateAndRenderAll() after non-admin shared bell save for immediate UI update
+        // - Backup now includes bellOverrides (shared bell customizations)
+        // - Restore now restores bellOverrides and shows count in confirmation
+        // V5.46.4: Fix Shared Bell Sound Overrides to Sync Across Devices
+        // - Sound overrides for shared bells now save to Firestore (bellOverrides) instead of localStorage
+        // - Firestore overrides now take priority over localStorage during rendering
+        // - This ensures changes to shared bell sounds sync across all your devices
+        // V5.46.3: Fix ESC Key Handler Reference Error
+        // - Fixed reference to deleted 'renamePeriodModal' that was causing JavaScript errors
+        // - Changed to correct 'edit-period-details-modal' with proper form reset
+        // V5.46.2: Three Important Fixes
+        // - Fixed "Duplicate as Another Personal Schedule" to copy ALL data (periods, bellOverrides, passingPeriodVisual, isStandalone)
+        // - Restore from backup now allows editing the schedule name (pre-filled with backup's name)
+        // - Added global ESC key handler to close any open modal without saving
+        // V5.46.1: Fix Shared Bell Visual Overrides Persistence
+        // - Added personalBellOverrides variable to store shared bell customizations
+        // - Load bellOverrides from Firestore when personal schedule loads
+        // - Apply visual overrides, sound overrides, and nicknames to shared bells during rendering
+        // - Visual overrides for shared bells now persist across page refreshes
+        // V5.46.0: Bulk Edit for Audio and Visual Cues
+        // - Added "Bulk Edit" button to schedule list controls (visible when personal schedule is active)
+        // - Click to enter selection mode, checkboxes appear next to each bell
+        // - Select bells, click button again to open bulk edit modal
+        // - Change audio and/or visual cue for all selected bells at once
+        // - Custom bells: Updated directly in Firestore periods
+        // - Shared bells: Sound overrides saved to localStorage, visual overrides saved to bellOverrides
+        // - Purple themed UI to distinguish from other edit modes
+        // V5.45.4: Remove inconsistent "Override:" prefix from sound display
+        // - The sound name alone is sufficient information
+        // - Removes confusing inconsistency where some overridden bells showed it and others didn't
+        // V5.45.3: Fix background color picker preview for [DEFAULT] SVGs
+        // - getVisualHtmlWithBg now properly handles [DEFAULT] SVGs and empty values
+        // - "New" preview now updates in real-time when changing the color
+        // V5.45.2: Custom background colors for default SVGs (pedestrian, lunch, numbers)
+        // - [BG:#hexcolor] prefix now works with [DEFAULT] SVGs, not just images
+        // - Uses raw SVG content to avoid nested backgrounds
+        // - Both full-size and icon previews support custom backgrounds
+        // V5.45.1: Fix period visual override backup/restore
+        // - Fixed key format: uses hyphen (-) not colon (:)
+        // - Fixed ID: uses activePersonalScheduleId, not baseScheduleId
+        // - Restore now remaps keys to current schedule ID (so backups work across schedules)
+        // - Also checks baseScheduleId for linked schedule compatibility
+        // V5.45.0: Comprehensive personal schedule backup/restore
+        // - Backup now saves: periods (v4 structure), period visual overrides, custom quick bells
+        // - Backup includes references to custom audio/visual files (URLs)
+        // - Restore supports both v1 (legacy bells) and v2 (full) formats
+        // - Restore prompts to optionally restore quick bells
+        // - Backup filename now includes date
+        // V5.44.11: Consistent icon/text sizing across all quick bell previews
+        // - Modal previews, manager previews, and actual buttons now all use SVG text
+        // - SVG text scales proportionally to container, ensuring consistent appearance
+        // - Font sizes: 80/45 for full preview, 70/50 for button preview (short/long text)
+        // V5.44.10: Fix custom text/color modal for quick bells
+        // - Created setupCustomTextModalPreviews() helper function for consistent preview behavior
+        // - Live preview now updates in real-time when editing custom text/colors for quick bells
+        // - Icon preview shape is now a rounded square (matching button) instead of a circle
+        // - Fixed hours field not loading from Firestore for custom quick bells
+        // V5.44.0: Custom Standalone Schedules - create blank schedules unlinked from shared bells
+        // - New "Create Custom Standalone Schedule" button and modal
+        // - Standalone schedules have baseScheduleId: null, isStandalone: true
+        // - Schedule selector now shows three groups: Personal, Standalone, Shared
+        // - Standalone badge displays when viewing a standalone schedule
+        // - Anchor dropdowns now show bells from ALL periods (for cross-period relative bells)
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         
@@ -41,6 +118,7 @@
         const relativePeriodName = document.getElementById('relative-period-name');
         const relativeAnchorBellSelect = document.getElementById('relative-anchor-bell'); 
         const relativeDirection = document.getElementById('relative-direction');
+        const relativeHoursInput = document.getElementById('relative-hours');
         const relativeMinutesInput = document.getElementById('relative-minutes');
         const relativeSecondsInput = document.getElementById('relative-seconds');
         const relativeBellNameInput = document.getElementById('relative-bell-name');
@@ -58,6 +136,15 @@
         const createPersonalScheduleStatus = document.getElementById('create-personal-schedule-status');
         const createPersonalScheduleCancelBtn = document.getElementById('create-personal-schedule-cancel');
         const createPersonalScheduleBtn = document.getElementById('create-personal-schedule-btn');
+
+        // V5.44: Standalone Schedule Modal
+        const createStandaloneScheduleModal = document.getElementById('create-standalone-schedule-modal');
+        const createStandaloneScheduleForm = document.getElementById('create-standalone-schedule-form');
+        const standaloneScheduleNameInput = document.getElementById('standalone-schedule-name');
+        const createStandaloneStatus = document.getElementById('create-standalone-status');
+        const createStandaloneCancelBtn = document.getElementById('create-standalone-cancel');
+        const createStandaloneScheduleBtn = document.getElementById('create-standalone-schedule-btn');
+        const standaloneScheduleBadge = document.getElementById('standalone-schedule-badge');
 
         // Delete Personal Schedule Modal
         const confirmDeletePersonalModal = document.getElementById('confirm-delete-personal-modal');
@@ -148,7 +235,7 @@
         const editBellStatus = document.getElementById('edit-bell-status');
         // NEW in 4.21: Override checkbox for Edit Bell modal
         const editBellOverrideContainer = document.getElementById('edit-bell-override-container');
-        const editBellOverrideCheckbox = document.getElementById('edit-bell-override-sound');
+        const editBellOverrideCheckbox = document.getElementById('edit-bell-override-checkbox'); // FIX V5.42: Corrected ID
         
         // Change Sound Modal
         const changeSoundModal = document.getElementById('change-sound-modal');
@@ -197,6 +284,7 @@
         const customTextColorInput = document.getElementById('custom-text-color');
         const customTextBgColorInput = document.getElementById('custom-text-bg-color');
         let currentVisualSelectTarget = null; // Stores the <select> element that opened the modal
+        let customTextJustSaved = false; // FIX V5.42.7: Flag to prevent modal re-open after save
 
         // NEW in 4.57: New Period Modal Variables
         const newPeriodModal = document.getElementById('new-period-modal');
@@ -446,6 +534,7 @@
         let activePersonalScheduleListenerUnsubscribe = null; // NEW: For personal schedule
         let personalSchedulesListenerUnsubscribe = null; // NEW: v3.09 - For the collection
         let customQuickBellsListenerUnsubscribe = null; // NEW V5.00: For custom quick bells
+        let userPreferencesListenerUnsubscribe = null; // NEW V5.53: For cloud-synced preferences
         let synths = {};
         let lastBellRingTime = null; 
         let lastRingTimestamp = 0; // NEW: For ring cooldown
@@ -479,10 +568,11 @@
         let quickBellSound = 'ellisBell.mp3'; // Default sound
         
         // NEW V5.00: Custom Quick Bell State
-        let customQuickBells = []; // Array of { id, name, minutes, seconds, iconText, sound, isActive }
+        let customQuickBells = []; // Array of { id, name, hours, minutes, seconds, iconText, sound, isActive }
         window.customQuickBells = customQuickBells; // 5.30: Make it accessible from console
 
         let mutedBellIds = new Set(); 
+        let skippedBellOccurrences = new Set(); // V5.47.9: Temporarily skipped bells (format: "bellId:YYYY-MM-DD")
         let bellSoundOverrides = {}; // NEW: Store local sound overrides
         let periodNameOverrides = {}; // NEW in 4.22: Store local period nicknames
         
@@ -547,6 +637,38 @@
         let visualToDelete = null; // State for visual deletion
         let periodVisualOverrides = {}; // Store local visual cue choices
 
+        // NEW V5.42.0: Passing Period Visual State
+        let personalPassingPeriodVisual = null;  // From personal schedule
+        let sharedPassingPeriodVisual = null;    // From shared schedule (admin-set default)
+
+        // NEW V5.46.0: Bulk Edit State
+        let bulkEditMode = false;
+        let bulkSelectedBells = new Set(); // Set of bell IDs
+        
+        // NEW V5.46.1: Personal Bell Overrides (for shared bell customizations)
+        let personalBellOverrides = {}; // { bellId: { sound, visualCue, visualMode, nickname } }
+
+        // NEW V5.47.0: Picture-in-Picture state
+        let pipWindow = null; // Reference to the PiP window
+        
+        // NEW V5.49.0: Kiosk Mode state
+        let kioskModeEnabled = false;
+        
+        // NEW V5.52.0: Countdown Warning state
+        let warningSettings = {
+            enabled: false,
+            time: 60,           // seconds before bell to start warning
+            style: 'pulse',     // pulse, color, breathe, shake, all
+            intensity: 'medium', // subtle, medium, urgent
+            scheduledBells: true,
+            quickBells: true,
+            // V5.52.1: Custom colors
+            colorSubtle: '#fbbf24',
+            colorMedium: '#f97316',
+            colorUrgent: '#ef4444'
+        };
+        let currentWarningClass = null; // Track currently applied warning class
+
         let currentSoundSelectTarget = null; // NEW V4.76: Stores <select> for audio modal
 
         const MAX_FILE_SIZE = 1024 * 1024; // 1MB
@@ -587,8 +709,147 @@
         function saveMutedBells() {
             try {
                 localStorage.setItem('mutedBellIds', JSON.stringify([...mutedBellIds]));
+                // V5.53: Also save to cloud
+                saveUserPreferencesToCloud();
             } catch (e) {
                 console.error("Failed to save muted bells", e);
+            }
+        }
+
+        // --- V5.47.9: Skip Bell Helper Functions ---
+        // Skipped bells are temporary (for today only) and not persisted
+        
+        function getSkipKey(bell) {
+            // Use time + name as a reliable identifier (works for all bell types)
+            // Format: "HH:MM:SS|BellName|YYYY-MM-DD"
+            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            const bellTime = bell.time || '00:00:00';
+            const bellName = (bell.name || 'Unknown').replace(/\|/g, '-'); // Escape pipe chars
+            return `${bellTime}|${bellName}|${today}`;
+        }
+        
+        function isBellSkipped(bell) {
+            if (!bell) return false;
+            return skippedBellOccurrences.has(getSkipKey(bell));
+        }
+        
+        function skipNextBell() {
+            // Find the next scheduled bell (not quick bell)
+            const now = new Date();
+            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            
+            const allBells = [...localSchedule, ...personalBells];
+            
+            if (allBells.length === 0) {
+                showUserMessage("No bells in schedule to skip.");
+                return;
+            }
+            
+            const upcomingBells = allBells
+                .filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell))
+                .sort((a, b) => a.time.localeCompare(b.time));
+            
+            if (upcomingBells.length === 0) {
+                showUserMessage("No upcoming bells to skip today.");
+                return;
+            }
+            
+            const bellToSkip = upcomingBells[0];
+            const skipKey = getSkipKey(bellToSkip);
+            skippedBellOccurrences.add(skipKey);
+            
+            console.log(`Skipped bell: ${bellToSkip.name} at ${bellToSkip.time} (key: ${skipKey})`);
+            showUserMessage(`Skipped: ${bellToSkip.name} at ${formatTime12Hour(bellToSkip.time, true)}`);
+            
+            // Force immediate UI update
+            updateClock();
+            updatePipWindow();
+            updateMainPageSkipButtons();
+        }
+        
+        function clearOldSkippedBells() {
+            // Clear any skipped bells from previous days
+            // Key format: "HH:MM:SS|BellName|YYYY-MM-DD"
+            const today = new Date().toISOString().split('T')[0];
+            const toRemove = [];
+            
+            skippedBellOccurrences.forEach(key => {
+                const datePart = key.split('|').pop(); // Get date from end of key
+                if (datePart !== today) {
+                    toRemove.push(key);
+                }
+            });
+            
+            toRemove.forEach(key => skippedBellOccurrences.delete(key));
+            
+            if (toRemove.length > 0) {
+                console.log(`Cleared ${toRemove.length} old skipped bell(s)`);
+            }
+        }
+        
+        function getNextSkippedBell() {
+            // Find the earliest skipped bell that's still upcoming
+            const now = new Date();
+            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            const today = now.toISOString().split('T')[0];
+            
+            const allBells = [...localSchedule, ...personalBells];
+            const skippedBells = allBells
+                .filter(bell => {
+                    const skipKey = getSkipKey(bell);
+                    return skippedBellOccurrences.has(skipKey) && bell.time > currentTimeHHMMSS;
+                })
+                .sort((a, b) => a.time.localeCompare(b.time));
+            
+            return skippedBells.length > 0 ? skippedBells[0] : null;
+        }
+        
+        function unskipBell(bell) {
+            if (!bell) return;
+            
+            const skipKey = getSkipKey(bell);
+            skippedBellOccurrences.delete(skipKey);
+            
+            console.log(`Unskipped bell: ${bell.name} at ${bell.time}`);
+            showUserMessage(`Restored: ${bell.name} at ${formatTime12Hour(bell.time, true)}`);
+            
+            // Force immediate UI update
+            updateClock();
+            updatePipWindow();
+            updateMainPageSkipButtons();
+        }
+        
+        /**
+         * V5.47.13: Update Skip/Unskip buttons on main page
+         * V5.48: Also hide Skip Bell when no upcoming bells today
+         */
+        function updateMainPageSkipButtons() {
+            const skipBtn = document.getElementById('skip-bell-btn');
+            const unskipBtn = document.getElementById('unskip-bell-btn');
+            if (!skipBtn || !unskipBtn) return;
+            
+            // Check for upcoming bells
+            const now = new Date();
+            const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            const allBells = [...localSchedule, ...personalBells];
+            const upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell));
+            
+            // Show/hide Skip Bell based on whether there are upcoming bells
+            if (upcomingBells.length === 0) {
+                skipBtn.classList.add('hidden');
+            } else {
+                skipBtn.classList.remove('hidden');
+            }
+            
+            // Show/hide Unskip based on whether there's a skipped bell
+            const skippedBell = getNextSkippedBell();
+            if (skippedBell) {
+                unskipBtn.classList.remove('hidden');
+                const timeStr = formatTime12Hour(skippedBell.time, true);
+                unskipBtn.textContent = `Unskip (${timeStr})`;
+                unskipBtn.title = `Restore: ${skippedBell.name} at ${timeStr}`;
+            } else {
+                unskipBtn.classList.add('hidden');
             }
         }
 
@@ -625,6 +886,8 @@
         function saveSoundOverrides() {
             try {
                 localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
+                // V5.53: Also save to cloud
+                saveUserPreferencesToCloud();
             } catch (e) {
                 console.error("Failed to save sound overrides", e);
             }
@@ -652,6 +915,8 @@
         function savePeriodNameOverrides() {
             try {
                 localStorage.setItem('periodNameOverrides', JSON.stringify(periodNameOverrides));
+                // V5.53: Also save to cloud
+                saveUserPreferencesToCloud();
             } catch (e) {
                 console.error("Failed to save period nicknames", e);
             }
@@ -684,9 +949,180 @@
                 console.log('Saving to localStorage:', periodVisualOverrides);
                 localStorage.setItem('periodVisualOverrides', JSON.stringify(periodVisualOverrides));
                 console.log('Successfully saved to localStorage');
+                // V5.53: Also save to cloud
+                saveUserPreferencesToCloud();
             } catch (e) {
                 console.error("Failed to save visual overrides", e);
             }
+        }
+
+        // ============================================
+        // V5.53: CLOUD SYNC FOR USER PREFERENCES
+        // Syncs all user preferences to Firestore
+        // ============================================
+        
+        /**
+         * V5.53: Save all user preferences to Firestore
+         * Only saves for non-anonymous users
+         */
+        async function saveUserPreferencesToCloud() {
+            if (isUserAnonymous || !userId || !db) {
+                console.log('[CloudSync] Skipping cloud save (anonymous or no user)');
+                return;
+            }
+            
+            try {
+                const prefsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'preferences');
+                
+                // Convert mutedBellIds Set to Array for storage
+                const mutedBellIdsArray = Array.from(mutedBellIds);
+                
+                const prefsData = {
+                    periodVisualOverrides: periodVisualOverrides || {},
+                    bellSoundOverrides: bellSoundOverrides || {},
+                    periodNameOverrides: periodNameOverrides || {},
+                    mutedBellIds: mutedBellIdsArray,
+                    warningSettings: warningSettings || {},
+                    kioskModeEnabled: kioskModeEnabled || false,
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                await setDoc(prefsDocRef, prefsData, { merge: true });
+                console.log('[CloudSync] User preferences saved to cloud');
+                
+            } catch (error) {
+                console.error('[CloudSync] Error saving preferences to cloud:', error);
+            }
+        }
+        
+        /**
+         * V5.53: Load user preferences from Firestore
+         * Falls back to localStorage if cloud data doesn't exist
+         */
+        async function loadUserPreferencesFromCloud() {
+            if (isUserAnonymous || !userId || !db) {
+                console.log('[CloudSync] Skipping cloud load (anonymous or no user)');
+                return false;
+            }
+            
+            try {
+                const prefsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'preferences');
+                const docSnap = await getDoc(prefsDocRef);
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    console.log('[CloudSync] Loaded preferences from cloud:', data);
+                    
+                    // Apply cloud data to local state
+                    if (data.periodVisualOverrides) {
+                        periodVisualOverrides = data.periodVisualOverrides;
+                        localStorage.setItem('periodVisualOverrides', JSON.stringify(periodVisualOverrides));
+                    }
+                    
+                    if (data.bellSoundOverrides) {
+                        bellSoundOverrides = data.bellSoundOverrides;
+                        localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
+                    }
+                    
+                    if (data.periodNameOverrides) {
+                        periodNameOverrides = data.periodNameOverrides;
+                        localStorage.setItem('periodNameOverrides', JSON.stringify(periodNameOverrides));
+                    }
+                    
+                    if (data.mutedBellIds && Array.isArray(data.mutedBellIds)) {
+                        mutedBellIds = new Set(data.mutedBellIds);
+                        localStorage.setItem('mutedBellIds', JSON.stringify(data.mutedBellIds));
+                    }
+                    
+                    if (data.warningSettings) {
+                        warningSettings = { ...warningSettings, ...data.warningSettings };
+                        localStorage.setItem('countdownWarningSettings', JSON.stringify(warningSettings));
+                        applyWarningColors();
+                    }
+                    
+                    if (typeof data.kioskModeEnabled === 'boolean') {
+                        kioskModeEnabled = data.kioskModeEnabled;
+                        localStorage.setItem('kioskModeEnabled', kioskModeEnabled ? 'true' : 'false');
+                        applyKioskMode(kioskModeEnabled);
+                    }
+                    
+                    return true; // Cloud data was loaded
+                } else {
+                    console.log('[CloudSync] No cloud preferences found, using localStorage');
+                    // First time user - save current localStorage data to cloud
+                    await saveUserPreferencesToCloud();
+                    return false;
+                }
+                
+            } catch (error) {
+                console.error('[CloudSync] Error loading preferences from cloud:', error);
+                return false;
+            }
+        }
+        
+        /**
+         * V5.53: Set up real-time listener for user preferences
+         * Syncs changes from other devices
+         */
+        function setupUserPreferencesListener() {
+            if (isUserAnonymous || !userId || !db) {
+                return;
+            }
+            
+            // Unsubscribe from previous listener if exists
+            if (userPreferencesListenerUnsubscribe) {
+                userPreferencesListenerUnsubscribe();
+            }
+            
+            const prefsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'preferences');
+            
+            console.log('[CloudSync] Setting up preferences listener...');
+            
+            userPreferencesListenerUnsubscribe = onSnapshot(prefsDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    console.log('[CloudSync] Preferences updated from cloud');
+                    
+                    // Apply cloud data to local state (same as loadUserPreferencesFromCloud)
+                    if (data.periodVisualOverrides) {
+                        periodVisualOverrides = data.periodVisualOverrides;
+                        localStorage.setItem('periodVisualOverrides', JSON.stringify(periodVisualOverrides));
+                    }
+                    
+                    if (data.bellSoundOverrides) {
+                        bellSoundOverrides = data.bellSoundOverrides;
+                        localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
+                    }
+                    
+                    if (data.periodNameOverrides) {
+                        periodNameOverrides = data.periodNameOverrides;
+                        localStorage.setItem('periodNameOverrides', JSON.stringify(periodNameOverrides));
+                    }
+                    
+                    if (data.mutedBellIds && Array.isArray(data.mutedBellIds)) {
+                        mutedBellIds = new Set(data.mutedBellIds);
+                        localStorage.setItem('mutedBellIds', JSON.stringify(data.mutedBellIds));
+                        // Mute states will be updated when recalculateAndRenderAll() is called below
+                    }
+                    
+                    if (data.warningSettings) {
+                        warningSettings = { ...warningSettings, ...data.warningSettings };
+                        localStorage.setItem('countdownWarningSettings', JSON.stringify(warningSettings));
+                        applyWarningColors();
+                    }
+                    
+                    if (typeof data.kioskModeEnabled === 'boolean') {
+                        kioskModeEnabled = data.kioskModeEnabled;
+                        localStorage.setItem('kioskModeEnabled', kioskModeEnabled ? 'true' : 'false');
+                        applyKioskMode(kioskModeEnabled);
+                    }
+                    
+                    // Re-render the bell list to reflect any visual/sound changes
+                    recalculateAndRenderAll();
+                }
+            }, (error) => {
+                console.error('[CloudSync] Error listening to preferences:', error);
+            });
         }
 
         // NEW: Helper to format 24h time to 12h AM/PM
@@ -799,6 +1235,7 @@
             /**
              * NEW in 4.18: Handles time calculation for the Relative Bell Modal. (MOVED/REFACTORED)
              * Reads from the new anchor bell dropdown.
+             * MODIFIED V5.44.1: Added hours support
              */
             const updateCalculatedTime = () => { 
                 if (!currentRelativePeriod || !currentRelativePeriod.bells) {
@@ -808,6 +1245,7 @@
 
                 const anchorBellSelect = document.getElementById('relative-anchor-bell');
                 const relativeDirection = document.getElementById('relative-direction');
+                const relativeHoursInput = document.getElementById('relative-hours');
                 const relativeMinutesInput = document.getElementById('relative-minutes');
                 const relativeSecondsInput = document.getElementById('relative-seconds');
                 const calculatedTimeDisplay = document.getElementById('calculated-time');
@@ -827,12 +1265,16 @@
                 }
 
                 const direction = relativeDirection.value;
+                const hours = parseInt(relativeHoursInput?.value) || 0;
                 const minutes = parseInt(relativeMinutesInput.value) || 0; 
                 const seconds = parseInt(relativeSecondsInput.value) || 0;
                 
+                // V5.44.1: Convert hours to minutes for calculation
+                const totalMinutes = (hours * 60) + minutes;
+                
                 const anchorSeconds = timeToSeconds(parentBell.time);
 
-                const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, minutes, seconds);
+                const calculatedTimeHHMMSS = calculateRelativeTime(anchorSeconds, direction, totalMinutes, seconds);
                 
                 calculatedTimeDisplay.textContent = formatTime12Hour(calculatedTimeHHMMSS, false);
                 
@@ -1060,16 +1502,22 @@
     
             function findNextBell(currentTimeHHMMSS) {
                 // MODIFIED: v3.03 - Merges base schedule and personal schedule bells
+                // MODIFIED: v5.47.9 - Skip over temporarily skipped bells
                 const allBells = [...localSchedule, ...personalBells];
                 if (allBells.length === 0) return null;
                 
-                let upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS);
+                // Filter to upcoming bells that aren't skipped
+                let upcomingBells = allBells.filter(bell => 
+                    bell.time > currentTimeHHMMSS && !isBellSkipped(bell)
+                );
                 
                 let nextBell;
                 if (upcomingBells.length > 0) {
                     upcomingBells.sort((a, b) => a.time.localeCompare(b.time));
                     nextBell = upcomingBells[0];
                 } else {
+                    // No upcoming bells today - find first bell (for tomorrow display)
+                    // Don't filter by skipped here since skips are day-specific
                     allBells.sort((a, b) => a.time.localeCompare(b.time));
                     nextBell = allBells[0];
                 }
@@ -1092,11 +1540,13 @@
                 
                 if (currentIndex === -1) return null; // Bell not found
                 
-                if (currentIndex + 1 < sortedBells.length) {
-                    return sortedBells[currentIndex + 1]; // Return the next bell
-                } else {
-                    return null; // This was the last bell of the day
+                // V5.47.9: Find next bell that isn't skipped
+                for (let i = currentIndex + 1; i < sortedBells.length; i++) {
+                    if (!isBellSkipped(sortedBells[i])) {
+                        return sortedBells[i];
+                    }
                 }
+                return null; // No unskipped bells after this one
             }
     
             /**
@@ -1111,6 +1561,753 @@
                 bellDate.setHours(h, m, s, 0); // Set time, clear milliseconds
                 return bellDate;
             }
+
+            // ============================================
+            // V5.52.0: COUNTDOWN WARNING FUNCTIONALITY
+            // ============================================
+            
+            /**
+             * Load warning settings from localStorage
+             */
+            function loadWarningSettings() {
+                try {
+                    const stored = localStorage.getItem('countdownWarningSettings');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        warningSettings = { ...warningSettings, ...parsed };
+                        console.log('[Warning] Settings loaded:', warningSettings);
+                    }
+                    // V5.52.1: Apply custom colors on load
+                    applyWarningColors();
+                } catch (e) {
+                    console.error('[Warning] Error loading settings:', e);
+                }
+            }
+            
+            /**
+             * Save warning settings to localStorage
+             */
+            function saveWarningSettings() {
+                try {
+                    localStorage.setItem('countdownWarningSettings', JSON.stringify(warningSettings));
+                    console.log('[Warning] Settings saved:', warningSettings);
+                    // V5.52.1: Apply custom colors after saving
+                    applyWarningColors();
+                    // V5.53: Also save to cloud
+                    saveUserPreferencesToCloud();
+                } catch (e) {
+                    console.error('[Warning] Error saving settings:', e);
+                }
+            }
+            
+            /**
+             * V5.52.1: Apply custom warning colors to CSS variables
+             */
+            function applyWarningColors() {
+                const root = document.documentElement;
+                root.style.setProperty('--warning-color-subtle', warningSettings.colorSubtle);
+                root.style.setProperty('--warning-color-medium', warningSettings.colorMedium);
+                root.style.setProperty('--warning-color-urgent', warningSettings.colorUrgent);
+            }
+            
+            /**
+             * V5.52.1: Reset warning colors to defaults
+             */
+            function resetWarningColors() {
+                warningSettings.colorSubtle = '#fbbf24';
+                warningSettings.colorMedium = '#f97316';
+                warningSettings.colorUrgent = '#ef4444';
+                
+                // Update color inputs in modal
+                const subtleInput = document.getElementById('warning-color-subtle');
+                const mediumInput = document.getElementById('warning-color-medium');
+                const urgentInput = document.getElementById('warning-color-urgent');
+                
+                if (subtleInput) subtleInput.value = warningSettings.colorSubtle;
+                if (mediumInput) mediumInput.value = warningSettings.colorMedium;
+                if (urgentInput) urgentInput.value = warningSettings.colorUrgent;
+                
+                applyWarningColors();
+            }
+            
+            /**
+             * Get the appropriate warning class based on settings and time remaining
+             * @param {number} secondsRemaining - Seconds until bell
+             * @param {boolean} isQuickBell - Whether this is a quick bell timer
+             * @returns {string|null} CSS class to apply, or null if no warning
+             */
+            function getWarningClass(secondsRemaining, isQuickBell = false) {
+                if (!warningSettings.enabled) return null;
+                if (isQuickBell && !warningSettings.quickBells) return null;
+                if (!isQuickBell && !warningSettings.scheduledBells) return null;
+                if (secondsRemaining > warningSettings.time || secondsRemaining <= 0) return null;
+                
+                // Calculate intensity based on time remaining
+                const timeRatio = secondsRemaining / warningSettings.time;
+                let intensity;
+                
+                if (timeRatio > 0.5) {
+                    intensity = 'subtle';
+                } else if (timeRatio > 0.2) {
+                    intensity = 'medium';
+                } else {
+                    intensity = 'urgent';
+                }
+                
+                // If user set a fixed intensity, use that instead
+                if (warningSettings.intensity !== 'auto') {
+                    // Progressive: start at subtle, escalate based on user's max
+                    if (warningSettings.intensity === 'subtle') {
+                        intensity = 'subtle';
+                    } else if (warningSettings.intensity === 'medium') {
+                        intensity = timeRatio > 0.5 ? 'subtle' : 'medium';
+                    } else if (warningSettings.intensity === 'urgent') {
+                        intensity = timeRatio > 0.5 ? 'subtle' : (timeRatio > 0.2 ? 'medium' : 'urgent');
+                    }
+                }
+                
+                return `warning-${warningSettings.style}-${intensity}`;
+            }
+            
+            /**
+             * Apply warning effect to visual cue container
+             * @param {number} secondsRemaining - Seconds until bell
+             * @param {boolean} isQuickBell - Whether this is a quick bell timer
+             */
+            function applyWarningEffect(secondsRemaining, isQuickBell = false) {
+                const container = document.getElementById('visual-cue-container');
+                if (!container) return;
+                
+                const newClass = getWarningClass(secondsRemaining, isQuickBell);
+                
+                // Remove old warning class if different
+                if (currentWarningClass && currentWarningClass !== newClass) {
+                    container.classList.remove(currentWarningClass);
+                }
+                
+                // Apply new warning class
+                if (newClass && newClass !== currentWarningClass) {
+                    container.classList.add(newClass);
+                    currentWarningClass = newClass;
+                } else if (!newClass && currentWarningClass) {
+                    container.classList.remove(currentWarningClass);
+                    currentWarningClass = null;
+                }
+                
+                // Also apply to PiP window if open
+                if (pipWindow && !pipWindow.closed) {
+                    const pipContainer = pipWindow.document.getElementById('pip-visual');
+                    if (pipContainer) {
+                        // Remove all warning classes first
+                        pipContainer.className = pipContainer.className.replace(/warning-\S+/g, '').trim();
+                        if (newClass) {
+                            pipContainer.classList.add(newClass);
+                        }
+                    }
+                }
+            }
+            
+            /**
+             * Clear all warning effects
+             */
+            function clearWarningEffects() {
+                const container = document.getElementById('visual-cue-container');
+                if (container && currentWarningClass) {
+                    container.classList.remove(currentWarningClass);
+                }
+                currentWarningClass = null;
+                
+                // Also clear from PiP
+                if (pipWindow && !pipWindow.closed) {
+                    const pipContainer = pipWindow.document.getElementById('pip-visual');
+                    if (pipContainer) {
+                        pipContainer.className = pipContainer.className.replace(/warning-\S+/g, '').trim();
+                    }
+                }
+            }
+            
+            /**
+             * Open warning settings modal
+             */
+            function openWarningSettingsModal() {
+                const modal = document.getElementById('warning-settings-modal');
+                if (!modal) return;
+                
+                // Populate form with current settings
+                document.getElementById('warning-enabled').checked = warningSettings.enabled;
+                document.getElementById('warning-time').value = warningSettings.time;
+                document.getElementById('warning-style').value = warningSettings.style;
+                document.getElementById('warning-intensity').value = warningSettings.intensity;
+                document.getElementById('warning-scheduled-bells').checked = warningSettings.scheduledBells;
+                document.getElementById('warning-quick-bells').checked = warningSettings.quickBells;
+                
+                // V5.52.1: Populate color inputs
+                document.getElementById('warning-color-subtle').value = warningSettings.colorSubtle;
+                document.getElementById('warning-color-medium').value = warningSettings.colorMedium;
+                document.getElementById('warning-color-urgent').value = warningSettings.colorUrgent;
+                
+                modal.classList.remove('hidden');
+            }
+            
+            /**
+             * Close warning settings modal
+             */
+            function closeWarningSettingsModal() {
+                const modal = document.getElementById('warning-settings-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+                // Stop any preview animation
+                stopWarningPreview();
+            }
+            
+            /**
+             * Save warning settings from modal
+             */
+            function saveWarningSettingsFromModal() {
+                warningSettings.enabled = document.getElementById('warning-enabled').checked;
+                warningSettings.time = parseInt(document.getElementById('warning-time').value) || 60;
+                warningSettings.style = document.getElementById('warning-style').value;
+                warningSettings.intensity = document.getElementById('warning-intensity').value;
+                warningSettings.scheduledBells = document.getElementById('warning-scheduled-bells').checked;
+                warningSettings.quickBells = document.getElementById('warning-quick-bells').checked;
+                
+                // V5.52.1: Save custom colors
+                warningSettings.colorSubtle = document.getElementById('warning-color-subtle').value;
+                warningSettings.colorMedium = document.getElementById('warning-color-medium').value;
+                warningSettings.colorUrgent = document.getElementById('warning-color-urgent').value;
+                
+                saveWarningSettings();
+                closeWarningSettingsModal();
+                
+                // Clear any existing warnings so they recalculate
+                clearWarningEffects();
+            }
+            
+            /**
+             * Preview warning effect in modal
+             */
+            let warningPreviewTimeout = null;
+            function previewWarningEffect() {
+                const preview = document.getElementById('warning-preview');
+                if (!preview) return;
+                
+                // Get current form values
+                const style = document.getElementById('warning-style').value;
+                const intensity = document.getElementById('warning-intensity').value;
+                
+                // V5.52.1: Apply current color settings from form for preview
+                const root = document.documentElement;
+                root.style.setProperty('--warning-color-subtle', document.getElementById('warning-color-subtle').value);
+                root.style.setProperty('--warning-color-medium', document.getElementById('warning-color-medium').value);
+                root.style.setProperty('--warning-color-urgent', document.getElementById('warning-color-urgent').value);
+                
+                // Clear previous preview
+                preview.className = 'mx-auto w-24 h-24 bg-gray-800 rounded-lg flex items-center justify-center';
+                
+                // Apply preview class
+                const previewClass = `warning-${style}-${intensity}`;
+                preview.classList.add(previewClass);
+                
+                // Stop after 3 seconds
+                if (warningPreviewTimeout) clearTimeout(warningPreviewTimeout);
+                warningPreviewTimeout = setTimeout(() => {
+                    stopWarningPreview();
+                }, 3000);
+            }
+            
+            /**
+             * Stop warning preview
+             */
+            function stopWarningPreview() {
+                const preview = document.getElementById('warning-preview');
+                if (preview) {
+                    preview.className = 'mx-auto w-24 h-24 bg-gray-800 rounded-lg flex items-center justify-center';
+                }
+                if (warningPreviewTimeout) {
+                    clearTimeout(warningPreviewTimeout);
+                    warningPreviewTimeout = null;
+                }
+            }
+
+            // ============================================
+            // V5.49.0: KIOSK MODE FUNCTIONALITY
+            // ============================================
+            
+            /**
+             * Load kiosk mode preference from localStorage
+             */
+            function loadKioskModePreference() {
+                try {
+                    const stored = localStorage.getItem('kioskModeEnabled');
+                    if (stored === 'true') {
+                        kioskModeEnabled = true;
+                        applyKioskMode(true);
+                    }
+                } catch (e) {
+                    console.error('Error loading kiosk mode preference:', e);
+                }
+            }
+            
+            /**
+             * Save kiosk mode preference to localStorage
+             */
+            function saveKioskModePreference() {
+                try {
+                    localStorage.setItem('kioskModeEnabled', kioskModeEnabled ? 'true' : 'false');
+                    // V5.53: Also save to cloud
+                    saveUserPreferencesToCloud();
+                } catch (e) {
+                    console.error('Error saving kiosk mode preference:', e);
+                }
+            }
+            
+            /**
+             * Apply or remove kiosk mode styling
+             * @param {boolean} enabled - Whether to enable kiosk mode
+             */
+            function applyKioskMode(enabled) {
+                const body = document.body;
+                const enterIcon = document.getElementById('kiosk-enter-icon');
+                const exitIcon = document.getElementById('kiosk-exit-icon');
+                const toggleBtn = document.getElementById('kiosk-toggle-btn');
+                
+                if (enabled) {
+                    body.classList.add('kiosk-mode');
+                    if (enterIcon) enterIcon.classList.add('hidden');
+                    if (exitIcon) exitIcon.classList.remove('hidden');
+                    if (toggleBtn) toggleBtn.title = 'Exit Kiosk Mode';
+                } else {
+                    body.classList.remove('kiosk-mode');
+                    if (enterIcon) enterIcon.classList.remove('hidden');
+                    if (exitIcon) exitIcon.classList.add('hidden');
+                    if (toggleBtn) toggleBtn.title = 'Enter Kiosk Mode';
+                }
+            }
+            
+            /**
+             * Toggle kiosk mode on/off
+             */
+            function toggleKioskMode() {
+                kioskModeEnabled = !kioskModeEnabled;
+                applyKioskMode(kioskModeEnabled);
+                saveKioskModePreference();
+                
+                // Also update PiP window if open
+                if (pipWindow && !pipWindow.closed) {
+                    applyPipKioskMode(pipWindow.document, kioskModeEnabled);
+                }
+                
+                console.log(`Kiosk mode: ${kioskModeEnabled ? 'enabled' : 'disabled'}`);
+            }
+            
+            /**
+             * Apply kiosk mode to PiP window
+             * @param {Document} pipDoc - The PiP window document
+             * @param {boolean} enabled - Whether kiosk mode is enabled
+             */
+            function applyPipKioskMode(pipDoc, enabled) {
+                if (!pipDoc) return;
+                
+                const pipBody = pipDoc.body;
+                const quickBellsRow = pipDoc.getElementById('pip-quick-bells');
+                const actionButtons = pipDoc.querySelector('.pip-action-buttons');
+                const enterIcon = pipDoc.getElementById('pip-kiosk-enter-icon');
+                const exitIcon = pipDoc.getElementById('pip-kiosk-exit-icon');
+                const toggleBtn = pipDoc.getElementById('pip-kiosk-toggle-btn');
+                
+                if (enabled) {
+                    if (pipBody) pipBody.classList.add('pip-kiosk-mode');
+                    if (quickBellsRow) quickBellsRow.style.display = 'none';
+                    if (actionButtons) actionButtons.style.display = 'none';
+                    if (enterIcon) enterIcon.classList.add('hidden');
+                    if (exitIcon) exitIcon.classList.remove('hidden');
+                    if (toggleBtn) toggleBtn.title = 'Exit Kiosk Mode';
+                } else {
+                    if (pipBody) pipBody.classList.remove('pip-kiosk-mode');
+                    if (quickBellsRow) quickBellsRow.style.display = '';
+                    if (actionButtons) actionButtons.style.display = '';
+                    if (enterIcon) enterIcon.classList.remove('hidden');
+                    if (exitIcon) exitIcon.classList.add('hidden');
+                    if (toggleBtn) toggleBtn.title = 'Enter Kiosk Mode';
+                }
+            }
+
+            // ============================================
+            // V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
+            // ============================================
+            
+            /**
+             * Toggle Picture-in-Picture mode - clones elements from main page
+             */
+            async function togglePictureInPicture() {
+                // Check if Document PiP is supported
+                if (!('documentPictureInPicture' in window)) {
+                    showUserMessage("Picture-in-Picture is not supported in this browser. Try Chrome, Edge, or another Chromium-based browser.");
+                    return;
+                }
+                
+                // If PiP is already open, close it
+                if (pipWindow && !pipWindow.closed) {
+                    pipWindow.close();
+                    pipWindow = null;
+                    return;
+                }
+                
+                try {
+                    // Request PiP window
+                    pipWindow = await documentPictureInPicture.requestWindow({
+                        width: 800,
+                        height: 420
+                    });
+                    
+                    const pipDoc = pipWindow.document;
+                    
+                    // Copy stylesheets from main page (for Tailwind)
+                    [...document.styleSheets].forEach((styleSheet) => {
+                        try {
+                            const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
+                            const style = document.createElement('style');
+                            style.textContent = cssRules;
+                            pipDoc.head.appendChild(style);
+                        } catch (e) {
+                            if (styleSheet.href) {
+                                const link = document.createElement('link');
+                                link.rel = 'stylesheet';
+                                link.href = styleSheet.href;
+                                pipDoc.head.appendChild(link);
+                            }
+                        }
+                    });
+                    
+                    // Add PiP-specific styles
+                    const pipStyle = pipDoc.createElement('style');
+                    pipStyle.textContent = `
+                        body {
+                            background: #f3f4f6;
+                            padding: 16px;
+                            margin: 0;
+                            overflow: hidden;
+                        }
+                        .pip-layout {
+                            display: grid;
+                            grid-template-columns: 250px 1fr;
+                            gap: 16px;
+                            align-items: center;
+                        }
+                        #pip-visual {
+                            width: 250px !important;
+                            height: 250px !important;
+                            min-height: 250px !important;
+                            aspect-ratio: 1 !important;
+                        }
+                        #pip-quick-bells {
+                            margin-top: 12px;
+                            padding-top: 12px;
+                            border-top: 1px solid #e5e7eb;
+                        }
+                        .pip-action-buttons {
+                            display: flex;
+                            gap: 8px;
+                            margin-top: 12px;
+                        }
+                        .pip-action-buttons button:not(.hidden) {
+                            flex: 1;
+                        }
+                        /* V5.49.0: Kiosk mode toggle button */
+                        #pip-kiosk-toggle-btn {
+                            position: fixed;
+                            top: 8px;
+                            right: 8px;
+                            padding: 6px;
+                            background: #1f2937;
+                            color: white;
+                            border: none;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            z-index: 100;
+                        }
+                        #pip-kiosk-toggle-btn:hover {
+                            background: #374151;
+                        }
+                        /* V5.49.2: PiP kiosk mode - keep horizontal, just hide extras */
+                        body.pip-kiosk-mode #pip-clock {
+                            display: none !important;
+                        }
+                        body.pip-kiosk-mode #pip-next-bell {
+                            display: none !important;
+                        }
+                    `;
+                    pipDoc.head.appendChild(pipStyle);
+                    
+                    // Build the layout
+                    const container = pipDoc.createElement('div');
+                    
+                    // Main section - two column layout
+                    const mainSection = pipDoc.createElement('div');
+                    mainSection.className = 'pip-layout';
+                    
+                    // Clone visual cue container
+                    const visualClone = document.getElementById('visual-cue-container').cloneNode(true);
+                    visualClone.id = 'pip-visual';
+                    mainSection.appendChild(visualClone);
+                    
+                    // Clone the countdown column
+                    const countdownCol = pipDoc.createElement('div');
+                    countdownCol.className = 'p-2 flex flex-col justify-center';
+                    
+                    const clockClone = document.getElementById('live-clock-sentence').cloneNode(true);
+                    clockClone.id = 'pip-clock';
+                    countdownCol.appendChild(clockClone);
+                    
+                    const countdownClone = document.getElementById('countdown-display').cloneNode(true);
+                    countdownClone.id = 'pip-countdown';
+                    countdownCol.appendChild(countdownClone);
+                    
+                    const bellNameClone = document.getElementById('next-bell-sentence').cloneNode(true);
+                    bellNameClone.id = 'pip-bell-name';
+                    countdownCol.appendChild(bellNameClone);
+                    
+                    const nextBellClone = document.getElementById('next-bell-info').cloneNode(true);
+                    nextBellClone.id = 'pip-next-bell';
+                    countdownCol.appendChild(nextBellClone);
+                    
+                    // Add action buttons row (Skip Bell, Unskip, Cancel Timer)
+                    const actionButtonsRow = pipDoc.createElement('div');
+                    actionButtonsRow.className = 'pip-action-buttons';
+                    
+                    // Skip Bell button - starts hidden, shown if bells exist
+                    const skipBtn = pipDoc.createElement('button');
+                    skipBtn.id = 'pip-skip-bell';
+                    skipBtn.className = 'px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 hidden';
+                    skipBtn.textContent = 'Skip Bell';
+                    skipBtn.title = 'Skip the next scheduled bell (just this once)';
+                    skipBtn.addEventListener('click', () => {
+                        skipNextBell();
+                        updatePipActionButtons(pipDoc);
+                    });
+                    actionButtonsRow.appendChild(skipBtn);
+                    
+                    // Unskip button - shows when a bell has been skipped
+                    const unskipBtn = pipDoc.createElement('button');
+                    unskipBtn.id = 'pip-unskip-bell';
+                    unskipBtn.className = 'px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 hidden';
+                    unskipBtn.textContent = 'Unskip';
+                    unskipBtn.addEventListener('click', () => {
+                        const skippedBell = getNextSkippedBell();
+                        if (skippedBell) {
+                            unskipBell(skippedBell);
+                            updatePipActionButtons(pipDoc);
+                        }
+                    });
+                    actionButtonsRow.appendChild(unskipBtn);
+                    
+                    // Cancel Timer button - hidden until timer active
+                    const cancelBtn = pipDoc.createElement('button');
+                    cancelBtn.id = 'pip-cancel-timer';
+                    cancelBtn.className = 'px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 hidden';
+                    cancelBtn.textContent = 'Cancel Timer';
+                    cancelBtn.addEventListener('click', () => {
+                        document.getElementById('cancel-quick-bell-btn')?.click();
+                    });
+                    actionButtonsRow.appendChild(cancelBtn);
+                    
+                    countdownCol.appendChild(actionButtonsRow);
+                    
+                    mainSection.appendChild(countdownCol);
+                    container.appendChild(mainSection);
+                    
+                    // Clone quick bells section
+                    const quickBellsClone = document.getElementById('quickBellControls').cloneNode(true);
+                    quickBellsClone.id = 'pip-quick-bells';
+                    // Remove the cancel button from quick bells (we have it in the countdown column now)
+                    const oldCancelBtn = quickBellsClone.querySelector('#cancel-quick-bell-btn');
+                    if (oldCancelBtn) oldCancelBtn.remove();
+                    container.appendChild(quickBellsClone);
+                    
+                    pipDoc.body.appendChild(container);
+                    
+                    // V5.49.0: Add kiosk toggle button to PiP
+                    const pipKioskBtn = pipDoc.createElement('button');
+                    pipKioskBtn.id = 'pip-kiosk-toggle-btn';
+                    pipKioskBtn.title = kioskModeEnabled ? 'Exit Kiosk Mode' : 'Enter Kiosk Mode';
+                    pipKioskBtn.innerHTML = `
+                        <svg id="pip-kiosk-enter-icon" ${kioskModeEnabled ? 'class="hidden"' : ''} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <polyline points="9 21 3 21 3 15"></polyline>
+                            <line x1="21" y1="3" x2="14" y2="10"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                        <svg id="pip-kiosk-exit-icon" ${kioskModeEnabled ? '' : 'class="hidden"'} xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="4 14 10 14 10 20"></polyline>
+                            <polyline points="20 10 14 10 14 4"></polyline>
+                            <line x1="14" y1="10" x2="21" y2="3"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                    `;
+                    pipKioskBtn.addEventListener('click', () => {
+                        toggleKioskMode();
+                    });
+                    pipDoc.body.appendChild(pipKioskBtn);
+                    
+                    // Apply current kiosk mode state to PiP
+                    if (kioskModeEnabled) {
+                        applyPipKioskMode(pipDoc, true);
+                    }
+                    
+                    // Set up click handlers - delegate to main page buttons
+                    quickBellsClone.addEventListener('click', (e) => {
+                        const btn = e.target.closest('button');
+                        if (!btn) return;
+                        
+                        // Find the equivalent button on main page and click it
+                        if (btn.classList.contains('quick-bell-btn')) {
+                            const minutes = btn.dataset.minutes;
+                            const mainBtn = document.querySelector(`#quickBellControls .quick-bell-btn[data-minutes="${minutes}"]`);
+                            if (mainBtn) mainBtn.click();
+                        } else if (btn.classList.contains('custom-quick-launch-btn')) {
+                            const customId = btn.dataset.customId;
+                            const mainBtn = document.querySelector(`#custom-quick-bells-container [data-custom-id="${customId}"]`);
+                            if (mainBtn) mainBtn.click();
+                        }
+                    });
+                    
+                    // Sync sound select changes back to main page
+                    const pipSoundSelect = quickBellsClone.querySelector('#quickBellSoundSelect');
+                    if (pipSoundSelect) {
+                        pipSoundSelect.addEventListener('change', () => {
+                            document.getElementById('quickBellSoundSelect').value = pipSoundSelect.value;
+                        });
+                    }
+                    
+                    // Initial sync
+                    updatePipWindow();
+                    
+                    // Handle close
+                    pipWindow.addEventListener('pagehide', () => {
+                        pipWindow = null;
+                    });
+                    
+                } catch (error) {
+                    console.error("Error opening Picture-in-Picture:", error);
+                    showUserMessage("Could not open Picture-in-Picture: " + error.message);
+                }
+            }
+            
+            /**
+             * Update the PiP window (called from updateClock)
+             */
+            function updatePipWindow() {
+                if (!pipWindow || pipWindow.closed) return;
+                
+                const pipDoc = pipWindow.document;
+                
+                // Sync visual cue
+                const mainVisual = document.getElementById('visual-cue-container');
+                const pipVisual = pipDoc.getElementById('pip-visual');
+                if (mainVisual && pipVisual) {
+                    pipVisual.innerHTML = mainVisual.innerHTML;
+                }
+                
+                // Sync text elements
+                const syncElement = (mainId, pipId) => {
+                    const main = document.getElementById(mainId);
+                    const pip = pipDoc.getElementById(pipId);
+                    if (main && pip) {
+                        pip.textContent = main.textContent;
+                    }
+                };
+                
+                syncElement('live-clock-sentence', 'pip-clock');
+                syncElement('countdown-display', 'pip-countdown');
+                syncElement('next-bell-sentence', 'pip-bell-name');
+                syncElement('next-bell-info', 'pip-next-bell');
+                
+                // Update action buttons (Skip, Unskip, Cancel)
+                updatePipActionButtons(pipDoc);
+                
+                // Sync custom quick bells container
+                const mainCustom = document.getElementById('custom-quick-bells-container');
+                const pipCustom = pipDoc.querySelector('#pip-quick-bells #custom-quick-bells-container');
+                if (mainCustom && pipCustom && mainCustom.innerHTML !== pipCustom.innerHTML) {
+                    pipCustom.innerHTML = mainCustom.innerHTML;
+                }
+                
+                // Sync separator visibility  
+                const mainSep = document.getElementById('custom-quick-bell-separator');
+                const pipSep = pipDoc.querySelector('#pip-quick-bells #custom-quick-bell-separator');
+                if (mainSep && pipSep) {
+                    if (mainSep.classList.contains('hidden')) {
+                        pipSep.classList.add('hidden');
+                    } else {
+                        pipSep.classList.remove('hidden');
+                    }
+                }
+            }
+            
+            /**
+             * Stub for compatibility - actual sync handled in updatePipWindow
+             */
+            function updatePipCustomQuickBells() {
+                updatePipWindow();
+            }
+            
+            /**
+             * Update PiP action buttons visibility based on state
+             * - Quick timer active: Show Cancel Timer only
+             * - No upcoming bells: Hide Skip Bell
+             * - No quick timer, has skipped bell: Show Skip Bell + Unskip
+             */
+            function updatePipActionButtons(pipDoc) {
+                if (!pipDoc) return;
+                
+                const skipBtn = pipDoc.getElementById('pip-skip-bell');
+                const unskipBtn = pipDoc.getElementById('pip-unskip-bell');
+                const cancelBtn = pipDoc.getElementById('pip-cancel-timer');
+                
+                if (!skipBtn || !unskipBtn || !cancelBtn) return;
+                
+                const hasQuickTimer = quickBellEndTime !== null;
+                const skippedBell = getNextSkippedBell();
+                const hasSkippedBell = skippedBell !== null;
+                
+                // V5.48: Check for upcoming bells
+                const now = new Date();
+                const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                const allBells = [...localSchedule, ...personalBells];
+                const upcomingBells = allBells.filter(bell => bell.time > currentTimeHHMMSS && !isBellSkipped(bell));
+                const hasUpcomingBells = upcomingBells.length > 0;
+                
+                if (hasQuickTimer) {
+                    // Quick timer active: Show only Cancel Timer
+                    skipBtn.classList.add('hidden');
+                    unskipBtn.classList.add('hidden');
+                    cancelBtn.classList.remove('hidden');
+                } else {
+                    // No quick timer: Hide Cancel
+                    cancelBtn.classList.add('hidden');
+                    
+                    // Show/hide Skip Bell based on upcoming bells
+                    if (hasUpcomingBells) {
+                        skipBtn.classList.remove('hidden');
+                    } else {
+                        skipBtn.classList.add('hidden');
+                    }
+                    
+                    // Show/hide Unskip based on skipped bell
+                    if (hasSkippedBell) {
+                        unskipBtn.classList.remove('hidden');
+                        const timeStr = formatTime12Hour(skippedBell.time, true);
+                        unskipBtn.textContent = `Unskip (${timeStr})`;
+                        unskipBtn.title = `Restore: ${skippedBell.name} at ${timeStr}`;
+                    } else {
+                        unskipBtn.classList.add('hidden');
+                    }
+                }
+            }
+            // ============================================
+            // END V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
+            // ============================================
 
             // MODIFIED: v3.22 -> v3.23 - Grammar changes
             function updateClock() {
@@ -1205,6 +2402,11 @@
                     }
                     countdownElement.textContent = countdownString;
                     
+                    // V5.52.0: Apply countdown warning effect
+                    const totalSecondsRemaining = Math.max(0, Math.floor(activeTimerMillis / 1000));
+                    const isQuickBellActive = millisToQuickBell < millisToScheduleBell;
+                    applyWarningEffect(totalSecondsRemaining, isQuickBellActive);
+                    
                     // Updated 5.26.1 - Add Period context to the label
                     let bellLabel = activeTimerLabel;
 
@@ -1230,6 +2432,10 @@
                     countdownElement.textContent = "--:--";
                     // MODIFICATION: Added period
                     nextBellElement.textContent = "until the next bell.";
+                    
+                    // V5.52.0: Clear warning effects when no active countdown
+                    clearWarningEffects();
+                    
                     // "Next Bell" info is already set to "No more bells today."
                     // Or, if school is out, scheduleBellObject is the first bell tomorrow.
                     if (scheduleBellObject) {
@@ -1288,12 +2494,17 @@
                     console.log("Day has changed. Resetting missed bell check.");
                     lastClockCheckTimestamp = 0; // Force reset
                     currentDay = newDay;
+                    clearOldSkippedBells(); // V5.47.9: Clear skipped bells from previous day
                 }
 
                 // B. On first run, just set the timestamp and wait for the next second.
                 if (lastClockCheckTimestamp === 0) {
                     lastClockCheckTimestamp = nowTimestamp;
                 } else if (nowTimestamp > lastClockCheckTimestamp) {
+                    // V5.48: Check if tab was asleep for a long time (more than 2 minutes)
+                    const timeSinceLastCheck = nowTimestamp - lastClockCheckTimestamp;
+                    const wasTabAsleep = timeSinceLastCheck > 120000; // 2 minutes
+                    
                     // C. Find all bells that *should have* rung between the last check and now
                     const bellsToRing = allBells.filter(bell => {
                         const bellDate = getDateForBellTime(bell.time, now);
@@ -1305,22 +2516,52 @@
                     
                     if (bellsToRing.length > 0) {
                         console.log(`Found ${bellsToRing.length} missed bell(s) to ring.`);
-                        // Sort them just in case
+                        // Sort them by time
                         bellsToRing.sort((a, b) => a.time.localeCompare(b.time));
+                        
+                        // V5.48: If tab was asleep and multiple bells missed, show notification
+                        if (wasTabAsleep && bellsToRing.length > 1) {
+                            const missedCount = bellsToRing.length;
+                            const missedNames = bellsToRing.map(b => `${b.name} (${formatTime12Hour(b.time, true)})`);
+                            
+                            // Show user message about missed bells
+                            showUserMessage(`Tab was asleep - ${missedCount} bell${missedCount > 1 ? 's' : ''} missed`);
+                            
+                            // Log details to console
+                            console.log('Missed bells while tab was asleep:', missedNames);
+                            
+                            // Update status to show missed count
+                            statusElement.textContent = `${missedCount} bells missed while tab was asleep`;
+                        }
 
-                        // Ring them all, but only if cooldown has passed
+                        // Ring only the MOST RECENT bell (last in sorted array), and only if cooldown passed
                         if (nowTimestamp - lastRingTimestamp > RING_COOLDOWN) {
-                            // For now, just ring the *last* one if multiple were missed
-                                const bell = bellsToRing[bellsToRing.length - 1];
-                                // FIX 5.17: Use the actual bell.bellId if it exists, otherwise fall back to getBellId()
-                                const bellId = bell.bellId || getBellId(bell);
-                                
-                                if (mutedBellIds.has(String(bellId))) {
-                                    console.log(`Skipping bell (Muted): ${bell.name}`);
+                            const bell = bellsToRing[bellsToRing.length - 1];
+                            const bellId = bell.bellId || getBellId(bell);
+                            
+                            if (mutedBellIds.has(String(bellId))) {
+                                console.log(`Skipping bell (Muted): ${bell.name}`);
+                                if (!wasTabAsleep || bellsToRing.length === 1) {
                                     statusElement.textContent = `Skipped (Muted): ${bell.name}`;
-                                } else {
-                                    ringBell(bell); // fire-and-forget
                                 }
+                            } else if (isBellSkipped(bell)) {
+                                // V5.47.9: Skip temporarily skipped bells
+                                console.log(`Skipping bell (Skipped): ${bell.name}`);
+                                if (!wasTabAsleep || bellsToRing.length === 1) {
+                                    statusElement.textContent = `Skipped: ${bell.name}`;
+                                }
+                                // Remove from skipped set since it's now passed
+                                skippedBellOccurrences.delete(getSkipKey(bell));
+                            } else {
+                                // Only ring if tab wasn't asleep for ages, OR if it's a reasonable catch-up
+                                if (!wasTabAsleep || bellsToRing.length <= 3) {
+                                    ringBell(bell);
+                                    lastBellRingTime = currentTimeHHMMSS;
+                                } else {
+                                    // Too many missed - don't ring, just notify
+                                    console.log(`Not ringing ${bell.name} - too many bells missed (${bellsToRing.length})`);
+                                }
+                            }
                             lastRingTimestamp = nowTimestamp; // Set cooldown
                         }
                     }
@@ -1333,6 +2574,7 @@
                 if (quickBellEndTime && nowTimestamp >= quickBellEndTime.getTime() && (nowTimestamp - lastRingTimestamp > RING_COOLDOWN)) {
                     console.log("Ringing Quick Bell");
                     ringBell({ name: "Quick Bell", sound: quickBellSound });
+                    lastBellRingTime = currentTimeHHMMSS; // FIX V5.42: Track ring time for status reset
                     // MODIFIED in 4.39: DO NOT set the lastRingTimestamp.
                     // This prevents a quick bell from "eating" a nearby schedule bell.
                     // lastRingTimestamp = nowTimestamp;
@@ -1345,65 +2587,50 @@
                     if (isAudioReady) statusElement.textContent = "Monitoring...";
                 }
 
-                // --- NEW in 4.44: Update Visual Cue ---
+                // --- MODIFIED V5.42.0: Update Visual Cue with proper period boundary detection ---
                 try {
-                    // Find the *current* period based on the countdown
-                    // Check 1: Is it a Quick Bell? OR is it counting down to the next day (> 6 hours = 21600000ms)?
-                    const isNextDayBell = activeTimerMillis > (6 * 3600 * 1000); // More than 6 hours
+                    const now = new Date();
+                    const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
                     
-                    const currentPeriod = (activeTimerMillis < millisToScheduleBell || isNextDayBell) 
-                        ? null // It's a Quick Bell OR it's the next day (End of Day)
-                        : (scheduleBellObject ? calculatedPeriodsList.find(p => p.name === scheduleBellObject.periodName) : null);
-
-                    // Determine the name of the period whose visual cue we SHOULD be displaying
-                    const nextPeriodName = currentPeriod ? currentPeriod.name : 
-                                           (millisToQuickBell < Infinity ? "Quick Bell" : "Passing Period");
-                    
-                    // Store the new period name
-                    currentVisualPeriodName = nextPeriodName; 
                     let visualHtml = '';
                     let visualSource = ''; // For debugging
                     let newVisualKey = ''; // Track what visual should be showing
-                        
-                    // NEW 5.31: Check for per-bell visual modes (before/after)
-                    // Priority: 1) After-mode bells that recently rang, 2) Before-mode upcoming bell, 3) Period default
-                      
+                    
                     // Get all bells from current schedule, sorted by time
                     const allBells = calculatedPeriodsList.flatMap(p => 
                         p.bells.map(b => ({ ...b, periodName: p.name }))
                     ).sort((a, b) => a.time.localeCompare(b.time));
-                        
-                    // Find the current time
-                    const now = new Date();
-                    const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-                        
+                    
                     // Find the most recent bell that has already rung
                     const previousBell = allBells
-                        .filter(b => b.time < currentTimeStr)
+                        .filter(b => b.time <= currentTimeStr)
                         .sort((a, b) => b.time.localeCompare(a.time))[0]; // Most recent first
-                        
-                    // scheduleBellObject is already the next upcoming bell
-                        
-                    // Priority 1: Show "after" visual from previous bell (if it has one)
-                    // This shows from when the bell rang until the next bell rings
+                    
+                    // Find the next upcoming bell
+                    const nextBell = allBells
+                        .filter(b => b.time > currentTimeStr)
+                        .sort((a, b) => a.time.localeCompare(b.time))[0];
+                    
+                    // Priority 1: "After" visual from previous bell
+                    // Shows from when the bell rang until the next bell rings
                     if (previousBell && previousBell.visualMode === 'after' && previousBell.visualCue) {
                         visualHtml = getVisualHtml(previousBell.visualCue, previousBell.name);
                         visualSource = `After: ${previousBell.name}`;
                         newVisualKey = `after:${previousBell.bellId}`;
                     }
-                        
-                    // Priority 2: Show "before" visual from upcoming bell (if it has one and no "after" is showing)
-                    // This shows from when previous bell rang until this bell rings
-                    if (!visualHtml && scheduleBellObject && scheduleBellObject.visualMode === 'before' && scheduleBellObject.visualCue) {
-                        visualHtml = getVisualHtml(scheduleBellObject.visualCue, scheduleBellObject.name);
-                        visualSource = `Before: ${scheduleBellObject.name}`;
-                        newVisualKey = `before:${scheduleBellObject.bellId}`;
+                    
+                    // Priority 2: "Before" visual from upcoming bell
+                    // Shows during countdown to the bell
+                    if (!visualHtml && nextBell && nextBell.visualMode === 'before' && nextBell.visualCue) {
+                        visualHtml = getVisualHtml(nextBell.visualCue, nextBell.name);
+                        visualSource = `Before: ${nextBell.name}`;
+                        newVisualKey = `before:${nextBell.bellId}`;
                     }
-                        
-                    // 3. Quick bells (existing logic)
+                    
+                    // Priority 3: Quick Bell (if active)
                     if (!visualHtml && millisToQuickBell < Infinity) {
                         const activeCustomBell = customQuickBells.find(b => b && b.isActive !== false && b.name === activeTimerLabel);
-                          
+                        
                         if (activeCustomBell) {
                             const visualCue = activeCustomBell.visualCue || `[CUSTOM_TEXT] ${activeCustomBell.iconText}|${activeCustomBell.iconBgColor}|${activeCustomBell.iconFgColor}`;
                             visualHtml = getVisualHtml(visualCue, activeCustomBell.name);
@@ -1415,21 +2642,28 @@
                             newVisualKey = 'quickbell:generic';
                         }
                     }
-                     
-                    // 4. Fall back to period visual
-                    if (!visualHtml && currentPeriod) {
-                        const visualKey = getVisualOverrideKey(activeBaseScheduleId, currentPeriod.name);
-                        const visualValue = periodVisualOverrides[visualKey] || "";
-                        visualHtml = getVisualHtml(visualValue, currentPeriod.name);
-                        visualSource = `Period: ${currentPeriod.name}`;
-                        newVisualKey = `period:${currentPeriod.name}`;
-                    }
-                        
-                    // 5. Default passing period
+                    
+                    // Priority 4 & 5: Period visual OR Passing period
+                    // V5.42.0: Now based on TIME within period boundaries, not next bell association
                     if (!visualHtml) {
-                        visualHtml = getDefaultVisualCue("Passing Period");
-                        visualSource = 'Passing Period (default)';
-                        newVisualKey = 'passing';
+                        const currentPeriod = findCurrentPeriodByTime(currentTimeStr, calculatedPeriodsList);
+                        
+                        if (currentPeriod) {
+                            // Inside a period - show period visual
+                            const visualKey = getVisualOverrideKey(activeBaseScheduleId, currentPeriod.name);
+                            const visualValue = periodVisualOverrides[visualKey] || "";
+                            visualHtml = getVisualHtml(visualValue, currentPeriod.name);
+                            visualSource = `Period: ${currentPeriod.name}`;
+                            newVisualKey = `period:${currentPeriod.name}`;
+                            currentVisualPeriodName = currentPeriod.name;
+                        } else {
+                            // Outside all periods - show passing period visual
+                            const passingVisual = getPassingPeriodVisualCue();
+                            visualHtml = getVisualHtml(passingVisual, 'Passing Period');
+                            visualSource = 'Passing Period';
+                            newVisualKey = 'passing';
+                            currentVisualPeriodName = 'Passing Period';
+                        }
                     }
                     
                     // Only update the DOM if the visual has actually changed
@@ -1438,16 +2672,23 @@
                         visualCueContainer.innerHTML = visualHtml;
                         currentVisualKey = newVisualKey;
                     }
-                        
-                    } catch (e) {
-                        console.error("Error updating visual cue:", e);
-                    }
+                    
+                } catch (e) {
+                    console.error("Error updating visual cue:", e);
+                }
+                
+                // V5.48: Update Skip/Unskip button visibility
+                updateMainPageSkipButtons();
+                
+                // V5.47.0: Update Picture-in-Picture window if open
+                updatePipWindow();
             }
             
             // --- NEW: Quick Bell Function (MODIFIED V5.00) ---
-            function startQuickBell(minutes, seconds = 0, sound, name = "Quick Bell") {
+            function startQuickBell(hours = 0, minutes = 0, seconds = 0, sound, name = "Quick Bell") {
                 const now = new Date();
-                const totalMillis = (minutes * 60000) + (seconds * 1000);
+                // V5.44.8: Include hours in calculation
+                const totalMillis = (hours * 3600000) + (minutes * 60000) + (seconds * 1000);
                 
                 quickBellEndTime = new Date(now.getTime() + totalMillis);
                 document.getElementById('cancel-quick-bell-btn').classList.remove('hidden'); // 5.27: Show cancel button
@@ -1457,7 +2698,7 @@
                 // NEW V5.00: Store quick bell name for countdown display
                 quickBellEndTime.bellName = name; 
 
-                console.log(`Quick bell set for ${minutes}m ${seconds}s from now. Sound: ${quickBellSound}`);
+                console.log(`Quick bell set for ${hours}h ${minutes}m ${seconds}s from now. Sound: ${quickBellSound}`);
                 updateClock(); // Update display immediately
             }
             
@@ -1515,14 +2756,23 @@
                     
                     // Defaults for empty slots
                     const name = bell ? bell.name : `Slot ${id}`;
+                    const hours = bell ? (bell.hours || 0) : 0;
                     const minutes = bell ? bell.minutes : 5;
                     const seconds = bell ? bell.seconds : 0;
                     // V5.03: Read/default the full visual cue (which includes custom text/colors or URL)
                     const rawVisualCue = bell ? (bell.visualCue || '[CUSTOM_TEXT] ?|#4338CA|#FFFFFF') : '[CUSTOM_TEXT] ?|#4338CA|#FFFFFF'; 
                     const rawIconText = bell ? bell.iconText : String(id); // Legacy/Custom Text value
-                    const iconColor = bell ? (bell.iconBgColor || '#4338CA') : '#4338CA';
-                    const textColor = bell ? (bell.iconFgColor || '#FFFFFF') : '#FFFFFF';
+                    let iconColor = bell ? (bell.iconBgColor || '#4338CA') : '#4338CA';
+                    let textColor = bell ? (bell.iconFgColor || '#FFFFFF') : '#FFFFFF';
                     const sound = bell ? bell.sound : 'ellisBell.mp3';
+                    
+                    // V5.43.2: Extract background color from [BG:...] prefix if present
+                    if (rawVisualCue && rawVisualCue.startsWith('[BG:')) {
+                        const parsed = parseVisualBgColor(rawVisualCue);
+                        if (parsed.bgColor) {
+                            iconColor = parsed.bgColor;
+                        }
+                    }
                     
                     console.log(`Rendering bell ${id}:`, { name, sound, bell });
                     
@@ -1536,21 +2786,26 @@
                     // Generate Sound Options for this slot
                     const soundOptionsHtml = getCustomBellSoundOptions(sound);
                     
-                    // V5.03: Use helper to render the content inside the large button
-                    const iconButtonContent = getCustomBellIconHtml(rawVisualCue, rawIconText, iconColor, textColor);
+                    // V5.43.1: Generate visual dropdown options
+                    const visualOptionsHtml = getCustomBellVisualOptions(rawVisualCue);
+                    
+                    // V5.43.1: Generate full-size preview HTML
+                    const fullPreviewHtml = getVisualHtml(rawVisualCue, name || 'Preview');
+                    
+                    // V5.43.1: Generate button preview HTML  
+                    const buttonPreviewHtml = getCustomBellIconHtml(rawVisualCue, rawIconText, iconColor, textColor);
 
                     return `
-                        <div class="p-4 border rounded-xl shadow-md ${hasData ? 'border-indigo-300 bg-white' : 'border-dashed border-gray-300 bg-gray-50'} space-y-3">
+                        <div class="p-4 border rounded-xl shadow-md ${hasData ? 'border-indigo-300 bg-white' : 'border-dashed border-gray-300 bg-gray-50'} space-y-4">
                             
                             <!-- ROW 1: Checkbox, Name, Time, Clear -->
                             <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
                                 
                                 <!-- Col 1: Active Checkbox (Col Span 1) -->
                                 <div class="col-span-1 flex justify-center" title="${hasData ? 'Activate/Deactivate Bell' : 'Click to activate this slot'}">
-                                    <!-- V5.04 FIX: Checkbox is always ENABLED, even if slot is empty, allowing user to activate the row. -->
                                     <input type="checkbox" data-bell-id="${id}" name="custom-bell-toggle-${id}" 
                                            class="custom-quick-bell-toggle h-5 w-5 text-indigo-600 focus:ring-indigo-500 rounded-md" 
-                                           ${isActive ? 'checked' : ''}> <!-- 5.19.2 Fix the checkbox! -->
+                                           ${isActive ? 'checked' : ''}>
                                 </div>
                                 
                                 <!-- Col 2: Display Name (Col Span 5) -->
@@ -1561,18 +2816,24 @@
                                            placeholder="e.g. Hamburger Time" ${disabledAttr}>
                                 </div>
 
-                                <!-- Col 3: Time (Min/Sec) (Col Span 4) -->
-                                <div class="col-span-4 grid grid-cols-2 gap-2">
+                                <!-- Col 3: Time (Hr/Min/Sec) (Col Span 4) - V5.44.8 -->
+                                <div class="col-span-4 grid grid-cols-3 gap-1">
                                     <div>
-                                        <label class="block text-xs font-medium text-gray-500 mb-1">Minutes</label>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Hr</label>
+                                        <input type="number" data-bell-id="${id}" data-field="hours" name="hours-${id}" value="${hours}" min="0" max="23" 
+                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-1 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
+                                           placeholder="Hr" ${disabledAttr}>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Min</label>
                                         <input type="number" data-bell-id="${id}" data-field="minutes" name="minutes-${id}" value="${minutes}" min="0" max="59" 
-                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-2 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
+                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-1 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
                                            placeholder="Min" ${disabledAttr}>
                                     </div>
                                     <div>
-                                        <label class="block text-xs font-medium text-gray-500 mb-1">Seconds</label>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Sec</label>
                                         <input type="number" data-bell-id="${id}" data-field="seconds" name="seconds-${id}" value="${seconds}" min="0" max="59" 
-                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-2 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
+                                           ${isActive ? 'required' : ''} class="custom-bell-editable-input w-full px-1 py-1 text-sm border border-gray-300 rounded-lg text-center ${disabledClass}" 
                                            placeholder="Sec" ${disabledAttr}>
                                     </div>
                                 </div>
@@ -1588,50 +2849,60 @@
 
                             </div>
                             
-                            <!-- ROW 2: Icon/Visual and Sound -->
-                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                                
-                                <!-- Col 1: Icon/Visual Button (Col Span 3 - Large button) -->
-                                <div class="col-span-3">
-                                    <label class="block text-xs font-medium text-gray-500 mb-1">Visual Cue</label>
-                                    <button type="button" data-bell-id="${id}" 
-                                            data-icon-text="${rawIconText}" 
-                                            data-bg-color="${iconColor}" 
-                                            data-fg-color="${textColor}"
-                                            data-visual-cue="${rawVisualCue}"
-                                            class="custom-bell-icon-btn custom-bell-editable-input w-12 h-12 text-sm bg-gray-200 text-gray-700 rounded-lg hover:opacity-80 flex items-center justify-center gap-2 font-bold transition-opacity duration-150 ${disabledClass} overflow-hidden"
-                                            style="background-color: ${iconColor}; color: ${textColor};"
-                                            title="Edit Icon/Visual" ${disabledAttr}>
-                                        ${iconButtonContent}
-                                    </button>
-                                    <!-- Hidden inputs to store visual state -->
-                                    <input type="hidden" data-bell-id="${id}" data-field="iconText" name="iconText-${id}" value="${rawIconText}">
-                                    <input type="hidden" data-bell-id="${id}" data-field="iconBgColor" name="iconBgColor-${id}" value="${iconColor}">
-                                    <input type="hidden" data-bell-id="${id}" data-field="iconFgColor" name="iconFgColor-${id}" value="${textColor}">
-                                    <input type="hidden" data-bell-id="${id}" data-field="visualCue" name="visualCue-${id}" value="${rawVisualCue}">
+                            <!-- ROW 2: Sound (full width) -->
+                            <div class="flex items-end gap-2">
+                                <div class="flex-grow">
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Ring Sound</label>
+                                    <select data-bell-id="${id}" data-field="sound" name="sound-${id}" 
+                                            class="custom-bell-editable-input w-full px-2 py-1 border border-gray-300 rounded-lg custom-bell-sound-select truncate ${disabledClass}" 
+                                            ${disabledAttr}>
+                                        ${soundOptionsHtml}
+                                    </select>
                                 </div>
-                                
-                                <!-- Col 2: Sound & Preview (Col Span 9) -->
-                                <div class="col-span-9 flex items-end gap-2">
-                                    <div class="flex-grow">
-                                        <label class="block text-xs font-medium text-gray-500 mb-1">Ring Sound</label>
-                                        <select data-bell-id="${id}" data-field="sound" name="sound-${id}" 
-                                                class="custom-bell-editable-input w-full px-2 py-1 border border-gray-300 rounded-lg custom-bell-sound-select truncate ${disabledClass} h-[34px]" 
-                                                ${disabledAttr}>
-                                            ${soundOptionsHtml}
-                                        </select>
+                                <button type="button" data-bell-id="${id}" data-sound="${sound}" 
+                                        class="preview-audio-btn custom-bell-editable-input w-8 h-8 flex-shrink-0 flex items-center justify-center text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors ${disabledClass}" 
+                                        aria-label="Preview" ${disabledAttr}>&#9654;</button>
+                            </div>
+                            
+                            <!-- ROW 3: Visual Cue Dropdown (full width) -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Visual Cue</label>
+                                <select data-bell-id="${id}" data-field="visualCue" name="visualCue-${id}" 
+                                        class="custom-bell-visual-select custom-bell-editable-input w-full px-2 py-1 border border-gray-300 rounded-lg ${disabledClass}" 
+                                        ${disabledAttr}>
+                                    ${visualOptionsHtml}
+                                </select>
+                                <!-- Hidden inputs for legacy icon data -->
+                                <input type="hidden" data-bell-id="${id}" data-field="iconText" name="iconText-${id}" value="${rawIconText}">
+                                <input type="hidden" data-bell-id="${id}" data-field="iconBgColor" name="iconBgColor-${id}" value="${iconColor}">
+                                <input type="hidden" data-bell-id="${id}" data-field="iconFgColor" name="iconFgColor-${id}" value="${textColor}">
+                            </div>
+                            
+                            <!-- ROW 4: Two-column preview -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <!-- Full Size Preview -->
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1 text-center">Full Preview</label>
+                                    <div data-bell-id="${id}" class="custom-bell-full-preview visual-preview-full mx-auto cursor-pointer ${disabledClass}" 
+                                         style="width: 10rem; height: 10rem;" title="Click to customize">
+                                        ${fullPreviewHtml}
                                     </div>
-                                    <button type="button" data-bell-id="${id}" data-sound="${sound}" 
-                                            class="preview-audio-btn custom-bell-editable-input w-8 h-8 flex-shrink-0 flex items-center justify-center text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors ${disabledClass}" 
-                                            aria-label="Preview" ${disabledAttr}>&#9654;</button>
+                                </div>
+                                <!-- Button Preview -->
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1 text-center">Button Preview</label>
+                                    <div class="flex items-center justify-center h-40">
+                                        <div data-bell-id="${id}" class="custom-bell-button-preview w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden ${disabledClass}"
+                                             style="background-color: ${iconColor}; color: ${textColor};">
+                                            ${buttonPreviewHtml}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
                         </div>
                     `;
                 }).join('');
-
-                customQuickBellListContainer.innerHTML = managerSlots;
 
                 customQuickBellListContainer.innerHTML = managerSlots;
 
@@ -1654,10 +2925,18 @@
                 if (activeCustomBells.length > 0) {
                     customQuickBellSeparator.classList.remove('hidden');
                     customQuickBellsContainer.innerHTML = activeCustomBells.map(bell => {
-                        // V5.30.4: Format tooltip time to omit seconds or minutes if zero
-                        const formattedTime = bell.minutes > 0 
-                            ? (bell.seconds > 0 ? `${bell.minutes}m ${bell.seconds}s` : `${bell.minutes}m`)
-                            : `${bell.seconds}s`;
+                        // V5.44.8: Format tooltip time to include hours if present
+                        const hours = bell.hours || 0;
+                        const minutes = bell.minutes || 0;
+                        const seconds = bell.seconds || 0;
+                        let formattedTime = '';
+                        if (hours > 0) {
+                            formattedTime = seconds > 0 ? `${hours}h ${minutes}m ${seconds}s` : (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`);
+                        } else if (minutes > 0) {
+                            formattedTime = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+                        } else {
+                            formattedTime = `${seconds}s`;
+                        }
                         
                         // NEW 5.20: Get the visual content (image or text)
                         const visualCue = bell.visualCue || `[CUSTOM_TEXT] ${bell.iconText}|${bell.iconBgColor}|${bell.iconFgColor}`;
@@ -1668,23 +2947,33 @@
                             // Constantly updating in 5.25 to get the appearance right.
                             visualContent = `<img src="${visualCue}" alt="${bell.name}" class="absolute inset-0 w-full h-full object-contain p-1">`;
                         } else if (visualCue.startsWith('[CUSTOM_TEXT]')) {
-                            // It's custom text - extract text and colors
+                            // V5.44.11: Use SVG text with absolute positioning to fill button (ignoring padding)
                             const parts = visualCue.replace('[CUSTOM_TEXT] ', '').split('|');
                             const text = parts[0] || bell.iconText || bell.id;
-                            visualContent = `<span class="text-xl font-bold block leading-none">${text}</span>`;
+                            const fontSize = text.length > 2 ? 50 : 70;  // Match getCustomBellIconHtml
+                            visualContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="absolute inset-0 w-full h-full p-1">
+                                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${fontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text>
+                            </svg>`;
                         } else if (visualCue.startsWith('[DEFAULT]')) {
-                            // It's a default SVG - just show the icon text as fallback
-                            visualContent = `<span class="text-xl font-bold block leading-none">${bell.iconText}</span>`;
+                            // V5.44.11: Use SVG text for default fallback too
+                            const fontSize = bell.iconText.length > 2 ? 50 : 70;
+                            visualContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="absolute inset-0 w-full h-full p-1">
+                                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${fontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${bell.iconText}</text>
+                            </svg>`;
                         } else {
-                            // Fallback
-                            visualContent = `<span class="text-xl font-bold block leading-none">${bell.iconText}</span>`;
+                            // V5.44.11: Fallback with SVG text
+                            const fontSize = bell.iconText.length > 2 ? 50 : 70;
+                            visualContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="absolute inset-0 w-full h-full p-1">
+                                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${fontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${bell.iconText}</text>
+                            </svg>`;
                         }
 
-                        // 5.30.3 Add mouseover text to buttons
+                        // V5.44.8: Add hours data attribute
                         return `
                         <button data-custom-id="${bell.id}"
-                                data-minutes="${bell.minutes}"
-                                data-seconds="${bell.seconds}"
+                                data-hours="${hours}"
+                                data-minutes="${minutes}"
+                                data-seconds="${seconds}"
                                 data-sound="${bell.sound}"
                                 data-name="${bell.name}"
                                 class="custom-quick-launch-btn font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11 w-11 relative overflow-hidden group flex items-center justify-center"
@@ -1699,6 +2988,9 @@
                     customQuickBellSeparator.classList.add('hidden');
                     customQuickBellsContainer.innerHTML = '';
                 }
+                
+                // V5.47.0: Update PiP window custom quick bells if open
+                updatePipCustomQuickBells();
             }
 
             /**
@@ -1728,11 +3020,122 @@
                 
                 return tempDiv.innerHTML;
             }
+            
+            /**
+             * V5.43.3: Sync form values back to the customQuickBells array
+             * Called before re-rendering to preserve user edits
+             */
+            function syncCustomBellFormToArray() {
+                const formContainer = document.getElementById('custom-quick-bell-list-container');
+                if (!formContainer) return;
+                
+                // Get all bell IDs currently in the form
+                const toggles = formContainer.querySelectorAll('.custom-quick-bell-toggle');
+                
+                toggles.forEach(toggle => {
+                    const bellId = parseInt(toggle.dataset.bellId);
+                    const row = toggle.closest('.p-4');
+                    if (!row) return;
+                    
+                    // Find or create bell in array
+                    let bellIndex = customQuickBells.findIndex(b => b && b.id === bellId);
+                    if (bellIndex === -1) {
+                        // Bell doesn't exist yet, create it
+                        customQuickBells.push({
+                            id: bellId,
+                            isActive: toggle.checked
+                        });
+                        bellIndex = customQuickBells.length - 1;
+                    }
+                    
+                    const bell = customQuickBells[bellIndex];
+                    if (!bell) return;
+                    
+                    // Sync all form values
+                    const nameInput = row.querySelector(`input[data-field="name"][data-bell-id="${bellId}"]`);
+                    const hoursInput = row.querySelector(`input[data-field="hours"][data-bell-id="${bellId}"]`);
+                    const minutesInput = row.querySelector(`input[data-field="minutes"][data-bell-id="${bellId}"]`);
+                    const secondsInput = row.querySelector(`input[data-field="seconds"][data-bell-id="${bellId}"]`);
+                    const soundSelect = row.querySelector(`select[data-field="sound"][data-bell-id="${bellId}"]`);
+                    const visualCueInput = row.querySelector(`input[data-field="visualCue"][data-bell-id="${bellId}"]`);
+                    const iconTextInput = row.querySelector(`input[data-field="iconText"][data-bell-id="${bellId}"]`);
+                    const iconBgColorInput = row.querySelector(`input[data-field="iconBgColor"][data-bell-id="${bellId}"]`);
+                    const iconFgColorInput = row.querySelector(`input[data-field="iconFgColor"][data-bell-id="${bellId}"]`);
+                    
+                    bell.isActive = toggle.checked;
+                    if (nameInput) bell.name = nameInput.value;
+                    if (hoursInput) bell.hours = parseInt(hoursInput.value) || 0;
+                    if (minutesInput) bell.minutes = parseInt(minutesInput.value) || 0;
+                    if (secondsInput) bell.seconds = parseInt(secondsInput.value) || 0;
+                    if (soundSelect) bell.sound = soundSelect.value;
+                    if (visualCueInput) bell.visualCue = visualCueInput.value;
+                    if (iconTextInput) bell.iconText = iconTextInput.value;
+                    if (iconBgColorInput) bell.iconBgColor = iconBgColorInput.value;
+                    if (iconFgColorInput) bell.iconFgColor = iconFgColorInput.value;
+                });
+            }
+            
+            /**
+             * V5.43.1: Generate visual dropdown options for custom quick bells
+             * @param {string} currentVisual - The currently selected visual cue value
+             * @returns {string} HTML options for a select element
+             */
+            function getCustomBellVisualOptions(currentVisual) {
+                // Get options from the edit period dropdown (which has all visuals)
+                const editPeriodSelect = document.getElementById('edit-period-image-select');
+                if (!editPeriodSelect) {
+                    return `<option value="">[None / Default]</option>
+                            <option value="[CUSTOM_TEXT]">Custom Text/Color...</option>`;
+                }
+                
+                // Clone the content
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = editPeriodSelect.innerHTML;
+                
+                // If currentVisual is a custom text value that doesn't exist as an option, add it
+                if (currentVisual && currentVisual.startsWith('[CUSTOM_TEXT] ')) {
+                    let existingOption = tempDiv.querySelector(`option[value="${currentVisual}"]`);
+                    if (!existingOption) {
+                        const parts = currentVisual.replace('[CUSTOM_TEXT] ', '').split('|');
+                        const customText = parts[0] || '?';
+                        const newOption = document.createElement('option');
+                        newOption.value = currentVisual;
+                        newOption.textContent = `Custom Text: ${customText}`;
+                        // Insert before the Custom Text trigger option
+                        const customTextTrigger = tempDiv.querySelector('option[value="[CUSTOM_TEXT]"]');
+                        if (customTextTrigger) {
+                            customTextTrigger.insertAdjacentElement('afterend', newOption);
+                        } else {
+                            tempDiv.appendChild(newOption);
+                        }
+                    }
+                }
+                
+                // Select the current visual
+                const options = Array.from(tempDiv.querySelectorAll('option'));
+                options.forEach(opt => {
+                    if (opt.value === currentVisual) {
+                        opt.setAttribute('selected', 'selected');
+                        opt.selected = true;
+                    } else {
+                        opt.removeAttribute('selected');
+                        opt.selected = false;
+                    }
+                });
+                
+                return tempDiv.innerHTML;
+            }
 
             // MODIFIED: v4.13 - Now accepts calculatedPeriods as an argument
             function renderCombinedList(calculatedPeriods) {
                 // NEW V5.05: Update header buttons state before rendering bell list
                 updateMuteButtonsUI(); 
+                
+                // NEW V5.46.0: Update bulk edit button visibility
+                const bulkEditBtn = document.getElementById('bulk-edit-toggle-btn');
+                if (bulkEditBtn) {
+                    bulkEditBtn.classList.toggle('hidden', !activePersonalScheduleId);
+                }
                 
                 // Use the calculated, merged, and time-resolved periods passed from the engine
                 const combinedPeriods = calculatedPeriods || [];
@@ -1819,8 +3222,31 @@
                             <div class="flex-grow flex flex-col sm:flex-row items-start sm:items-center justify-between">
                                 <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-3 mb-2 sm:mb-0">
                                     <span class="text-xl font-bold text-gray-800" ${titleAttr}>${displayPeriodName}</span>
-                                    <!-- MODIFIED in 4.29: Use 'period.origin' and only show "CUSTOM" for periods created by the user -->
-                                ${period.origin === 'personal' ? '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full" title="This is a custom period you created.">CUSTOM</span>' : ''}
+                                    <!-- V5.44.8: Show badges based on context -->
+                                ${(() => {
+                                    // Check if this is a standalone schedule (no shared bells anywhere)
+                                    const isStandalone = localSchedulePeriods.length === 0;
+                                    
+                                    // Check if this period has relative anchor bells (meaning it's linked to another period)
+                                    // Anchor bells are identified by anchorRole OR by name "Period Start"/"Period End"
+                                    const hasRelativeAnchors = period.bells.some(b => {
+                                        const isAnchorBell = b.anchorRole || b.name === 'Period Start' || b.name === 'Period End';
+                                        return isAnchorBell && b.relative;
+                                    });
+                                    
+                                    if (period.origin === 'shared' || period.origin === 'merged') {
+                                        // Shared/merged period - show blue link icon
+                                        return '<span class="text-blue-500 ml-1" title="Linked to shared schedule"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg></span>';
+                                    } else if (hasRelativeAnchors) {
+                                        // Personal period with relative anchors - show purple link icon
+                                        return '<span class="text-purple-500 ml-1" title="Period anchors are linked to another period"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg></span>';
+                                    } else if (period.origin === 'personal' && !isStandalone) {
+                                        // Custom period on a LINKED schedule - show CUSTOM badge
+                                        return '<span class="text-xs font-semibold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full" title="This is a custom period you created.">CUSTOM</span>';
+                                    }
+                                    // Standalone schedule with no relative anchors - show nothing
+                                    return '';
+                                })()}
                                 <span class="text-gray-600 text-sm mt-1 sm:mt-0">${firstBellTime} - ${lastBellTime}</span>
                             </div>
                             
@@ -1909,11 +3335,8 @@
                             soundDisplay = "No Sound";
                         }
                         
-                        // NEW V4.62.3: Reapply the override flag AFTER naming convention is resolved
-                        // MODIFIED V4.86: Only show "Override" for SHARED bells
-                        if (isOverridden && bell.type === 'shared') {
-                            soundDisplay = `Override: ${soundDisplay}`;
-                        }
+                        // V5.45.4: Removed "Override:" prefix for cleaner, more consistent display
+                        // The sound name alone is sufficient - users can see what's playing
     
                         return `
                             <div class="bell-item flex items-center justify-between p-4 border-t border-gray-100 hover:bg-gray-50 transition-colors"
@@ -1925,6 +3348,12 @@
                                 data-visual-cue="${bell.visualCue || ''}"
                                 data-visual-mode="${bell.visualMode || 'none'}">
                                 
+                                <!-- V5.46.0: Bulk Edit Checkbox (hidden by default) -->
+                                <input type="checkbox" 
+                                    class="bulk-edit-checkbox h-5 w-5 text-purple-600 rounded focus:ring-purple-500 mr-3 flex-shrink-0 ${bulkEditMode ? '' : 'hidden'}"
+                                    data-bell-id="${bell.bellId || getBellId(bell)}"
+                                    ${bulkSelectedBells.has(bell.bellId || getBellId(bell)) ? 'checked' : ''}>
+                                
                                 <!-- Bell Info (Time, Name, Sound) (left) -->
                                 <div class="flex items-center space-x-4 min-w-0 flex-grow">
                                     <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
@@ -1935,15 +3364,19 @@
                                         <!-- MODIFIED V4.87: Removed all custom coloring for a cleaner UI -->
                                         <span class="font-medium text-gray-800 truncate block flex items-center" title="${safeName}">
                                             ${safeName}
-                                            <!-- MODIFIED in 4.32: Anchor icon now indicates a 'shared' (admin-controlled) bell, not first/last in period -->
-                                            ${bell.type === 'shared' ?
+                                            <!-- V5.44.8: Anchor icon for anchor bells (by anchorRole OR name) -->
+                                            ${(bell.anchorRole || bell.name === 'Period Start' || bell.name === 'Period End') && !bell.type?.includes('shared') ?
+                                                `<span class="ml-2 text-amber-600" title="Anchor Bell (${bell.anchorRole === 'start' || bell.name === 'Period Start' ? 'Period Start' : 'Period End'})">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 15l1.55 1.55c-.96 1.69-3.33 3.04-5.55 3.37V11h3V9h-3V7.82C14.16 7.4 15 6.3 15 5c0-1.65-1.35-3-3-3S9 3.35 9 5c0 1.3.84 2.4 2 2.82V9H8v2h3v8.92c-2.22-.33-4.59-1.68-5.55-3.37L7 15l-4-3v3c0 3.88 4.92 7 9 7s9-3.12 9-7v-3l-4 3zM12 5c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
+                                                </span>` : ''}
+                                            <!-- V5.44.8: Show shared icon only for shared bells that aren't anchor bells -->
+                                            ${bell.type === 'shared' && !bell.anchorRole && bell.name !== 'Period Start' && bell.name !== 'Period End' ?
                                                 `<span class="ml-2 text-blue-500" title="Shared Bell (Admin Controlled)">
-                                                    <!-- MODIFIED in 4.32: Replaced disjointed path with a single, connected path -->
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-1 6v5.24c-1.72-.4-3-1.89-3-3.74h-2c0 2.8 2.2 5 5 5v2h2v-2c2.8 0 5-2.2 5-5h-2c0 1.85-1.28 3.34-3 3.74V11h-2z"/></svg>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                                                 </span>` : ''}
                                             
-                                            <!-- NEW: v4.10.3 - Relative Bell Icon -->
-                                            ${bell.relative ? 
+                                            <!-- V5.44.8: Relative Bell Icon - only for non-anchor relative bells -->
+                                            ${bell.relative && !bell.anchorRole && bell.name !== 'Period Start' && bell.name !== 'Period End' ? 
                                                 `<span class="ml-2 text-purple-600" title="Relative Bell (Time is calculated)">
                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/></svg>
                                                 </span>` : ''}
@@ -2006,6 +3439,7 @@
     
             function renderScheduleSelector() {
                 // MODIFIED: v3.03 - Renders with optgroups
+                // MODIFIED: V5.44 - Added standalone schedules optgroup
                 const lastSelectedId = localStorage.getItem('activeScheduleId') || (allSchedules.length > 0 ? `shared-${allSchedules[0].id}` : '');
                 
                 if (allSchedules.length === 0 && allPersonalSchedules.length === 0) {
@@ -2014,9 +3448,19 @@
                      return;
                 }
                 
-                let personalOptions = allPersonalSchedules.map(schedule => 
+                // V5.44: Separate personal schedules into linked and standalone
+                const linkedPersonalSchedules = allPersonalSchedules.filter(s => s.baseScheduleId && !s.isStandalone);
+                const standaloneSchedules = allPersonalSchedules.filter(s => !s.baseScheduleId || s.isStandalone);
+                
+                let personalOptions = linkedPersonalSchedules.map(schedule => 
                     `<option value="personal-${schedule.id}" ${`personal-${schedule.id}` === lastSelectedId ? 'selected' : ''}>
                         ${schedule.name} (Personal)
+                    </option>`
+                ).join('');
+                
+                let standaloneOptions = standaloneSchedules.map(schedule => 
+                    `<option value="personal-${schedule.id}" ${`personal-${schedule.id}` === lastSelectedId ? 'selected' : ''}>
+                        ${schedule.name}
                     </option>`
                 ).join('');
     
@@ -2029,6 +3473,9 @@
                 scheduleSelector.innerHTML = `
                     <optgroup label="My Personal Schedules" id="personal-schedules-optgroup">
                         ${personalOptions || '<option value="" disabled>No personal schedules created.</option>'}
+                    </optgroup>
+                    <optgroup label="My Custom Standalone Schedules" id="standalone-schedules-optgroup">
+                        ${standaloneOptions || '<option value="" disabled>No standalone schedules created.</option>'}
                     </optgroup>
                     <optgroup label="Shared Schedules" id="shared-schedules-optgroup">
                         ${sharedOptions}
@@ -2228,25 +3675,36 @@
                     // Note: We MUST recursively find the time for these, as they could also be relative.
                     let anchorBell;
                        
-                    // --- MODIFIED V4.78 & V5.28: Only anchor to SHARED bells ---
-                    // Relative bells should ONLY anchor to admin-controlled shared bells,
-                    // never to teacher-added personal bells. This keeps anchors stable.
+                    // --- MODIFIED V5.44.1: Use anchorRole for fluke periods, shared bells for linked periods ---
+                    // Determine if this is a shared/linked period or a custom/fluke period
                     const sharedStaticBells = parentPeriod.bells.filter(b => 
                         !b.relative && b._originType === 'shared'
                     );
                     
-                    if (sharedStaticBells.length === 0) {
-                        console.warn(`No shared anchor bells in period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
+                    if (sharedStaticBells.length > 0) {
+                        // LINKED PERIOD: Use first/last shared static bell as anchor
+                        if (parentAnchorType === 'period_start') {
+                            anchorBell = sharedStaticBells[0];
+                        } else {
+                            anchorBell = sharedStaticBells[sharedStaticBells.length - 1];
+                        }
+                    } else {
+                        // FLUKE/STANDALONE PERIOD: Find bells with explicit anchorRole
+                        const targetRole = parentAnchorType === 'period_start' ? 'start' : 'end';
+                        anchorBell = parentPeriod.bells.find(b => b.anchorRole === targetRole);
+                        
+                        // Legacy fallback: look for "Period Start" / "Period End" names
+                        if (!anchorBell) {
+                            const targetName = parentAnchorType === 'period_start' ? 'Period Start' : 'Period End';
+                            anchorBell = parentPeriod.bells.find(b => b.name === targetName && !b.relative);
+                        }
+                    }
+                    
+                    if (!anchorBell) {
+                        console.warn(`No anchor bell found in period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
                         return { ...bell, isOrphan: true, fallbackTime: "00:00:00" };
                     }
-                        
-                    if (parentAnchorType === 'period_start') {
-                       anchorBell = sharedStaticBells[0]; // First shared bell
-                    } else {
-                       // 'period_end'
-                       anchorBell = sharedStaticBells[sharedStaticBells.length - 1]; // Last shared bell
-                    }
-                    // --- END V4.78/V5.28 FIX ---
+                    // --- END V5.44.1 FIX ---
 
                     // 2d. Recursively find the anchor bell's time
                     const anchorTime = calculateRelativeBellTime(anchorBell, bellMap, allPeriods, new Set(visited));
@@ -2437,15 +3895,40 @@
                             // 'bell.sound' *is* the original sound at this point.
                             bell.originalSound = bell.sound; 
                             
-                            // 2. Check for an override.
-                            const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
-                            const overrideSound = bellSoundOverrides[overrideKey];
+                            // V5.46.4: Firestore overrides take priority over localStorage
+                            // This ensures changes sync across devices
+                            const bellId = bell.bellId || getBellId(bell);
+                            const personalOverride = personalBellOverrides[bellId];
                             
-                            // 3. Apply the override *if it exists*.
-                            if (overrideSound) {
-                                bell.sound = overrideSound;
+                            // 2. Check for Firestore override FIRST (syncs across devices)
+                            if (personalOverride) {
+                                // Apply sound override from Firestore
+                                if (personalOverride.sound) {
+                                    bell.sound = personalOverride.sound;
+                                }
+                                // Apply visual override
+                                if (personalOverride.visualCue !== undefined) {
+                                    bell.visualCue = personalOverride.visualCue;
+                                }
+                                if (personalOverride.visualMode !== undefined) {
+                                    bell.visualMode = personalOverride.visualMode;
+                                }
+                                // Apply nickname
+                                if (personalOverride.nickname) {
+                                    bell.originalName = bell.name;
+                                    bell.name = personalOverride.nickname;
+                                }
                             }
-                            // If no override, 'bell.sound' remains the original sound.
+                            
+                            // 3. Fall back to localStorage override (legacy, device-specific)
+                            // Only if Firestore didn't have a sound override
+                            if (!personalOverride?.sound) {
+                                const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
+                                const localStorageSound = bellSoundOverrides[overrideKey];
+                                if (localStorageSound) {
+                                    bell.sound = localStorageSound;
+                                }
+                            }
                         }
                         // For custom bells, bell.sound is just bell.sound.
                         // We set originalSound to null (or it's undefined)
@@ -2488,15 +3971,30 @@
              * @returns {string} HTML content for the button (Icon or Text)
              */
             function getCustomBellIconHtml(visualCue, iconText, bgColor, fgColor) {
+                // V5.43.2: Extract background color from [BG:...] prefix if present
+                let customBgColor = null;
+                let baseVisualCue = visualCue;
+                if (visualCue && visualCue.startsWith('[BG:')) {
+                    const parsed = parseVisualBgColor(visualCue);
+                    customBgColor = parsed.bgColor;
+                    baseVisualCue = parsed.baseValue;
+                }
+                
                 // If it's a URL, use the image tag
                 // V5.03: object-contain ensures it fits the square button
-                if (visualCue && visualCue.startsWith('http')) {
-                    return `<img src="${visualCue}" alt="Custom Visual" class="w-full h-full object-contain p-1">`;
+                if (baseVisualCue && baseVisualCue.startsWith('http')) {
+                    if (customBgColor) {
+                        return `<div class="w-full h-full flex items-center justify-center" style="background-color:${customBgColor};"><img src="${baseVisualCue}" alt="Custom Visual" class="max-w-full max-h-full object-contain p-1"></div>`;
+                    }
+                    return `<img src="${baseVisualCue}" alt="Custom Visual" class="w-full h-full object-contain p-1">`;
                 }
                 
                 // If it's a default SVG
-                if (visualCue && visualCue.startsWith('[DEFAULT]')) {
-                    const defaultSvgHtml = getRawDefaultVisualCueSvg(visualCue.replace('[DEFAULT] ', ''));
+                if (baseVisualCue && baseVisualCue.startsWith('[DEFAULT]')) {
+                    const defaultSvgHtml = getRawDefaultVisualCueSvg(baseVisualCue.replace('[DEFAULT] ', ''));
+                    if (customBgColor) {
+                        return `<div class="w-full h-full p-1 flex items-center justify-center text-blue-500" style="background-color:${customBgColor};">${defaultSvgHtml}</div>`;
+                    }
                     // V5.03: Added p-1 for padding
                     return `<div class="w-full h-full p-1 flex items-center justify-center text-blue-500">${defaultSvgHtml}</div>`;
                 }
@@ -2518,6 +4016,82 @@
             }
 
             /**
+             * V5.44.10: Helper function to set up the custom text modal previews.
+             * This ensures live preview updates work regardless of which code path opens the modal.
+             * @param {boolean} isQuickBell - Whether this is for a quick bell (uses square icon) or period (uses circle icon)
+             */
+            function setupCustomTextModalPreviews(isQuickBell = false) {
+                const iconInner = document.getElementById('quick-bell-visual-preview-icon-inner');
+                const fullLabel = document.getElementById('custom-text-preview-full-label');
+                const iconLabel = document.getElementById('custom-text-preview-icon-label');
+                
+                // Set labels based on context
+                if (fullLabel && iconLabel) {
+                    fullLabel.textContent = 'Full Size Preview';
+                    iconLabel.textContent = isQuickBell ? 'Button Preview' : 'Icon Preview';
+                }
+                
+                // Set icon shape based on context
+                if (iconInner) {
+                    if (isQuickBell) {
+                        // Square button shape with rounded corners (matches quick bell buttons)
+                        iconInner.className = 'w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden bg-gray-200';
+                    } else {
+                        // Circle icon shape (for periods)
+                        iconInner.className = 'visual-preview-icon-circle bg-gray-200';
+                    }
+                }
+                
+                // Define the preview update function
+                // V5.44.11: Use SVG text for consistent sizing across all preview contexts
+                function updatePreviews() {
+                    const text = customTextInput.value.trim().substring(0, 3) || '?';
+                    const fgColor = customTextColorInput.value;
+                    const bgColor = customTextBgColorInput.value;
+                    
+                    // V5.44.11: Calculate font sizes based on text length (matching VISUAL_CONFIG)
+                    const fullFontSize = text.length > 2 ? 45 : 80;  // Match VISUAL_CONFIG.full.customTextFontSize
+                    const iconFontSize = text.length > 2 ? 50 : 70;  // Match getCustomBellIconHtml
+                    
+                    // Update full size preview - using SVG for consistent scaling
+                    const livePreview = document.getElementById('quick-bell-visual-preview-full');
+                    if (livePreview) {
+                        livePreview.innerHTML = `<div class="w-full h-full p-8 flex items-center justify-center" style="background-color: ${bgColor};">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full">
+                                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${fullFontSize}" font-weight="bold" fill="${fgColor}" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text>
+                            </svg>
+                        </div>`;
+                    }
+                    
+                    // Update icon preview (small) - using SVG for consistent scaling
+                    const iconInnerEl = document.getElementById('quick-bell-visual-preview-icon-inner');
+                    if (iconInnerEl) {
+                        iconInnerEl.style.backgroundColor = bgColor;
+                        iconInnerEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full">
+                            <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${iconFontSize}" font-weight="bold" fill="${fgColor}" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text>
+                        </svg>`;
+                    }
+                }
+                
+                // Remove any existing listeners to prevent stacking (use a named function reference)
+                // We store the current handler on the element to be able to remove it later
+                if (customTextInput._previewHandler) {
+                    customTextInput.removeEventListener('input', customTextInput._previewHandler);
+                    customTextColorInput.removeEventListener('input', customTextInput._previewHandler);
+                    customTextBgColorInput.removeEventListener('input', customTextInput._previewHandler);
+                }
+                
+                // Store and add the new handler
+                customTextInput._previewHandler = updatePreviews;
+                customTextInput.addEventListener('input', updatePreviews);
+                customTextColorInput.addEventListener('input', updatePreviews);
+                customTextBgColorInput.addEventListener('input', updatePreviews);
+                
+                // Trigger initial preview update
+                updatePreviews();
+            }
+
+            /**
              * NEW V5.00: Saves the current state of customQuickBells to Firestore.
              */
             async function saveCustomQuickBells(finalBells) {
@@ -2534,6 +4108,7 @@
                         console.log(`  Bell ${bell.id}:`, {
                             name: bell.name,
                             sound: bell.sound,
+                            hours: bell.hours || 0,
                             minutes: bell.minutes,
                             seconds: bell.seconds
                         });
@@ -2589,20 +4164,42 @@
             function findBellChildren(parentBellId) {
                 if (!parentBellId) return [];
 
-                // --- MODIFIED V4.80: CRITICAL BUG FIX ---
+                // --- MODIFIED V4.80 & V5.44.1: CRITICAL BUG FIX ---
                 // We must use the time-resolved, sorted *calculatedPeriodsList* to find
                 // the true anchors. Using the raw 'allPeriods' list was causing
                 // new bells (at the end of the raw array) to be misidentified as anchors.
                 const allPeriods = [...localSchedulePeriods, ...personalBellsPeriods]; // Raw data for iteration
                 const calculatedParentPeriod = calculatedPeriodsList.find(p => p.bells.some(b => b.bellId === parentBellId));
                 
-                let trueFirstBell, trueLastBell;
+                // V5.44.1: Determine anchor bells based on period type
+                let startAnchorBell = null;
+                let endAnchorBell = null;
+                
                 if (calculatedParentPeriod && calculatedParentPeriod.bells.length > 0) {
-                    // This list IS sorted by time.
-                    trueFirstBell = calculatedParentPeriod.bells[0];
-                    trueLastBell = calculatedParentPeriod.bells[calculatedParentPeriod.bells.length - 1];
+                    // Check if this is a shared/linked period or a fluke period
+                    const sharedStaticBells = calculatedParentPeriod.bells.filter(b => 
+                        !b.relative && b._originType === 'shared'
+                    );
+                    
+                    if (sharedStaticBells.length > 0) {
+                        // SHARED/LINKED PERIOD: Anchors are first/last shared static bells by time
+                        startAnchorBell = sharedStaticBells[0];
+                        endAnchorBell = sharedStaticBells[sharedStaticBells.length - 1];
+                    } else {
+                        // FLUKE PERIOD: Find bells with explicit anchorRole
+                        startAnchorBell = calculatedParentPeriod.bells.find(b => b.anchorRole === 'start');
+                        endAnchorBell = calculatedParentPeriod.bells.find(b => b.anchorRole === 'end');
+                        
+                        // Legacy fallback: look for "Period Start" / "Period End" names
+                        if (!startAnchorBell) {
+                            startAnchorBell = calculatedParentPeriod.bells.find(b => b.name === 'Period Start' && !b.relative);
+                        }
+                        if (!endAnchorBell) {
+                            endAnchorBell = calculatedParentPeriod.bells.find(b => b.name === 'Period End' && !b.relative);
+                        }
+                    }
                 }
-                // --- END V4.80 FIX ---
+                // --- END V4.80 & V5.44.1 FIX ---
 
                 let children = [];
                 
@@ -2615,22 +4212,20 @@
                         
                         // Check for new-style anchor link
                         let isAnchorMatch = false;
-                        // MODIFIED V4.80 & V5.28.1: Use calculated anchor bells AND check they're shared
-                        if (bell.relative.parentPeriodName && calculatedParentPeriod && trueFirstBell && trueLastBell) {
+                        if (bell.relative.parentPeriodName && calculatedParentPeriod) {
                             const isSamePeriod = bell.relative.parentPeriodName === calculatedParentPeriod.name;
                             const anchorType = bell.relative.parentAnchorType; // 'period_start' or 'period_end'
                             
-                            // NEW V5.28.1: Only match if the anchor bell is SHARED (not personal)
-                            // This prevents personal static bells from being treated as anchors
+                            // V5.44.1: Check if the bell being deleted IS the anchor for this relative bell
                             const isStartAnchor = isSamePeriod && 
                                                  anchorType === 'period_start' && 
-                                                 trueFirstBell.bellId === parentBellId &&
-                                                 trueFirstBell._originType === 'shared';
+                                                 startAnchorBell &&
+                                                 startAnchorBell.bellId === parentBellId;
                                                  
                             const isEndAnchor = isSamePeriod && 
                                                anchorType === 'period_end' && 
-                                               trueLastBell.bellId === parentBellId &&
-                                               trueLastBell._originType === 'shared';
+                                               endAnchorBell &&
+                                               endAnchorBell.bellId === parentBellId;
                             
                             if (isStartAnchor || isEndAnchor) {
                                 isAnchorMatch = true;
@@ -2823,6 +4418,7 @@
              * NEW: v3.19 (4.03?) - Handles saving the new sound URL as a local override.
              * MODIFIED: v4.85 - Now handles BOTH shared bell overrides (localStorage)
              * AND custom bell sound edits (Firestore).
+             * MODIFIED: V5.46.4 - Shared bell overrides now save to Firestore for cross-device sync
              */
             async function handleChangeSoundSubmit(e) {
                 e.preventDefault();
@@ -2832,31 +4428,52 @@
                 const newSound = changeSoundSelect.value;
                 const oldBell = currentChangingSoundBell;
     
-                // --- CASE 1: SHARED BELL (Save override to localStorage) ---
+                // --- CASE 1: SHARED BELL (Save to Firestore for cross-device sync) ---
                 if (oldBell.type === 'shared') {
-                    if (!activeBaseScheduleId) {
-                        console.error("No activeBaseScheduleId to save shared override.");
-                        return;
-                    }
-                    
-                    const overrideKey = getBellOverrideKey(activeBaseScheduleId, oldBell);
-                    if (!overrideKey) {
-                        console.error("Cannot create override key for shared bell.");
+                    // V5.46.4: Save to Firestore bellOverrides instead of localStorage
+                    if (!activePersonalScheduleId) {
+                        console.error("No activePersonalScheduleId to save shared bell override.");
+                        showUserMessage("Please select a personal schedule to customize shared bells.");
                         closeChangeSoundModal();
                         return;
                     }
-        
-                    if (newSound === oldBell.originalSound) {
-                        // If the user selected the original shared sound, delete the override
-                        delete bellSoundOverrides[overrideKey];
-                        console.log("Deleted sound override.");
-                    } else {
-                        // Store the new sound override
-                        bellSoundOverrides[overrideKey] = newSound;
-                        console.log(`Saved sound override: ${newSound}`);
+                    
+                    try {
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        const docSnap = await getDoc(personalScheduleRef);
+                        const currentData = docSnap.exists() ? docSnap.data() : {};
+                        const bellOverrides = currentData.bellOverrides || {};
+                        
+                        const bellId = oldBell.bellId || getBellId(oldBell);
+                        
+                        if (newSound === oldBell.originalSound) {
+                            // If user selected the original sound, remove the override
+                            if (bellOverrides[bellId]) {
+                                delete bellOverrides[bellId].sound;
+                                // Clean up empty object
+                                if (Object.keys(bellOverrides[bellId]).length === 0) {
+                                    delete bellOverrides[bellId];
+                                }
+                            }
+                            console.log("Deleted sound override from Firestore.");
+                        } else {
+                            // Store the new sound override
+                            if (!bellOverrides[bellId]) {
+                                bellOverrides[bellId] = {};
+                            }
+                            bellOverrides[bellId].sound = newSound;
+                            console.log(`Saved sound override to Firestore: ${newSound}`);
+                        }
+                        
+                        await updateDoc(personalScheduleRef, { bellOverrides });
+                        
+                        // Also update local state immediately
+                        personalBellOverrides = bellOverrides;
+                        
+                    } catch (error) {
+                        console.error("Error saving sound override:", error);
+                        showUserMessage("Error saving sound: " + error.message);
                     }
-        
-                    saveSoundOverrides();
                     
                 // --- CASE 2: CUSTOM BELL (Save directly to Firestore) ---
                 } else if (oldBell.type === 'custom') {
@@ -3054,14 +4671,23 @@
                                 listenForPersonalSchedules(user.uid);
                                 // NEW V5.00: Start Custom Quick Bell listener
                                 listenForCustomQuickBells(user.uid);
+                                // V5.53: Load cloud preferences and set up listener
+                                await loadUserPreferencesFromCloud();
+                                setupUserPreferencesListener();
                                 // NEW V5.00: Enable custom quick bell button
                                 showCustomQuickBellManagerBtn.disabled = false;
                                 showCustomQuickBellManagerBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                                // V5.44: Enable standalone schedule button
+                                createStandaloneScheduleBtn.disabled = false;
+                                createStandaloneScheduleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                             } else {
                                 allPersonalSchedules = []; // Clear personal schedules
                                 // NEW V5.00: Disable custom quick bell button
                                 showCustomQuickBellManagerBtn.disabled = true;
                                 showCustomQuickBellManagerBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                                // V5.44: Disable standalone schedule button
+                                createStandaloneScheduleBtn.disabled = true;
+                                createStandaloneScheduleBtn.classList.add('opacity-50', 'cursor-not-allowed');
                             }
                             schedulesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'schedules');
                             // MODIFIED: v3.24 - Changed to real-time listener
@@ -3129,6 +4755,11 @@
                             if (customQuickBellsListenerUnsubscribe) {
                                 customQuickBellsListenerUnsubscribe();
                                 customQuickBellsListenerUnsubscribe = null;
+                            }
+                            // V5.53: Unsubscribe from user preferences
+                            if (userPreferencesListenerUnsubscribe) {
+                                userPreferencesListenerUnsubscribe();
+                                userPreferencesListenerUnsubscribe = null;
                             }
                             
                             document.body.classList.remove('authenticated', 'not-anonymous', 'admin-mode');
@@ -3327,6 +4958,7 @@
                         const bells = (docSnap.data().bells || []).slice(0, 4).map((b, index) => ({
                             id: index + 1, // Use index + 1 as the ID 
                             name: b.name || `Custom Timer ${index + 1}`,
+                            hours: b.hours || 0,   // V5.44.9: Include hours field
                             minutes: b.minutes || 0,
                             seconds: b.seconds || 0,
                             // NEW V5.00: Read Icon Colors
@@ -3413,11 +5045,22 @@
                 localSchedule = []; // Reset flat list
                 personalBells = []; // Reset flat list
                 
+                // NEW V5.42.0: Reset passing period visual variables
+                personalPassingPeriodVisual = null;
+                sharedPassingPeriodVisual = null;
+                
+                // NEW V5.46.1: Reset personal bell overrides
+                personalBellOverrides = {};
+                
                 // v3.05: Disable manager buttons
                 renamePersonalScheduleBtn.disabled = true;
                 backupPersonalScheduleBtn.disabled = true;
                 restorePersonalScheduleBtn.disabled = true;
                 showMultiAddRelativeModalBtn.disabled = true; // NEW in 4.42: Reset button state
+                
+                // NEW V5.42.0: Disable passing period visual button
+                const passingPeriodVisualBtn = document.getElementById('passing-period-visual-btn');
+                if (passingPeriodVisualBtn) passingPeriodVisualBtn.disabled = true;
                 
                 // NEW V4.90: Disable admin import/export buttons
                 exportCurrentScheduleBtn.disabled = true;
@@ -3453,6 +5096,11 @@
                     console.log("Setting active SHARED schedule:", scheduleId);
                     activeBaseScheduleId = scheduleId;
                     activePersonalScheduleId = null;
+                    
+                    // V5.44: Hide standalone badge for shared schedules
+                    if (standaloneScheduleBadge) {
+                        standaloneScheduleBadge.classList.add('hidden');
+                    }
     
                     const scheduleData = allSchedules.find(s => s.id === scheduleId);
                     if (scheduleData) {
@@ -3537,9 +5185,21 @@
                         console.error("Could not find personal schedule data.");
                         return;
                     }
-    
+                    
+                    // V5.44: Check if this is a standalone schedule
+                    const isStandalone = !personalSchedule.baseScheduleId || personalSchedule.isStandalone;
+                    
                     activeBaseScheduleId = personalSchedule.baseScheduleId;
                     scheduleTitle.textContent = personalSchedule.name;
+                    
+                    // V5.44: Show/hide standalone badge
+                    if (standaloneScheduleBadge) {
+                        if (isStandalone) {
+                            standaloneScheduleBadge.classList.remove('hidden');
+                        } else {
+                            standaloneScheduleBadge.classList.add('hidden');
+                        }
+                    }
                     
                     // DELETED in 4.40: Removed logic for old personal bell form
                     
@@ -3557,132 +5217,237 @@
                     // NEW in 4.57: Enable new period button
                     newPeriodBtn.disabled = false;
                     
-                    // 1. Listen to the BASE shared schedule
-                    scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
-                    activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
-                        // NEW in 4.35: Set the base loaded flag
-                        isBaseScheduleLoaded = true;
-
-                        if (docSnap.exists()) {
-                            const scheduleData = docSnap.data();
-                            // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
-                            if (scheduleData.periods && scheduleData.periods.length > 0) {
-                                localSchedulePeriods = scheduleData.periods;
-                            } else if (scheduleData.bells && scheduleData.bells.length > 0) {
-                                // If only old 'bells' exist, migrate it in memory.
-                                localSchedulePeriods = migrateLegacyBellsToPeriods(scheduleData.bells);
-                                console.log("Reading base shared schedule using LEGACY structure.");
-                            } else {
-                                localSchedulePeriods = [];
-                            }
-
-                            // --- NEW V4.90: One-Time Bell ID Migration for SHARED bells ---
-                            // This fixes the bug where overrides wouldn't save on refresh.
-                            let needsSharedMigration = false;
-                            localSchedulePeriods.forEach(period => {
-                                period.bells.forEach(bell => {
-                                    if (!bell.bellId) {
-                                        bell.bellId = generateBellId();
-                                        needsSharedMigration = true;
-                                        console.log(`Assigning new bellId to SHARED bell: ${bell.name} in ${period.name}`);
-                                    }
-                                });
-                            });
-
-                            if (needsSharedMigration && document.body.classList.contains('admin-mode')) {
-                                console.log("Saving migrated bellId data back to SHARED schedule...");
-                                // Fire-and-forget update.
-                                // We only save if user is an admin to prevent write errors.
-                                // Non-admins will still have the IDs in-memory for this session.
-                                updateDoc(scheduleRef, { periods: localSchedulePeriods }) 
-                                    .then(() => console.log("Shared schedule bellId migration successful."))
-                                    .catch(err => console.error("Error saving shared bellId migration:", err));
-                            }
-                            // --- END V4.90 Migration ---
-                            
-                            console.log("Active shared schedule updated.");
-
-                        } else {
-                            console.warn("Base schedule does not exist.");
-                            localSchedulePeriods = [];
-                            localSchedule = [];
-                        }
-                        // NEW: v4.10.3 - Run the master calculation engine
-                        recalculateAndRenderAll();
-                    });
+                    // NEW V5.42.0: Enable passing period visual button
+                    const passingPeriodVisualBtn = document.getElementById('passing-period-visual-btn');
+                    if (passingPeriodVisualBtn) passingPeriodVisualBtn.disabled = false;
                     
-                    // 2. Listen to the PERSONAL schedule
-                    const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-                    activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
-                        // NEW in 4.32: Mark personal schedule as loaded
-                        isPersonalScheduleLoaded = true;
+                    // V5.44: For standalone schedules, skip the base schedule listener
+                    if (isStandalone) {
+                        console.log("This is a STANDALONE schedule - no base schedule to load");
+                        isBaseScheduleLoaded = true;  // Mark as loaded since there's nothing to load
+                        localSchedulePeriods = [];     // No shared periods
+                        sharedPassingPeriodVisual = null;
+                        
+                        // Only set up the personal schedule listener
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
+                            isPersonalScheduleLoaded = true;
 
-                        if (docSnap.exists()) {
-                            const personalData = docSnap.data();
+                            if (docSnap.exists()) {
+                                const personalData = docSnap.data();
+                                let periodsToUse = personalData.periods || [];
+                                let needsMigration = false;
+                                
+                                // Check for missing bellIds
+                                periodsToUse.forEach(period => {
+                                    period.bells.forEach(bell => {
+                                        if (!bell.bellId) {
+                                            bell.bellId = generateBellId();
+                                            needsMigration = true;
+                                            console.log(`Assigning new bellId to ${bell.name} in ${period.name}`);
+                                        }
+                                    });
+                                });
+                                
+                                // V5.44.1: Migrate legacy anchor bells in standalone schedules
+                                periodsToUse.forEach(period => {
+                                    period.bells.forEach(bell => {
+                                        if (bell.name === 'Period Start' && !bell.anchorRole && !bell.relative) {
+                                            bell.anchorRole = 'start';
+                                            needsMigration = true;
+                                            console.log(`Assigning anchorRole 'start' to "${bell.name}" in ${period.name}`);
+                                        }
+                                        if (bell.name === 'Period End' && !bell.anchorRole && !bell.relative) {
+                                            bell.anchorRole = 'end';
+                                            needsMigration = true;
+                                            console.log(`Assigning anchorRole 'end' to "${bell.name}" in ${period.name}`);
+                                        }
+                                    });
+                                });
 
-                            // --- NEW in 4.38: One-Time Bell ID Migration ---
-                            let needsMigration = false;
-                            let periodsToUse = [];
-                            let fieldsToUpdate = {}; // NEW: Track updates
-
-                            // --- MODIFIED V4.69: Prioritize 'periods' field ---
-                            // If the 'periods' field exists (even if empty), use it.
-                            if (personalData.periods !== undefined) {
-                                periodsToUse = personalData.periods;
-                                // If the old 'bells' field *also* exists, mark it for deletion.
-                                if (personalData.bells && personalData.bells.length > 0) {
-                                    fieldsToUpdate.bells = []; // Mark for deletion
-                                    needsMigration = true; // Trigger the update
-                                    console.log("Marking deprecated 'bells' field for cleanup.");
+                                if (needsMigration) {
+                                    updateDoc(personalScheduleRef, { periods: periodsToUse })
+                                        .then(() => console.log("Standalone schedule bellId migration successful."))
+                                        .catch(err => console.error("Error saving bellId migration:", err));
                                 }
-                            } 
-                            // Only if 'periods' does NOT exist, fall back to 'bells' for migration.
-                            else if (personalData.bells && personalData.bells.length > 0) {
-                                // This is a legacy schedule, migrate it
-                                periodsToUse = migrateLegacyBellsToPeriods(personalData.bells);
-                                fieldsToUpdate.periods = periodsToUse; // Add new periods
-                                fieldsToUpdate.bells = []; // Delete old bells
-                                needsMigration = true; // Force save if we just migrated periods
-                                console.log("Running migration from flat 'bells' to 'periods' structure.");
+                                
+                                personalBellsPeriods = periodsToUse;
+                                personalPassingPeriodVisual = personalData.passingPeriodVisual || null;
+                                // V5.46.1: Load bell overrides (standalone schedules typically don't use these)
+                                personalBellOverrides = personalData.bellOverrides || {};
+                                
+                                console.log("Standalone schedule updated:", periodsToUse.length, "periods");
+                            } else {
+                                console.warn("Standalone schedule removed.");
+                                personalBellsPeriods = [];
+                                personalPassingPeriodVisual = null;
+                                personalBellOverrides = {};
                             }
-                            
-                            // Now check for missing bellIds within the periods
-                            periodsToUse.forEach(period => {
-                                period.bells.forEach(bell => {
-                                    if (!bell.bellId) {
-                                        bell.bellId = generateBellId();
-                                        needsMigration = true;
-                                        console.log(`Assigning new permanent bellId to ${bell.name} in ${period.name}`);
+                            recalculateAndRenderAll();
+                        });
+                        
+                    } else {
+                        // ORIGINAL: Listen to both base and personal schedules
+                        // 1. Listen to the BASE shared schedule
+                        scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
+                        activeScheduleListenerUnsubscribe = onSnapshot(scheduleRef, (docSnap) => {
+                            // NEW in 4.35: Set the base loaded flag
+                            isBaseScheduleLoaded = true;
+
+                            if (docSnap.exists()) {
+                                const scheduleData = docSnap.data();
+                                // V4.0 FINAL: Check for PERIODS structure first. If not found, use legacy BELLS structure.
+                                if (scheduleData.periods && scheduleData.periods.length > 0) {
+                                    localSchedulePeriods = scheduleData.periods;
+                                } else if (scheduleData.bells && scheduleData.bells.length > 0) {
+                                    // If only old 'bells' exist, migrate it in memory.
+                                    localSchedulePeriods = migrateLegacyBellsToPeriods(scheduleData.bells);
+                                    console.log("Reading base shared schedule using LEGACY structure.");
+                                } else {
+                                    localSchedulePeriods = [];
+                                }
+
+                                // --- NEW V4.90: One-Time Bell ID Migration for SHARED bells ---
+                                // This fixes the bug where overrides wouldn't save on refresh.
+                                let needsSharedMigration = false;
+                                localSchedulePeriods.forEach(period => {
+                                    period.bells.forEach(bell => {
+                                        if (!bell.bellId) {
+                                            bell.bellId = generateBellId();
+                                            needsSharedMigration = true;
+                                            console.log(`Assigning new bellId to SHARED bell: ${bell.name} in ${period.name}`);
+                                        }
+                                    });
+                                });
+
+                                if (needsSharedMigration && document.body.classList.contains('admin-mode')) {
+                                    console.log("Saving migrated bellId data back to SHARED schedule...");
+                                    // Fire-and-forget update.
+                                    // We only save if user is an admin to prevent write errors.
+                                    // Non-admins will still have the IDs in-memory for this session.
+                                    updateDoc(scheduleRef, { periods: localSchedulePeriods }) 
+                                        .then(() => console.log("Shared schedule bellId migration successful."))
+                                        .catch(err => console.error("Error saving shared bellId migration:", err));
+                                }
+                                // --- END V4.90 Migration ---
+                                
+                                // NEW V5.42.0: Load passing period visual from shared schedule (admin-set default)
+                                sharedPassingPeriodVisual = scheduleData.passingPeriodVisual || null;
+                                
+                                console.log("Active shared schedule updated.");
+
+                            } else {
+                                console.warn("Base schedule does not exist.");
+                                localSchedulePeriods = [];
+                                localSchedule = [];
+                            }
+                            // NEW: v4.10.3 - Run the master calculation engine
+                            recalculateAndRenderAll();
+                        });
+                        
+                        // 2. Listen to the PERSONAL schedule
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        activePersonalScheduleListenerUnsubscribe = onSnapshot(personalScheduleRef, (docSnap) => {
+                            // NEW in 4.32: Mark personal schedule as loaded
+                            isPersonalScheduleLoaded = true;
+
+                            if (docSnap.exists()) {
+                                const personalData = docSnap.data();
+
+                                // --- NEW in 4.38: One-Time Bell ID Migration ---
+                                let needsMigration = false;
+                                let periodsToUse = [];
+                                let fieldsToUpdate = {}; // NEW: Track updates
+
+                                // --- MODIFIED V4.69: Prioritize 'periods' field ---
+                                // If the 'periods' field exists (even if empty), use it.
+                                if (personalData.periods !== undefined) {
+                                    periodsToUse = personalData.periods;
+                                    // If the old 'bells' field *also* exists, mark it for deletion.
+                                    if (personalData.bells && personalData.bells.length > 0) {
+                                        fieldsToUpdate.bells = []; // Mark for deletion
+                                        needsMigration = true; // Trigger the update
+                                        console.log("Marking deprecated 'bells' field for cleanup.");
+                                    }
+                                } 
+                                // Only if 'periods' does NOT exist, fall back to 'bells' for migration.
+                                else if (personalData.bells && personalData.bells.length > 0) {
+                                    // This is a legacy schedule, migrate it
+                                    periodsToUse = migrateLegacyBellsToPeriods(personalData.bells);
+                                    fieldsToUpdate.periods = periodsToUse; // Add new periods
+                                    fieldsToUpdate.bells = []; // Delete old bells
+                                    needsMigration = true; // Force save if we just migrated periods
+                                    console.log("Running migration from flat 'bells' to 'periods' structure.");
+                                }
+                                
+                                // Now check for missing bellIds within the periods
+                                periodsToUse.forEach(period => {
+                                    period.bells.forEach(bell => {
+                                        if (!bell.bellId) {
+                                            bell.bellId = generateBellId();
+                                            needsMigration = true;
+                                            console.log(`Assigning new permanent bellId to ${bell.name} in ${period.name}`);
+                                        }
+                                    });
+                                });
+                                
+                                // V5.44.1: Migrate legacy fluke period anchor bells
+                                // If a period has bells named "Period Start"/"Period End" without anchorRole, add it
+                                periodsToUse.forEach(period => {
+                                    // Only check personal/fluke periods (origin === 'personal' or no origin)
+                                    if (period.origin === 'personal' || !period.origin) {
+                                        period.bells.forEach(bell => {
+                                            if (bell.name === 'Period Start' && !bell.anchorRole && !bell.relative) {
+                                                bell.anchorRole = 'start';
+                                                needsMigration = true;
+                                                console.log(`Assigning anchorRole 'start' to "${bell.name}" in ${period.name}`);
+                                            }
+                                            if (bell.name === 'Period End' && !bell.anchorRole && !bell.relative) {
+                                                bell.anchorRole = 'end';
+                                                needsMigration = true;
+                                                console.log(`Assigning anchorRole 'end' to "${bell.name}" in ${period.name}`);
+                                            }
+                                        });
                                     }
                                 });
-                            });
 
-                            if (needsMigration) {
-                                // If we are *only* migrating IDs, we need to add periods to the update object
-                                if (!fieldsToUpdate.periods) {
-                                    fieldsToUpdate.periods = periodsToUse;
+                                if (needsMigration) {
+                                    // If we are *only* migrating IDs, we need to add periods to the update object
+                                    if (!fieldsToUpdate.periods) {
+                                        fieldsToUpdate.periods = periodsToUse;
+                                    }
+
+                                    console.log("Saving migrated/cleaned bell data back to Firestore...", fieldsToUpdate);
+                                    // Save the updated data back.
+                                    // We do this as a 'fire-and-forget' in the background.
+                                    updateDoc(personalScheduleRef, fieldsToUpdate) 
+                                        .then(() => console.log("Personal schedule migration/cleanup successful."))
+                                        .catch(err => console.error("Error saving bellId migration:", err));
                                 }
-
-                                console.log("Saving migrated/cleaned bell data back to Firestore...", fieldsToUpdate);
-                                // Save the updated data back.
-                                // We do this as a 'fire-and-forget' in the background.
-                                updateDoc(personalScheduleRef, fieldsToUpdate) 
-                                    .then(() => console.log("Personal schedule migration/cleanup successful."))
-                                    .catch(err => console.error("Error saving bellId migration:", err));
+                                // --- END 4.38 Migration ---
+                                
+                                personalBellsPeriods = periodsToUse;
+                                
+                                // NEW V5.42.0: Load passing period visual from personal schedule
+                                personalPassingPeriodVisual = personalData.passingPeriodVisual || null;
+                                
+                                // NEW V5.46.1: Load bell overrides for shared bell customizations
+                                personalBellOverrides = personalData.bellOverrides || {};
+                                
+                                console.log("Personal schedule bells updated.");
+                            } else {
+                                console.warn("Personal schedule removed.");
+                                personalBellsPeriods = [];
+                                personalBells = [];
+                                // NEW V5.42.0: Clear passing period visual when schedule is removed
+                                personalPassingPeriodVisual = null;
+                                // NEW V5.46.1: Clear bell overrides
+                                personalBellOverrides = {};
                             }
-                            // --- END 4.38 Migration ---
-                            
-                            personalBellsPeriods = periodsToUse;
-                            
-                            console.log("Personal schedule bells updated.");
-                        } else {
-                            console.warn("Personal schedule removed.");
-                            personalBellsPeriods = [];
-                            personalBells = [];
-                        }
-                        // NEW: v4.10.3 - Run the master calculation engine
-                        recalculateAndRenderAll();
-                    });
+                            // NEW: v4.10.3 - Run the master calculation engine
+                            recalculateAndRenderAll();
+                        });
+                    }
                 }
             }
     
@@ -3925,17 +5690,29 @@
                 currentEditingBell = rawBell;
 
                 // 2. We need to populate the "Parent Bell" dropdown
-                // This re-uses the logic from `openRelativeBellModal`
+                // V5.44: Use all periods for anchor options, not just the current period
                 const targetPeriod = calculatedPeriodsList.find(p => p.name === bell.periodName);
                 if (!targetPeriod) {
                     showUserMessage(`Error: Could not find period ${bell.periodName}.`);
                     return;
                 }
-                const resolvedBells = targetPeriod.bells;
-                // Store resolved bells for the time calculator
+                
+                // V5.44: Collect all bells from all periods
+                const allResolvedBells = [];
+                calculatedPeriodsList.forEach(p => {
+                    p.bells.forEach(b => {
+                        allResolvedBells.push({
+                            ...b,
+                            _periodName: p.name,
+                            _periodOrigin: p.origin
+                        });
+                    });
+                });
+                
+                // Store ALL bells for the time calculator
                 currentRelativePeriod = {
                     name: bell.periodName,
-                    bells: resolvedBells
+                    bells: allResolvedBells
                 };
                 
                 // 3. Populate Modal UI
@@ -3951,17 +5728,15 @@
                 const modalTitle = relativeBellModal.querySelector('h3');
                 if (modalTitle) modalTitle.textContent = "Edit Relative Bell";
 
-                // 4. Populate Parent Bell dropdown
-                const anchorOptionsHtml = resolvedBells.map(b => `
-                    <option value="${b.bellId}">${b.name} (${formatTime12Hour(b.time, true)})</option>
-                `).join('');
+                // 4. Populate Parent Bell dropdown - V5.44: Use helper for all periods
+                const anchorOptionsHtml = generateAnchorOptionsHtml(allResolvedBells, bell.periodName);
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
 
                 // 5. Populate fields with the bell's saved data
                 // Check for specific parent bell ID first
                 if (rawBell.relative.parentBellId) {
-                    // Check if this bell ID actually exists in the dropdown
-                    const parentExists = resolvedBells.some(b => b.bellId === rawBell.relative.parentBellId);
+                    // Check if this bell ID actually exists in the dropdown (now checking all bells)
+                    const parentExists = allResolvedBells.some(b => b.bellId === rawBell.relative.parentBellId);
                     if (parentExists) {
                         relativeAnchorBellSelect.value = rawBell.relative.parentBellId;
                     } else {
@@ -3971,8 +5746,22 @@
                     }
                 } else if (rawBell.relative.parentPeriodName && rawBell.relative.parentAnchorType) {
                     // Multi-period relative bell - anchored to first/last anchor bell of each period
-                    // Find anchor bells in this period (bells with type 'shared')
-                    const anchorBells = resolvedBells.filter(b => b.type === 'shared');
+                    // V5.44.4: Find anchor bells based on period type
+                    const sharedStaticBells = targetPeriod.bells.filter(b => 
+                        !b.relative && b._originType === 'shared'
+                    );
+                    
+                    let anchorBells = [];
+                    if (sharedStaticBells.length > 0) {
+                        // Shared/linked period: use shared static bells
+                        anchorBells = sharedStaticBells;
+                    } else {
+                        // Fluke period: find bells with anchorRole
+                        const startAnchor = targetPeriod.bells.find(b => b.anchorRole === 'start');
+                        const endAnchor = targetPeriod.bells.find(b => b.anchorRole === 'end');
+                        if (startAnchor) anchorBells.push(startAnchor);
+                        if (endAnchor) anchorBells.push(endAnchor);
+                    }
                     
                     if (anchorBells.length > 0) {
                         if (rawBell.relative.parentAnchorType === 'period_start') {
@@ -3994,16 +5783,25 @@
                 relativeBellNameInput.value = rawBell.name;
                 relativeBellSoundSelect.value = rawBell.sound;
 
+                // V5.44.1: Populate hours, minutes, and seconds from offset
                 const offset = rawBell.relative.offsetSeconds;
+                const absOffset = Math.abs(offset);
+                const relativeHoursInput = document.getElementById('relative-hours');
+                
                 if (offset < 0) {
                     relativeDirection.value = 'before';
-                    relativeMinutesInput.value = Math.floor(Math.abs(offset) / 60);
-                    relativeSecondsInput.value = Math.abs(offset) % 60;
                 } else {
                     relativeDirection.value = 'after';
-                    relativeMinutesInput.value = Math.floor(offset / 60);
-                    relativeSecondsInput.value = offset % 60;
                 }
+                
+                const hours = Math.floor(absOffset / 3600);
+                const remainingAfterHours = absOffset % 3600;
+                const minutes = Math.floor(remainingAfterHours / 60);
+                const seconds = remainingAfterHours % 60;
+                
+                if (relativeHoursInput) relativeHoursInput.value = hours;
+                relativeMinutesInput.value = minutes;
+                relativeSecondsInput.value = seconds;
                 
                 // 6. Populate sound dropdowns
                 // MODIFIED in 4.40: Use sharedSoundInput as the template, not the deleted personalSoundInput
@@ -4018,7 +5816,55 @@
                 const relativeBellVisualSelect = document.getElementById('relative-bell-visual');
                 if (relativeBellVisualSelect) {
                     updateVisualDropdowns(); // Make sure dropdowns are populated
-                    relativeBellVisualSelect.value = rawBell.visualCue || '';
+                    let visualCue = rawBell.visualCue || '';
+                    relativeBellVisualSelect.value = visualCue;
+                    
+                    // FIX V5.42.11: Directly set preview with known value
+                    const preview = document.getElementById('relative-bell-visual-preview-full');
+                    if (preview) {
+                        const periodName = bell.periodName || 'Preview';
+                        
+                        // FIX V5.42.11 & V5.44.4: For bells outside period bounds with no custom visual, use passing period visual
+                        let previewVisualCue = visualCue;
+                        if (!visualCue) {
+                            // Check if this bell is outside the period's anchor bells
+                            // V5.44.4: Use proper anchor detection based on period type
+                            const sharedStatic = targetPeriod.bells.filter(b => !b.relative && b._originType === 'shared');
+                            let anchorBells = [];
+                            if (sharedStatic.length > 0) {
+                                anchorBells = sharedStatic;
+                            } else {
+                                // Fluke period - use anchorRole
+                                const startAnchor = targetPeriod.bells.find(b => b.anchorRole === 'start');
+                                const endAnchor = targetPeriod.bells.find(b => b.anchorRole === 'end');
+                                if (startAnchor) anchorBells.push(startAnchor);
+                                if (endAnchor) anchorBells.push(endAnchor);
+                            }
+                            
+                            if (anchorBells.length > 0) {
+                                const firstAnchorTime = anchorBells[0].time;
+                                const lastAnchorTime = anchorBells[anchorBells.length - 1].time;
+                                if (bell.time < firstAnchorTime || bell.time > lastAnchorTime) {
+                                    // This bell rings outside period bounds - use passing period visual
+                                    previewVisualCue = getPassingPeriodVisualCue();
+                                }
+                            }
+                        }
+                        
+                        preview.innerHTML = getVisualHtml(previewVisualCue, periodName);
+                        
+                        // Set up click handlers
+                        if (visualCue && visualCue.startsWith('[CUSTOM_TEXT]')) {
+                            makePreviewClickableForCustomText(preview, relativeBellVisualSelect);
+                        } else if (visualCue && supportsBackgroundColor(visualCue)) {
+                            makePreviewClickable(preview, 'relative-bell-visual', periodName);
+                        } else {
+                            preview.style.cursor = 'default';
+                            preview.onclick = null;
+                            preview.title = '';
+                            preview.classList.remove('clickable');
+                        }
+                    }
                 }
 
                 // 7. Show "Convert to Static" checkbox
@@ -4061,17 +5907,36 @@
                     if (visualSelect) {
                         updateVisualDropdowns();
                         visualSelect.value = visualCue;
-                        updateEditBellVisualPreview(); // NEW 5.33: Show initial preview
+                        
+                        // FIX V5.42.9: Directly set preview with known value instead of relying on dropdown read
+                        const preview = document.getElementById('edit-bell-visual-preview');
+                        if (preview) {
+                            const periodName = currentEditingBell?.periodName || 'Preview';
+                            preview.innerHTML = getVisualHtml(visualCue, periodName);
+                            
+                            // Set up click handlers
+                            if (visualCue && visualCue.startsWith('[CUSTOM_TEXT]')) {
+                                makePreviewClickableForCustomText(preview, visualSelect);
+                            } else if (visualCue && supportsBackgroundColor(visualCue)) {
+                                makePreviewClickable(preview, 'edit-bell-visual', periodName);
+                            } else {
+                                preview.style.cursor = 'default';
+                                preview.onclick = null;
+                                preview.title = '';
+                                preview.classList.remove('clickable');
+                            }
+                        }
                     }
                     
-                    // FIX 5.19: Use the bell's actual sound for custom bells, originalSound for shared bells
-                    const soundToShow = bell.type === 'custom' ? bell.sound : bell.originalSound;
-                    editBellSoundInput.value = soundToShow || 'ellisBell.mp3';
+                    // FIX V5.46.5: For shared bells, show the CURRENT sound (which may be overridden)
+                    // not originalSound. The user wants to see what's actually playing.
+                    const soundToShow = bell.sound || 'ellisBell.mp3';
+                    editBellSoundInput.value = soundToShow;
                     
                     editBellStatus.classList.add('hidden');
                     
                     updateSoundDropdowns();
-                    editBellSoundInput.value = soundToShow || 'ellisBell.mp3'; // Set again after dropdown update
+                    editBellSoundInput.value = soundToShow; // Set again after dropdown update
                     
                     // NEW 5.32.3: Handle anchor bells (shared type) - lock time but allow visual/sound/name
                     if (bell.type === 'shared') {
@@ -4116,15 +5981,195 @@
             // DELETED in 4.31: Removed duplicate/old handleEditBellClick function.
             // The new router function is located below.
 
+            /**
+             * FIX V5.42: Make a preview element clickable to re-edit custom text
+             * @param {HTMLElement} previewElement - The preview container element
+             * @param {HTMLElement} selectElement - The associated select dropdown
+             */
+            function makePreviewClickableForCustomText(previewElement, selectElement) {
+                if (!previewElement || !selectElement) return;
+                
+                previewElement.style.cursor = 'pointer';
+                previewElement.title = 'Click to edit custom text';
+                
+                previewElement.onclick = () => {
+                    const currentValue = selectElement.value;
+                    // Only trigger if showing custom text
+                    if (currentValue && currentValue.startsWith('[CUSTOM_TEXT]')) {
+                        // Trigger the change event to open the custom text modal
+                        selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                };
+            }
+
             // NEW 5.33: Update visual preview in edit modal
+            // MODIFIED V5.41: Single preview only (bells don't show icons)
+            // FIX V5.42: Use actual period name from currentEditingBell for accurate preview
             function updateEditBellVisualPreview() {
                 const visualSelect = document.getElementById('edit-bell-visual');
-                const preview = document.getElementById('edit-bell-visual-preview');
+                const previewFull = document.getElementById('edit-bell-visual-preview');
+                if (!visualSelect || !previewFull) return;
+            
+                const visualValue = visualSelect.value;
+                // Use the period name from the bell being edited, or 'Preview' as fallback
+                const periodName = currentEditingBell?.periodName || 'Preview';
+                const htmlFull = getVisualHtml(visualValue, periodName);
+                previewFull.innerHTML = htmlFull;
+                
+                // FIX V5.42.7: Make preview clickable based on visual type
+                if (visualValue && visualValue.startsWith('[CUSTOM_TEXT]')) {
+                    makePreviewClickableForCustomText(previewFull, visualSelect);
+                } else if (visualValue && supportsBackgroundColor(visualValue)) {
+                    makePreviewClickable(previewFull, 'edit-bell-visual', periodName);
+                } else {
+                    previewFull.style.cursor = 'default';
+                    previewFull.onclick = null;
+                    previewFull.title = '';
+                    previewFull.classList.remove('clickable');
+                }
+            }
+
+            // NEW V5.41: Update visual preview in relative bell modal (single preview only)
+            // FIX V5.42: Use actual period name from context
+            function updateRelativeBellVisualPreview() {
+                const visualSelect = document.getElementById('relative-bell-visual');
+                const previewFull = document.getElementById('relative-bell-visual-preview-full');
+                if (!visualSelect || !previewFull) return;
+            
+                let visualValue = visualSelect.value;
+                // Use the period name from context
+                const periodName = currentRelativePeriod?.name || 'Preview';
+                
+                // FIX V5.42.11 & V5.44.4: For bells outside period bounds with no custom visual, use passing period visual
+                let previewVisualValue = visualValue;
+                if (!visualValue && currentRelativePeriod?.bells) {
+                    // Check if this bell would be outside the period's anchor bells
+                    // V5.44.4: Use proper anchor detection based on period type
+                    const sharedStatic = currentRelativePeriod.bells.filter(b => !b.relative && b._originType === 'shared');
+                    let anchorBells = [];
+                    if (sharedStatic.length > 0) {
+                        anchorBells = sharedStatic;
+                    } else {
+                        // Fluke period - use anchorRole
+                        const startAnchor = currentRelativePeriod.bells.find(b => b.anchorRole === 'start');
+                        const endAnchor = currentRelativePeriod.bells.find(b => b.anchorRole === 'end');
+                        if (startAnchor) anchorBells.push(startAnchor);
+                        if (endAnchor) anchorBells.push(endAnchor);
+                    }
+                    
+                    if (anchorBells.length > 0) {
+                        const firstAnchorTime = anchorBells[0].time;
+                        const lastAnchorTime = anchorBells[anchorBells.length - 1].time;
+                        const calculatedTime = updateCalculatedTime();
+                        if (calculatedTime && (calculatedTime < firstAnchorTime || calculatedTime > lastAnchorTime)) {
+                            // This bell rings outside period bounds - use passing period visual
+                            previewVisualValue = getPassingPeriodVisualCue();
+                        }
+                    }
+                }
+                
+                const htmlFull = getVisualHtml(previewVisualValue, periodName);
+                previewFull.innerHTML = htmlFull;
+                
+                // FIX V5.42.7: Make preview clickable based on visual type
+                if (visualValue && visualValue.startsWith('[CUSTOM_TEXT]')) {
+                    makePreviewClickableForCustomText(previewFull, visualSelect);
+                } else if (visualValue && supportsBackgroundColor(visualValue)) {
+                    makePreviewClickable(previewFull, 'relative-bell-visual', periodName);
+                } else {
+                    previewFull.style.cursor = 'default';
+                    previewFull.onclick = null;
+                    previewFull.title = '';
+                    previewFull.classList.remove('clickable');
+                }
+            }
+
+            // NEW V5.41: Update visual preview in multi-add-bell modal
+            // FIX V5.42: Use actual period name from context
+            function updateMultiBellVisualPreview() {
+                const visualSelect = document.getElementById('multi-bell-visual');
+                const preview = document.getElementById('multi-bell-visual-preview');
                 if (!visualSelect || !preview) return;
             
                 const visualValue = visualSelect.value;
-                const html = getVisualHtml(visualValue, 'Preview');
+                // Use the period name from context (multi-bell uses currentMultiAddPeriod or currentRelativePeriod)
+                const periodName = currentRelativePeriod?.name || 'Preview';
+                const html = getVisualHtml(visualValue, periodName);
                 preview.innerHTML = html;
+                
+                // FIX V5.42.7: Make preview clickable based on visual type
+                if (visualValue && visualValue.startsWith('[CUSTOM_TEXT]')) {
+                    makePreviewClickableForCustomText(preview, visualSelect);
+                } else if (visualValue && supportsBackgroundColor(visualValue)) {
+                    makePreviewClickable(preview, 'multi-bell-visual', periodName);
+                } else {
+                    preview.style.cursor = 'default';
+                    preview.onclick = null;
+                    preview.title = '';
+                    preview.classList.remove('clickable');
+                }
+            }
+
+            // NEW V5.42: Update visual preview in add-static-bell modal
+            // FIX V5.42: Use actual period name from currentRelativePeriod for accurate preview
+            function updateAddStaticBellVisualPreview() {
+                console.log('updateAddStaticBellVisualPreview called'); // DEBUG
+                const visualSelect = document.getElementById('add-static-bell-visual');
+                const preview = document.getElementById('add-static-bell-visual-preview');
+                console.log('visualSelect:', visualSelect, 'preview:', preview); // DEBUG
+                if (!visualSelect || !preview) {
+                    console.log('Early return - missing elements'); // DEBUG
+                    return;
+                }
+            
+                const visualValue = visualSelect.value;
+                // Use the period name from context, or 'Preview' as fallback
+                const periodName = currentRelativePeriod?.name || 'Preview';
+                console.log('visualValue:', visualValue, 'periodName:', periodName); // DEBUG
+                const html = getVisualHtml(visualValue, periodName);
+                console.log('generated html:', html?.substring(0, 100)); // DEBUG
+                preview.innerHTML = html;
+                console.log('Preview innerHTML NOW:', preview.innerHTML.substring(0, 50)); // DEBUG - verify it was set
+                
+                // FIX V5.42.7: Make preview clickable based on visual type
+                if (visualValue && visualValue.startsWith('[CUSTOM_TEXT]')) {
+                    // Custom text: click to edit text/colors
+                    makePreviewClickableForCustomText(preview, visualSelect);
+                } else if (visualValue && supportsBackgroundColor(visualValue)) {
+                    // Images/SVGs: click to change background color
+                    makePreviewClickable(preview, 'add-static-bell-visual', periodName);
+                } else {
+                    preview.style.cursor = 'default';
+                    preview.onclick = null;
+                    preview.title = '';
+                    preview.classList.remove('clickable');
+                }
+            }
+
+            // NEW V5.42: Update visual preview in multi-relative-bell modal
+            // FIX V5.42: Use actual period name from context
+            function updateMultiRelativeBellVisualPreview() {
+                const visualSelect = document.getElementById('multi-relative-bell-visual');
+                const preview = document.getElementById('multi-relative-bell-visual-preview');
+                if (!visualSelect || !preview) return;
+            
+                const visualValue = visualSelect.value;
+                // Use the period name from context
+                const periodName = currentRelativePeriod?.name || 'Preview';
+                const html = getVisualHtml(visualValue, periodName);
+                preview.innerHTML = html;
+                
+                // FIX V5.42.7: Make preview clickable based on visual type
+                if (visualValue && visualValue.startsWith('[CUSTOM_TEXT]')) {
+                    makePreviewClickableForCustomText(preview, visualSelect);
+                } else if (visualValue && supportsBackgroundColor(visualValue)) {
+                    makePreviewClickable(preview, 'multi-relative-bell-visual', periodName);
+                } else {
+                    preview.style.cursor = 'default';
+                    preview.onclick = null;
+                    preview.title = '';
+                    preview.classList.remove('clickable');
+                }
             }
                 
             /**
@@ -4174,15 +6219,22 @@
                 };
 
                 // NEW in 4.21: Check if we should override the sound
-                if (oldBell.type === 'shared' && editBellOverrideCheckbox.checked) {
-                    // The override box is checked, so take the new sound
-                    newBell.sound = editBellSoundInput.value;
+                // FIX V5.42: Add null check for checkbox
+                // FIX V5.46.5: For non-admin users, always take the sound (checkbox is hidden for them)
+                const isAdmin = document.body.classList.contains('admin-mode');
+                if (oldBell.type === 'shared') {
+                    if (isAdmin && editBellOverrideCheckbox?.checked) {
+                        // Admin with checkbox checked - take the new sound
+                        newBell.sound = editBellSoundInput.value;
+                    } else if (!isAdmin) {
+                        // Non-admin always overrides (checkbox is hidden)
+                        newBell.sound = editBellSoundInput.value;
+                    }
+                    // If admin and checkbox NOT checked, newBell.sound stays as oldBell.sound
                 } else if (oldBell.type === 'custom') {
                     // It's a custom bell, so always take the new sound
                     newBell.sound = editBellSoundInput.value;
                 }
-                // If it's a shared bell and the box is NOT checked,
-                // newBell.sound remains set to oldBell.sound, protecting it.
                 
                 if (!newBell.time || !newBell.name) {
                     editBellStatus.textContent = "Time and Name are required.";
@@ -4204,12 +6256,65 @@
                 editBellStatus.classList.remove('hidden');
     
                 try {
-                    // --- Case 1: Editing a Shared Bell (Admin Only) ---
+                    // --- Case 1: Editing a Shared Bell ---
                     if (oldBell.type === 'shared') {
-                        if (!document.body.classList.contains('admin-mode')) {
-                            throw new Error("Permission denied. Admin mode required to edit shared bells.");
+                        const isAdmin = document.body.classList.contains('admin-mode');
+                        
+                        // FIX V5.42.3: Non-admins can save personal overrides (nickname, visual)
+                        // They just can't edit the actual shared bell data
+                        if (!isAdmin) {
+                            // Save as personal override to personal schedule
+                            if (!activePersonalScheduleId) {
+                                throw new Error("Please select a personal schedule to save your customizations.");
+                            }
+                            
+                            const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                            const docSnap = await getDoc(personalScheduleRef);
+                            if (!docSnap.exists()) throw new Error("Personal schedule document not found.");
+                            
+                            // Get or create bell overrides object
+                            const currentData = docSnap.data();
+                            const bellOverrides = currentData.bellOverrides || {};
+                            
+                            // Save the override for this bell
+                            // V5.46.5 FIX: For non-admins, always save the sound if it differs from original
+                            // (checkbox is hidden for non-admins, so we can't rely on it)
+                            const soundChanged = editBellSoundInput.value !== oldBell.originalSound;
+                            
+                            bellOverrides[oldBell.bellId] = {
+                                nickname: newBell.name !== oldBell.originalName ? newBell.name : null,
+                                visualCue: visualCue || null,
+                                visualMode: visualMode !== 'none' ? visualMode : null,
+                                sound: soundChanged ? editBellSoundInput.value : null
+                            };
+                            
+                            // Clean up null values
+                            Object.keys(bellOverrides[oldBell.bellId]).forEach(key => {
+                                if (bellOverrides[oldBell.bellId][key] === null) {
+                                    delete bellOverrides[oldBell.bellId][key];
+                                }
+                            });
+                            
+                            // If no overrides left, remove the entry
+                            if (Object.keys(bellOverrides[oldBell.bellId]).length === 0) {
+                                delete bellOverrides[oldBell.bellId];
+                            }
+                            
+                            await updateDoc(personalScheduleRef, { bellOverrides });
+                            
+                            // V5.46.4: Update local state immediately for instant UI feedback
+                            personalBellOverrides = bellOverrides;
+                            
+                            editBellStatus.textContent = "Personal customization saved.";
+                            
+                            // V5.46.5: Trigger re-render to show updated bell
+                            recalculateAndRenderAll();
+                            
+                            closeEditBellModal();
+                            return;
                         }
                         
+                        // Admin path: Actually edit the shared bell
                         // V4.0 LOGIC: Find and update the bell within the periods array
                         const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
                         if (!currentSchedule) throw new Error("Active shared schedule not found.");
@@ -4413,8 +6518,15 @@
                         
                         // Create a new bells array for this period
                         const updatedBells = [...period.bells];
-                        // Replace the old bell with the new bell
-                        updatedBells[bellIndex] = newBell;
+                        
+                        // V5.44.4: Preserve anchorRole from original bell (critical for fluke periods)
+                        const originalAnchorRole = period.bells[bellIndex].anchorRole;
+                        const updatedBell = originalAnchorRole 
+                            ? { ...newBell, anchorRole: originalAnchorRole }
+                            : newBell;
+                        
+                        // Replace the old bell with the updated bell
+                        updatedBells[bellIndex] = updatedBell;
                         
                         // Return the updated period object
                         return { ...period, bells: updatedBells };
@@ -4489,6 +6601,7 @@
     
             /**
              * NEW: v3.02 (4.03?) - Opens the modal for adding a bell to multiple schedules.
+             * MODIFIED V5.41: Added visual dropdown population and preview update
              */
             function showMultiAddModal() {
                 // Re-render the schedule list every time
@@ -4496,6 +6609,12 @@
                 
                 // Populate sound dropdowns
                 updateSoundDropdowns();
+                
+                // NEW V5.41: Populate visual dropdowns
+                updateVisualDropdowns();
+                
+                // NEW V5.41: Initialize preview
+                updateMultiBellVisualPreview();
     
                 addBellModal.classList.remove('hidden');
             }
@@ -4632,12 +6751,92 @@
                 const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
                 if (!schedule) return;
     
-                // Create a clean backup object
+                // V5.45.0: Comprehensive backup including all user customizations
+                
+                // 1. Collect period visual overrides for this schedule
+                // V5.45.1 FIX: Keys use format "{personalScheduleId}-{periodName}" with hyphen
+                const relevantVisualOverrides = {};
+                const scheduleIdPrefix = `${activePersonalScheduleId}-`;
+                for (const key in periodVisualOverrides) {
+                    if (key.startsWith(scheduleIdPrefix)) {
+                        relevantVisualOverrides[key] = periodVisualOverrides[key];
+                    }
+                }
+                
+                // Also check with baseScheduleId for linked schedules (older format compatibility)
+                if (schedule.baseScheduleId) {
+                    const baseIdPrefix = `${schedule.baseScheduleId}-`;
+                    for (const key in periodVisualOverrides) {
+                        if (key.startsWith(baseIdPrefix) && !relevantVisualOverrides[key]) {
+                            relevantVisualOverrides[key] = periodVisualOverrides[key];
+                        }
+                    }
+                }
+                
+                // 2. Get custom quick bells (if any)
+                const quickBellsBackup = customQuickBells.filter(b => b !== null);
+                
+                // 3. Collect all referenced audio/visual URLs from the schedule
+                const referencedMedia = {
+                    audio: new Set(),
+                    visuals: new Set()
+                };
+                
+                // Scan periods for custom sounds and visuals
+                const periods = schedule.periods || [];
+                periods.forEach(period => {
+                    if (period.bells) {
+                        period.bells.forEach(bell => {
+                            // Check for custom audio (URLs start with http)
+                            if (bell.sound && bell.sound.startsWith('http')) {
+                                referencedMedia.audio.add(bell.sound);
+                            }
+                            // Check for custom visuals
+                            if (bell.visualCue && bell.visualCue.startsWith('http')) {
+                                referencedMedia.visuals.add(bell.visualCue);
+                            }
+                        });
+                    }
+                });
+                
+                // Scan visual overrides for custom visuals
+                for (const key in relevantVisualOverrides) {
+                    const value = relevantVisualOverrides[key];
+                    if (value && value.startsWith('http')) {
+                        referencedMedia.visuals.add(value);
+                    }
+                }
+                
+                // Scan quick bells for custom media
+                quickBellsBackup.forEach(bell => {
+                    if (bell.sound && bell.sound.startsWith('http')) {
+                        referencedMedia.audio.add(bell.sound);
+                    }
+                    if (bell.visualCue && bell.visualCue.startsWith('http')) {
+                        referencedMedia.visuals.add(bell.visualCue);
+                    }
+                });
+                
+                // Create comprehensive backup object
                 const backupData = {
-                    type: "EllisWebBell_PersonalSchedule_v1",
-                    name: schedule.name,
-                    baseScheduleId: schedule.baseScheduleId,
-                    bells: schedule.bells
+                    type: "EllisWebBell_PersonalSchedule_v2",  // NEW version!
+                    exportedAt: new Date().toISOString(),
+                    schedule: {
+                        name: schedule.name,
+                        baseScheduleId: schedule.baseScheduleId || null,
+                        isStandalone: schedule.isStandalone || false,
+                        periods: periods  // The full v4 structure
+                    },
+                    // V5.46.5: Include bell overrides (shared bell customizations)
+                    bellOverrides: schedule.bellOverrides || {},
+                    periodVisualOverrides: relevantVisualOverrides,
+                    customQuickBells: quickBellsBackup,
+                    referencedMedia: {
+                        audio: Array.from(referencedMedia.audio),
+                        visuals: Array.from(referencedMedia.visuals)
+                    },
+                    // Legacy compatibility - flatten to bells array
+                    _legacyBells: flattenPeriodsToLegacyBells(periods)
                 };
     
                 try {
@@ -4647,13 +6846,25 @@
                     const a = document.createElement('a');
                     a.href = url;
                     const filename = (schedule.name || 'personal_schedule').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                    a.download = `ellisbell_backup_${filename}.json`;
+                    const dateStr = new Date().toISOString().split('T')[0];
+                    a.download = `ellisbell_backup_${filename}_${dateStr}.json`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
+                    
+                    // Show confirmation with media count
+                    const audioCount = referencedMedia.audio.size;
+                    const visualCount = referencedMedia.visuals.size;
+                    let message = `Backup saved! Includes ${periods.length} periods`;
+                    if (audioCount > 0 || visualCount > 0) {
+                        message += ` and references to ${audioCount} audio + ${visualCount} visual files`;
+                    }
+                    showUserMessage(message);
+                    
                 } catch (error) {
                      console.error("Error backing up schedule:", error);
+                     showUserMessage("Error creating backup: " + error.message);
                 }
             }
             
@@ -4664,19 +6875,93 @@
                 reader.onload = (event) => {
                     try {
                         const data = JSON.parse(event.target.result);
-                        // Validate
-                        if (data.type !== "EllisWebBell_PersonalSchedule_v1" || data.name === undefined || data.baseScheduleId === undefined || !Array.isArray(data.bells)) {
-                            throw new Error("Invalid or corrupt backup file.");
+                        
+                        // V5.45.0: Support both v1 and v2 formats
+                        const isV2 = data.type === "EllisWebBell_PersonalSchedule_v2";
+                        const isV1 = data.type === "EllisWebBell_PersonalSchedule_v1";
+                        
+                        if (!isV1 && !isV2) {
+                            throw new Error("Invalid backup file type. Expected EllisWebBell_PersonalSchedule_v1 or v2.");
                         }
-                        pendingRestoreData = data; // Store data
+                        
+                        // Validate based on version
+                        if (isV1) {
+                            if (data.name === undefined || data.baseScheduleId === undefined || !Array.isArray(data.bells)) {
+                                throw new Error("Invalid or corrupt v1 backup file.");
+                            }
+                            // Convert v1 to internal format
+                            pendingRestoreData = {
+                                version: 1,
+                                name: data.name,
+                                baseScheduleId: data.baseScheduleId,
+                                periods: [], // V1 didn't have periods, will use bells
+                                bells: data.bells,
+                                periodVisualOverrides: {},
+                                customQuickBells: [],
+                                referencedMedia: { audio: [], visuals: [] }
+                            };
+                        } else {
+                            // V2 format
+                            if (!data.schedule || data.schedule.name === undefined || !Array.isArray(data.schedule.periods)) {
+                                throw new Error("Invalid or corrupt v2 backup file.");
+                            }
+                            pendingRestoreData = {
+                                version: 2,
+                                name: data.schedule.name,
+                                baseScheduleId: data.schedule.baseScheduleId,
+                                isStandalone: data.schedule.isStandalone || false,
+                                periods: data.schedule.periods,
+                                // V5.46.5: Include bell overrides (shared bell customizations)
+                                bellOverrides: data.bellOverrides || {},
+                                periodVisualOverrides: data.periodVisualOverrides || {},
+                                customQuickBells: data.customQuickBells || [],
+                                referencedMedia: data.referencedMedia || { audio: [], visuals: [] }
+                            };
+                        }
                         
                         const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
                         
-                        confirmRestoreText.textContent = `Overwrite "${schedule.name}" with data from "${data.name}" (from file ${file.name})? This cannot be undone.`;
+                        // Build confirmation message
+                        let confirmMsg = `Overwrite "${schedule.name}" with data from "${pendingRestoreData.name}" (from file ${file.name})?`;
+                        
+                        if (pendingRestoreData.version === 2) {
+                            const periodCount = pendingRestoreData.periods.length;
+                            const audioCount = pendingRestoreData.referencedMedia.audio.length;
+                            const visualCount = pendingRestoreData.referencedMedia.visuals.length;
+                            const quickBellCount = pendingRestoreData.customQuickBells.length;
+                            const overrideCount = Object.keys(pendingRestoreData.periodVisualOverrides).length;
+                            // V5.46.5: Count bell overrides
+                            const bellOverrideCount = Object.keys(pendingRestoreData.bellOverrides || {}).length;
+                            
+                            confirmMsg += `\n\nThis backup includes:`;
+                            confirmMsg += `\n• ${periodCount} periods`;
+                            if (bellOverrideCount > 0) confirmMsg += `\n• ${bellOverrideCount} shared bell customizations`;
+                            if (overrideCount > 0) confirmMsg += `\n• ${overrideCount} period visual customizations`;
+                            if (quickBellCount > 0) confirmMsg += `\n• ${quickBellCount} quick bells`;
+                            if (audioCount > 0 || visualCount > 0) {
+                                confirmMsg += `\n• References to ${audioCount} audio + ${visualCount} visual files`;
+                                confirmMsg += `\n  (Files must exist in your account or they'll fall back to defaults)`;
+                            }
+                        } else {
+                            confirmMsg += `\n\n⚠️ This is an older v1 backup with limited data.`;
+                        }
+                        
+                        confirmMsg += `\n\nThis cannot be undone.`;
+                        
+                        confirmRestoreText.textContent = confirmMsg;
+                        confirmRestoreText.style.whiteSpace = 'pre-line'; // Allow line breaks
+                        
+                        // V5.46.2: Pre-fill name input with backup's name
+                        const restoreNameInput = document.getElementById('restore-schedule-name');
+                        if (restoreNameInput) {
+                            restoreNameInput.value = pendingRestoreData.name;
+                        }
+                        
                         confirmRestoreModal.classList.remove('hidden');
     
                     } catch (error) {
                         console.error("Restore file read failed:", error);
+                        showUserMessage("Error reading backup: " + error.message);
                     } finally {
                         restoreFileInput.value = ''; // Clear input
                     }
@@ -4687,21 +6972,82 @@
             async function confirmRestorePersonalSchedule() {
                 if (!pendingRestoreData || !activePersonalScheduleId) return;
     
-                const { name, baseScheduleId, bells } = pendingRestoreData;
+                // V5.46.5: Extract bellOverrides from pending data
+                const { version, baseScheduleId, isStandalone, periods, bells, bellOverrides: backupBellOverrides, periodVisualOverrides: backupOverrides, customQuickBells: backupQuickBells } = pendingRestoreData;
+                
+                // V5.46.2: Use name from input field instead of backup
+                const restoreNameInput = document.getElementById('restore-schedule-name');
+                const name = restoreNameInput?.value.trim() || pendingRestoreData.name;
+                
                 const docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
                 
                 try {
-                    // setDoc will overwrite
-                    await setDoc(docRef, { name, baseScheduleId, bells });
-                    console.log("Schedule restored.");
+                    if (version === 2) {
+                        // V5.45.0: Full v2 restore
+                        
+                        // 1. Restore schedule data including bellOverrides
+                        const scheduleData = { 
+                            name, 
+                            baseScheduleId: baseScheduleId || null,
+                            periods,
+                            // V5.46.5: Include bell overrides
+                            bellOverrides: backupBellOverrides || {}
+                        };
+                        if (isStandalone) {
+                            scheduleData.isStandalone = true;
+                        }
+                        await setDoc(docRef, scheduleData);
+                        
+                        // V5.46.5: Update local state immediately
+                        personalBellOverrides = backupBellOverrides || {};
+                        
+                        // 2. Restore period visual overrides to localStorage
+                        // V5.45.1 FIX: Remap keys to use current schedule ID
+                        if (backupOverrides && Object.keys(backupOverrides).length > 0) {
+                            let restoredCount = 0;
+                            for (const oldKey in backupOverrides) {
+                                // Extract period name from key (format: "scheduleId-periodName")
+                                const hyphenIndex = oldKey.indexOf('-');
+                                if (hyphenIndex > -1) {
+                                    const periodName = oldKey.substring(hyphenIndex + 1);
+                                    // Create new key with current schedule ID
+                                    const newKey = `${activePersonalScheduleId}-${periodName}`;
+                                    periodVisualOverrides[newKey] = backupOverrides[oldKey];
+                                    restoredCount++;
+                                }
+                            }
+                            saveVisualOverrides();
+                            console.log(`Restored ${restoredCount} period visual overrides.`);
+                        }
+                        
+                        // 3. Restore custom quick bells (if any)
+                        if (backupQuickBells && backupQuickBells.length > 0) {
+                            // Ask user if they want to overwrite quick bells
+                            const restoreQuickBells = confirm(`This backup includes ${backupQuickBells.length} custom quick bells. Do you want to restore them?\n\n(This will replace your current quick bells.)`);
+                            
+                            if (restoreQuickBells) {
+                                await saveCustomQuickBells(backupQuickBells);
+                                console.log(`Restored ${backupQuickBells.length} custom quick bells.`);
+                            }
+                        }
+                        
+                        console.log("V2 schedule restored successfully.");
+                        showUserMessage(`Restored "${name}" with ${periods.length} periods.`);
+                        
+                    } else {
+                        // V1 legacy restore (bells array only)
+                        await setDoc(docRef, { name, baseScheduleId, bells });
+                        console.log("V1 schedule restored (legacy format).");
+                        showUserMessage(`Restored "${name}" (legacy format).`);
+                    }
                     
-                    // MODIFIED: v3.09 - No longer need to call loadPersonalSchedules()
-                    // The listener will handle the update.
+                    // Refresh the UI
                     scheduleSelector.value = `personal-${activePersonalScheduleId}`;
                     setActiveSchedule(scheduleSelector.value);
     
                 } catch (error) {
                     console.error("Error restoring schedule:", error);
+                    showUserMessage("Error restoring: " + error.message);
                 } finally {
                     pendingRestoreData = null;
                     confirmRestoreModal.classList.add('hidden');
@@ -5012,9 +7358,58 @@
                     addStaticBellSound.value = 'ellisBell.mp3'; // Reset to default
                 }
     
+                // NEW V5.42: Populate visual dropdowns and update preview
+                updateVisualDropdowns();
+                updateAddStaticBellVisualPreview();
+    
                 // 3. Show Modal
                 addStaticBellSound.value = 'ellisBell.mp3'; // Set default sound
                 addStaticBellModal.classList.remove('hidden');
+            }
+
+            /**
+             * V5.44: Generate HTML options for the anchor bell dropdown.
+             * Groups bells by period and shows the current period's bells first.
+             * @param {Array} allBells - All resolved bells with _periodName and _periodOrigin
+             * @param {string} currentPeriodName - The period the new bell will be added to
+             * @returns {string} HTML string of option elements
+             */
+            function generateAnchorOptionsHtml(allBells, currentPeriodName) {
+                // Group bells by period
+                const periodGroups = {};
+                allBells.forEach(bell => {
+                    const pName = bell._periodName || 'Unknown';
+                    if (!periodGroups[pName]) {
+                        periodGroups[pName] = [];
+                    }
+                    periodGroups[pName].push(bell);
+                });
+                
+                let html = '';
+                
+                // Current period first (if it has bells)
+                if (periodGroups[currentPeriodName] && periodGroups[currentPeriodName].length > 0) {
+                    html += `<optgroup label="This Period: ${currentPeriodName}">`;
+                    periodGroups[currentPeriodName].forEach(bell => {
+                        html += `<option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>`;
+                    });
+                    html += `</optgroup>`;
+                }
+                
+                // Other periods
+                Object.keys(periodGroups).forEach(pName => {
+                    if (pName !== currentPeriodName && periodGroups[pName].length > 0) {
+                        const origin = periodGroups[pName][0]._periodOrigin;
+                        const label = origin === 'personal' ? `Custom: ${pName}` : pName;
+                        html += `<optgroup label="${label}">`;
+                        periodGroups[pName].forEach(bell => {
+                            html += `<option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>`;
+                        });
+                        html += `</optgroup>`;
+                    }
+                });
+                
+                return html;
             }
 
             /**
@@ -5036,17 +7431,31 @@
                 }
                 
                 // 2. Use time-resolved bells as anchors
-                const resolvedBells = targetPeriod.bells;
+                // V5.44: Include bells from ALL periods, not just the current one
+                const allResolvedBells = [];
+                calculatedPeriodsList.forEach(p => {
+                    p.bells.forEach(b => {
+                        allResolvedBells.push({
+                            ...b,
+                            _periodName: p.name,
+                            _periodOrigin: p.origin
+                        });
+                    });
+                });
 
-                // 3. Store Anchor Data in State (add bells to existing state)
-                currentRelativePeriod.bells = resolvedBells;
+                // 3. Store Anchor Data in State (include ALL bells for time calculation)
+                currentRelativePeriod.bells = allResolvedBells;
     
                 // 4. Populate Modal UI
                 relativePeriodName.textContent = periodName;
 
-                const anchorOptionsHtml = resolvedBells.map(bell => `
-                    <option value="${bell.bellId}">${bell.name} (${formatTime12Hour(bell.time, true)})</option>
-                `).join('');
+                // NEW V5.42: Reset editing state and hide convert-to-static (this is for "Add", not "Edit")
+                currentEditingBell = null;
+                const convertToStaticContainer = document.getElementById('convert-to-static-container');
+                if (convertToStaticContainer) convertToStaticContainer.classList.add('hidden');
+
+                // V5.44: Group anchor options by period for better organization
+                const anchorOptionsHtml = generateAnchorOptionsHtml(allResolvedBells, periodName);
                 relativeAnchorBellSelect.innerHTML = anchorOptionsHtml;
     
                 // Populate sound dropdowns
@@ -5061,6 +7470,9 @@
     
                 // NEW: Populate visual dropdowns
                 updateVisualDropdowns();
+                
+                // NEW V5.41: Initialize visual previews
+                updateRelativeBellVisualPreview();
     
                 // Initial calculation
                 updateCalculatedTime(); 
@@ -5096,6 +7508,7 @@
                 const bellSound = document.getElementById('relative-bell-sound').value;
                 const parentBellId = document.getElementById('relative-anchor-bell').value;
                 const direction = document.getElementById('relative-direction').value;
+                const hours = parseInt(document.getElementById('relative-hours')?.value) || 0;
                 const minutes = parseInt(document.getElementById('relative-minutes').value) || 0;
                 const seconds = parseInt(document.getElementById('relative-seconds').value) || 0;
                 
@@ -5123,8 +7536,8 @@
                 }
                 // --- END V4.68 VALIDATION ---
 
-                // 2. Calculate the offset in seconds
-                let totalOffsetSeconds = (minutes * 60) + seconds;
+                // 2. Calculate the offset in seconds - V5.44.1: Include hours
+                let totalOffsetSeconds = (hours * 3600) + (minutes * 60) + seconds;
                 if (direction === 'before') {
                     totalOffsetSeconds = -totalOffsetSeconds; // Make it negative
                 }
@@ -5158,30 +7571,44 @@
                 }
 
                 // --- NEW in 4.48: Check if we can use a stable anchor ---
-                // We check if the selected parentBellId is *also* the first or last
-                // bell in the period. If so, we save a stable anchor instead.
-                const period = calculatedPeriodsList.find(p => p.name === currentRelativePeriod.name);
-                if (period && period.bells.length > 0) {
-                    const firstBell = period.bells[0];
-                    const lastBell = period.bells[period.bells.length - 1];
+                // MODIFIED V5.44.1: For cross-period anchoring, check if the anchor bell is 
+                // the first or last bell of ITS period (not the period we're adding to)
+                
+                // Find which period the anchor bell belongs to
+                let anchorPeriod = null;
+                for (const p of calculatedPeriodsList) {
+                    if (p.bells && p.bells.some(b => b.bellId === parentBellId)) {
+                        anchorPeriod = p;
+                        break;
+                    }
+                }
+                
+                if (anchorPeriod && anchorPeriod.bells.length > 0) {
+                    const firstBell = anchorPeriod.bells[0];
+                    const lastBell = anchorPeriod.bells[anchorPeriod.bells.length - 1];
 
                     if (parentBellId === firstBell.bellId) {
                         // It's anchored to Period Start!
                         finalBell.relative = {
-                            parentPeriodName: period.name,
+                            parentPeriodName: anchorPeriod.name,
                             parentAnchorType: 'period_start',
                             offsetSeconds: totalOffsetSeconds
                         };
-                        console.log("Saving relative bell with stable 'period_start' anchor.");
+                        console.log(`Saving relative bell with stable 'period_start' anchor to ${anchorPeriod.name}.`);
                     } else if (parentBellId === lastBell.bellId) {
                         // It's anchored to Period End!
                         finalBell.relative = {
-                            parentPeriodName: period.name,
+                            parentPeriodName: anchorPeriod.name,
                             parentAnchorType: 'period_end',
                             offsetSeconds: totalOffsetSeconds
                         };
-                        console.log("Saving relative bell with stable 'period_end' anchor.");
-                    };
+                        console.log(`Saving relative bell with stable 'period_end' anchor to ${anchorPeriod.name}.`);
+                    } else {
+                        // It's anchored to a middle bell - keep the parentBellId
+                        console.log(`Keeping parentBellId ${parentBellId} - anchor is not a period start/end.`);
+                    }
+                } else {
+                    console.warn(`Could not find anchor period for parentBellId ${parentBellId}`);
                 }
                 
                 // NEW in 4.57: If a stable anchor was assigned above, remove the parentBellId to prevent conflicting logic.
@@ -5356,6 +7783,10 @@
                     }).join('');
                 }
                 
+                // NEW V5.42: Populate visual dropdowns and update preview
+                updateVisualDropdowns();
+                updateMultiRelativeBellVisualPreview();
+                
                 // 4. Show the modal
                 multiAddRelativeBellModal.classList.remove('hidden');
             }
@@ -5391,6 +7822,7 @@
                 let bellSound = multiAddRelativeBellSound.value;
                 const parentAnchorType = multiAddRelativeParentAnchor.value; // 'period_start' or 'period_end'
                 const direction = multiAddRelativeDirection.value;
+                const hours = parseInt(document.getElementById('multi-add-relative-hours')?.value) || 0;
                 const minutes = parseInt(multiAddRelativeMinutes.value) || 0;
                 const seconds = parseInt(multiAddRelativeSeconds.value) || 0;
                 
@@ -5415,8 +7847,8 @@
                     bellSound = 'ellisBell.mp3';
                 }
                 
-                // 3. Calculate offset
-                let totalOffsetSeconds = (minutes * 60) + seconds;
+                // 3. Calculate offset - V5.44.2: Include hours
+                let totalOffsetSeconds = (hours * 3600) + (minutes * 60) + seconds;
                 if (direction === 'before') {
                     totalOffsetSeconds = -totalOffsetSeconds;
                 }
@@ -5927,8 +8359,24 @@
                 }
                 
                 // Show previews (MODIFIED in 4.51: Split into two columns)
-                document.getElementById('edit-period-image-preview-full').innerHTML = getVisualHtml(savedVisual, periodName);
+                const previewFull = document.getElementById('edit-period-image-preview-full');
+                previewFull.innerHTML = getVisualHtml(savedVisual, periodName);
                 document.getElementById('edit-period-image-preview-icon').innerHTML = getVisualIconHtml(savedVisual, periodName);
+                
+                // FIX V5.42.12: Make preview clickable based on visual type
+                if (savedVisual && savedVisual.startsWith('[CUSTOM_TEXT]')) {
+                    makePreviewClickableForCustomText(previewFull, editPeriodImageSelect);
+                } else if (savedVisual && supportsBackgroundColor(savedVisual)) {
+                    makePreviewClickable(previewFull, 'edit-period-image-select', periodName);
+                } else if (!savedVisual) {
+                    // Empty value (period default) - still allow bg color change
+                    makePreviewClickable(previewFull, 'edit-period-image-select', periodName);
+                } else {
+                    previewFull.style.cursor = 'default';
+                    previewFull.onclick = null;
+                    previewFull.title = '';
+                    previewFull.classList.remove('clickable');
+                }
                 
                 editPeriodStatusMsg.classList.add('hidden');
                 editPeriodModal.classList.remove('hidden');
@@ -6077,6 +8525,54 @@
             // --- NEW in 4.44: Visual Cue Display Logic ---
             
             /**
+             * NEW V5.41: Centralized Visual Configuration
+             * These constants ensure all previews match the actual display exactly.
+             */
+            const VISUAL_CONFIG = {
+                // Full-size display (countdown/period display)
+                full: {
+                    padding: 'p-8',           // Padding around the visual
+                    textColor: 'text-blue-500', // FIX V5.43.0: Match icon color for consistency
+                    bgColor: 'bg-gray-200',     // FIX V5.43.0: Match icon background for previews
+                    customTextFontSize: {
+                        short: 80,              // Font size for 1-2 chars (getVisualHtml)
+                        long: 45                // V5.44.4: Reduced from 55 to prevent cropping
+                    }
+                },
+                // Icon display (small circle next to period name)
+                icon: {
+                    size: 'w-10 h-10',        // Icon container size
+                    shape: 'rounded-full',     // Circle shape
+                    shadow: 'shadow-md',       // Shadow
+                    padding: 'p-1',           // Padding inside the icon
+                    bgColor: 'bg-gray-200',   // Background color
+                    textColor: 'text-blue-500', // Text color for SVGs
+                    customTextFontSize: {
+                        short: 40,              // Font size for 1-2 chars (getVisualIconHtml)
+                        long: 28                // Font size for 3+ chars (getVisualIconHtml)
+                    }
+                },
+                // Preview containers (in modals)
+                preview: {
+                    full: {
+                        containerSize: 'w-40 h-40',  // Container for full-size preview
+                        containerBg: 'bg-gray-100',
+                        containerRounded: 'rounded-lg',
+                        containerBorder: 'border border-gray-200',
+                        overflow: 'overflow-hidden',
+                        padding: 'p-2'           // Padding in preview container
+                    },
+                    icon: {
+                        containerSize: 'w-40 h-40',  // Container that holds the icon preview
+                        containerBg: 'bg-gray-100',
+                        containerRounded: 'rounded-lg',
+                        containerBorder: 'border border-gray-200',
+                        flex: 'flex items-center justify-center'
+                    }
+                }
+            };
+
+            /**
              * NEW: v4.44 - Generates default SVG visual cues.
              * @param {string} periodName - The name of the period.
              * @returns {string} An HTML string for an SVG or <img> tag.
@@ -6102,8 +8598,8 @@
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="60" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${text}</text></svg>`;
                 }
                 
-                // Return as a full HTML string for injection (MODIFIED V4.74: Removed wrapper div)
-                return `<div class="w-full h-full p-8 text-gray-400">${svgContent}</div>`;
+                // MODIFIED V5.43.0: Use centralized config with matching colors
+                return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.bgColor} ${VISUAL_CONFIG.full.textColor}">${svgContent}</div>`;
             }
 
             /**
@@ -6128,6 +8624,7 @@
 
             function updateVisualDropdowns() {
                 // Added 5.31.1: Dropdowns to add images to individual bells
+                // MODIFIED V5.42.0: Added passing period visual select
                 const selects = [ 
                     editPeriodImageSelect, 
                     newPeriodImageSelect, 
@@ -6136,7 +8633,8 @@
                     document.getElementById('relative-bell-visual'),
                     document.getElementById('edit-bell-visual'),
                     document.getElementById('multi-bell-visual'),
-                    document.getElementById('multi-relative-bell-visual')
+                    document.getElementById('multi-relative-bell-visual'),
+                    document.getElementById('passing-period-visual-select') // NEW V5.42.0
                 ];
                 // 1. Create options for default SVGs (dynamically)
                 // MODIFIED V4.61: Removed static number options ('1st Period', '2nd Period')
@@ -6147,7 +8645,8 @@
                 }).join('');
 
                 // NEW V4.76: Add [UPLOAD] option
-                const uploadHtml = `<option value="[UPLOAD]">Upload Audio...</option>`;
+                // FIX V5.42.8: Changed from "Audio" to "Image" - this is visual dropdown
+                const uploadHtml = `<option value="[UPLOAD]">Upload Image...</option>`;
 
                 // NEW V4.60.3: Add Custom Text entry option
                 const customTextOption = `<option value="[CUSTOM_TEXT]">Custom Text/Color...</option>`;
@@ -6191,47 +8690,97 @@
 
             /**
              * NEW: v4.44 - Gets the HTML for a given visual cue value.
+             * MODIFIED V5.29.0: Support [BG:#hexcolor] prefix for custom backgrounds
+             * MODIFIED V5.45.2: Proper support for [BG:] with [DEFAULT] SVGs
              */
             function getVisualHtml(value, periodName) {
+                // V5.29.0: Check for background color prefix
+                let customBgColor = null;
+                if (value && value.startsWith('[BG:')) {
+                    const parsed = parseVisualBgColor(value);
+                    customBgColor = parsed.bgColor;
+                    value = parsed.baseValue;
+                }
+
+                let baseHtml = '';
+                
                 if (!value) {
                     // Case 1: Value is "" (None/Default)
-                    return getDefaultVisualCue(periodName);
-                }
-                if (value.startsWith('[CUSTOM_TEXT]')) {
-                    // MODIFIED V4.75: Parse color data
+                    // FIX V5.42.9: Check for user's custom period visual override
+                    const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
+                    const periodOverride = periodVisualOverrides[visualKey];
+                    if (periodOverride && periodOverride !== '') {
+                        // User has a custom visual for this period - use it
+                        // Recursive call to handle the override value (could be URL, custom text, etc.)
+                        return getVisualHtml(periodOverride, periodName);
+                    }
+                    // No override - use generated default
+                    // V5.45.2: If custom bg, use raw SVG to avoid nested backgrounds
+                    if (customBgColor) {
+                        const rawSvg = getRawDefaultVisualCueSvg(periodName);
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${customBgColor};">${rawSvg}</div>`;
+                    }
+                    baseHtml = getDefaultVisualCue(periodName);
+                } else if (value.startsWith('[CUSTOM_TEXT]')) {
+                    // MODIFIED V5.41: Use centralized config
                     const parts = value.replace('[CUSTOM_TEXT] ', '').split('|');
                     const customText = parts[0] || '...';
                     const bgColor = parts[1] || '#4338CA'; // Default bg
                     const fgColor = parts[2] || '#FFFFFF'; // Default fg
                     
-                    // MODIFIED V4.78: Reduced 3-char font size & added font-family
-                    const svgFontSize = customText.length > 2 ? 55 : 80;
+                    const svgFontSize = customText.length > 2 ? 
+                        VISUAL_CONFIG.full.customTextFontSize.long : 
+                        VISUAL_CONFIG.full.customTextFontSize.short;
                     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full">
                         <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${customText}</text>
                     </svg>`;
-                    // MODIFIED V4.75: Use inline styles for custom colors
-                    return `<div class="w-full h-full p-8 flex items-center justify-center" style="background-color:${bgColor}; color:${fgColor};">
+                    // Custom text has its own bg, don't apply custom bg
+                    return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} flex items-center justify-center" style="background-color:${bgColor}; color:${fgColor};">
                         ${svgContent}
                     </div>`;
-                }
-                if (value.startsWith('[DEFAULT]')) {
+                } else if (value.startsWith('[DEFAULT]')) {
                     // Case 2: It's a default SVG key
-                    return getDefaultVisualCue(value.replace('[DEFAULT] ', ''));
-                }
-                if (value.startsWith('http')) {
+                    // V5.45.2: If custom bg, use raw SVG to avoid nested backgrounds
+                    if (customBgColor) {
+                        const rawSvg = getRawDefaultVisualCueSvg(value.replace('[DEFAULT] ', ''));
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${customBgColor};">${rawSvg}</div>`;
+                    }
+                    baseHtml = getDefaultVisualCue(value.replace('[DEFAULT] ', ''));
+                } else if (value.startsWith('http')) {
                     // Case 3: It's an uploaded image URL
-                    // MODIFIED in 4.54: Force image to fill and be contained by its parent DIV (fixing overlap).
+                    console.log('getVisualHtml: http URL detected:', value.substring(0, 50)); // DEBUG
+                    // V5.29.0: Support custom background for images
+                    if (customBgColor) {
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} flex items-center justify-center" style="background-color:${customBgColor};">
+                            <img src="${value}" alt="Visual Cue" class="max-w-full max-h-full object-contain">
+                        </div>`;
+                    }
                     return `<img src="${value}" alt="Visual Cue" class="w-full h-full object-contain">`;
-                
-                // NEW V4.89: Add default visual for standard Quick Bell
-                // MODIFIED V4.98: Moved from getDefaultVisualCue and changed icon
                 } else if (value === "[DEFAULT] Quick Bell") {
+                    // NEW V4.89: Add default visual for standard Quick Bell
+                    // FIX V5.43.0: Use matching background color
                     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM11 15h2v2h-2v-2zm0-8h2v6h-2V7z"/></svg>`;
-                    return `<div class="w-full h-full p-8 text-gray-400">${svgContent}</div>`;
+                    if (customBgColor) {
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${customBgColor};">${svgContent}</div>`;
+                    }
+                    baseHtml = `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.bgColor} ${VISUAL_CONFIG.full.textColor}">${svgContent}</div>`;
+                } else {
+                    // Fallback
+                    // V5.45.2: If custom bg, use raw SVG
+                    if (customBgColor) {
+                        const rawSvg = getRawDefaultVisualCueSvg(periodName);
+                        return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${customBgColor};">${rawSvg}</div>`;
+                    }
+                    baseHtml = getDefaultVisualCue(periodName);
                 }
                 
-                // Fallback
-                return getDefaultVisualCue(periodName);
+                // V5.29.0: Apply custom background color if specified (shouldn't reach here now with V5.45.2 changes)
+                if (customBgColor && baseHtml) {
+                    // Wrap the content with a background div
+                    return `<div class="w-full h-full flex items-center justify-center" style="background-color:${customBgColor};">${baseHtml}</div>`;
+                }
+                
+                return baseHtml;
             }
 
             /**
@@ -6267,51 +8816,502 @@
 
             /**
              * NEW: v4.45 - Gets the HTML for a *small icon* visual cue.
+             * MODIFIED V5.41: Uses centralized config for consistency
+             * MODIFIED V5.45.2: Support [BG:] prefix for custom backgrounds on all icon types
              */
             function getVisualIconHtml(value, periodName) {
-                // MODIFIED in 4.54: Added classes for circular clipping, sizing, and proper SVG padding.
-                // MODIFIED V4.60.2: Changed default text color to blue for visibility
-                const sharedClasses = "w-10 h-10 rounded-full shadow-md flex items-center justify-center overflow-hidden"; 
+                // V5.45.2: Check for background color prefix
+                let customBgColor = null;
+                if (value && value.startsWith('[BG:')) {
+                    const parsed = parseVisualBgColor(value);
+                    customBgColor = parsed.bgColor;
+                    value = parsed.baseValue;
+                }
+                
+                // Use centralized config for all icon classes
+                const sharedClasses = `${VISUAL_CONFIG.icon.size} ${VISUAL_CONFIG.icon.shape} ${VISUAL_CONFIG.icon.shadow} flex items-center justify-center overflow-hidden`; 
                 
                 if (!value) {
                     // If no image, return the default SVG, styled for the icon size/shape
-                    // MODIFIED V4.74: Call the new *raw* SVG function
                     const defaultSvgHtml = getRawDefaultVisualCueSvg(periodName);
-                    // MODIFIED V4.60.2: Changed SVG color to blue for better contrast
-                    return `<div class="${sharedClasses} bg-gray-200 text-blue-500 p-1">${defaultSvgHtml}</div>`;
+                    if (customBgColor) {
+                        return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}" style="background-color:${customBgColor};">${defaultSvgHtml}</div>`;
+                    }
+                    return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.bgColor} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('[CUSTOM_TEXT]')) {
-                    // MODIFIED V4.75: Parse color data
                     const parts = value.replace('[CUSTOM_TEXT] ', '').split('|');
                     const customText = parts[0] || '...';
                     const bgColor = parts[1] || '#4338CA'; // Default bg
                     const fgColor = parts[2] || '#FFFFFF'; // Default fg
                     
-                    // MODIFIED V4.78: Reduced 3-char font size & added font-family
-                    const svgFontSize = customText.length > 2 ? 28 : 40; // Use larger font size for 1-2 chars
+                    const svgFontSize = customText.length > 2 ? 
+                        VISUAL_CONFIG.icon.customTextFontSize.long : 
+                        VISUAL_CONFIG.icon.customTextFontSize.short;
                     const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
                         <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${svgFontSize}" font-weight="bold" fill="currentColor" font-family="'Century Gothic', 'Questrial', sans-serif">${customText}</text>
                     </svg>`;
-                    // MODIFIED V4.75: Use inline styles for custom colors
                     return `<div class="${sharedClasses} flex items-center justify-center" style="background-color:${bgColor}; color:${fgColor};">
                         ${svgContent}
                     </div>`;
                 }
                 if (value.startsWith('[DEFAULT]')) {
                     // Case 2: It's a default SVG key
-                    // MODIFIED V4.74: Call the new *raw* SVG function
                     const defaultSvgHtml = getRawDefaultVisualCueSvg(value.replace('[DEFAULT] ', ''));
-                    return `<div class="${sharedClasses} bg-gray-200 text-blue-500 p-1">${defaultSvgHtml}</div>`;
+                    if (customBgColor) {
+                        return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}" style="background-color:${customBgColor};">${defaultSvgHtml}</div>`;
+                    }
+                    return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.bgColor} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}">${defaultSvgHtml}</div>`;
                 }
                 if (value.startsWith('http')) {
                     // If uploaded image, use the URL and the shared classes (using object-cover for full circle fill)
-                    return `<img src="${value}" alt="Icon" class="w-full h-full object-cover rounded-full bg-gray-200">`;
+                    if (customBgColor) {
+                        return `<div class="${sharedClasses}" style="background-color:${customBgColor};"><img src="${value}" alt="Icon" class="max-w-full max-h-full object-contain"></div>`;
+                    }
+                    return `<img src="${value}" alt="Icon" class="w-full h-full object-cover ${VISUAL_CONFIG.icon.shape} ${VISUAL_CONFIG.icon.bgColor}">`;
                 }
                 // Fallback
-                // MODIFIED V4.74: Call the new *raw* SVG function
                 const defaultSvgHtml = getRawDefaultVisualCueSvg(periodName);
-                return `<div class="${sharedClasses} bg-gray-200 text-blue-500 p-1">${defaultSvgHtml}</div>`;
+                if (customBgColor) {
+                    return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}" style="background-color:${customBgColor};">${defaultSvgHtml}</div>`;
+                }
+                return `<div class="${sharedClasses} ${VISUAL_CONFIG.icon.bgColor} ${VISUAL_CONFIG.icon.textColor} ${VISUAL_CONFIG.icon.padding}">${defaultSvgHtml}</div>`;
             }
+
+            // ============================================
+            // NEW V5.42.0: Passing Period Visual Functions
+            // ============================================
+            
+            /**
+             * V5.42.0: Get period boundaries (first/last bell times)
+             * @param {Object} period - A period object with a bells array
+             * @returns {Object|null} Object with name, startTime, endTime, period reference, or null if no bells
+             */
+            function getPeriodBoundaries(period) {
+                if (!period.bells || period.bells.length === 0) return null;
+                
+                const sortedBells = [...period.bells].sort((a, b) => a.time.localeCompare(b.time));
+                
+                return {
+                    name: period.name,
+                    startTime: sortedBells[0].time,
+                    endTime: sortedBells[sortedBells.length - 1].time,
+                    period: period  // Keep reference for accessing visualCue
+                };
+            }
+
+            /**
+             * V5.42.0: Find which period we're currently inside (if any)
+             * @param {string} currentTimeStr - Current time in HH:MM:SS format
+             * @param {Array} periodsList - Array of period objects (calculatedPeriodsList)
+             * @returns {Object|null} The period object we're inside, or null (passing period)
+             */
+            function findCurrentPeriodByTime(currentTimeStr, periodsList) {
+                const activePeriods = [];
+                
+                for (const period of periodsList) {
+                    const bounds = getPeriodBoundaries(period);
+                    if (!bounds) continue;
+                    
+                    // Check if current time is within period boundaries (inclusive)
+                    if (currentTimeStr >= bounds.startTime && currentTimeStr <= bounds.endTime) {
+                        activePeriods.push(bounds);
+                    }
+                }
+                
+                if (activePeriods.length === 0) return null;  // Passing period
+                if (activePeriods.length === 1) return activePeriods[0].period;
+                
+                // Multiple overlapping periods - return the one ending soonest
+                activePeriods.sort((a, b) => a.endTime.localeCompare(b.endTime));
+                return activePeriods[0].period;
+            }
+
+            /**
+             * V5.42.0: Get the resolved passing period visual cue
+             * Priority: 1) Personal override, 2) Shared schedule default, 3) System default (empty string)
+             * @returns {string} The visual cue value to use
+             */
+            function getPassingPeriodVisualCue() {
+                // 1. Check personal schedule override
+                if (activePersonalScheduleId && personalPassingPeriodVisual) {
+                    return personalPassingPeriodVisual;
+                }
+                
+                // 2. Check shared schedule default (admin-set)
+                if (activeBaseScheduleId && sharedPassingPeriodVisual) {
+                    return sharedPassingPeriodVisual;
+                }
+                
+                // 3. System default (empty string triggers getDefaultVisualCue)
+                return '';
+            }
+
+            /**
+             * V5.42.0: Update preview in passing period visual modal
+             * V5.29.0: Handle custom background colors
+             * FIX V5.42: Make preview clickable for custom text editing
+             */
+            function updatePassingPeriodVisualPreview() {
+                const visualSelect = document.getElementById('passing-period-visual-select');
+                const preview = document.getElementById('passing-period-visual-preview');
+                if (!visualSelect || !preview) return;
+
+                const visualValue = visualSelect.value;
+                
+                // V5.29.0: Check for custom background color
+                const { bgColor } = parseVisualBgColor(visualValue);
+                if (bgColor) {
+                    preview.style.backgroundColor = bgColor;
+                } else {
+                    preview.style.backgroundColor = ''; // Reset to CSS default
+                }
+                
+                const html = getVisualHtml(visualValue || '', 'Passing Period');
+                preview.innerHTML = html;
+                
+                // FIX V5.42: Make preview clickable if showing custom text
+                if (visualValue && visualValue.startsWith('[CUSTOM_TEXT]')) {
+                    makePreviewClickableForCustomText(preview, visualSelect);
+                } else {
+                    preview.style.cursor = 'pointer'; // Keep pointer for bg color picker
+                    // Don't clear onclick - it's set in openPassingPeriodVisualModal for bg color
+                }
+            }
+
+            /**
+             * V5.42.0: Open the passing period visual modal
+             * V5.29.0: Set up clickable preview for background color customization
+             */
+            function openPassingPeriodVisualModal() {
+                if (!activePersonalScheduleId) {
+                    showUserMessage("Please select a personal schedule first.");
+                    return;
+                }
+                
+                // Populate visual dropdowns
+                updateVisualDropdowns();
+                
+                // Set current value
+                const select = document.getElementById('passing-period-visual-select');
+                if (select) {
+                    select.value = personalPassingPeriodVisual || '';
+                }
+                
+                // Update preview
+                updatePassingPeriodVisualPreview();
+                
+                // V5.29.0: Set up clickable preview for background color customization
+                const preview = document.getElementById('passing-period-visual-preview');
+                if (preview) {
+                    preview.classList.add('clickable');
+                    preview.title = 'Click to customize background color';
+                    preview.onclick = () => {
+                        const val = select ? select.value : '';
+                        if (supportsBackgroundColor(val)) {
+                            openBgColorPicker(val, 'passing-period-visual-select', 'Passing Period');
+                        } else {
+                            showUserMessage('This visual type has its own background color setting.', 'Info');
+                        }
+                    };
+                }
+                
+                // Show modal
+                document.getElementById('passing-period-visual-modal').classList.remove('hidden');
+            }
+
+            /**
+             * V5.42.0: Save passing period visual to personal schedule
+             */
+            async function handlePassingPeriodVisualSubmit(e) {
+                e.preventDefault();
+                
+                const visualValue = document.getElementById('passing-period-visual-select').value;
+                const statusEl = document.getElementById('passing-period-visual-status');
+                
+                try {
+                    const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                    await updateDoc(personalScheduleRef, { passingPeriodVisual: visualValue });
+                    
+                    personalPassingPeriodVisual = visualValue;
+                    
+                    document.getElementById('passing-period-visual-modal').classList.add('hidden');
+                    showUserMessage("Passing period visual saved!");
+                    
+                    // Force visual update
+                    updateClock();
+                } catch (error) {
+                    console.error("Error saving passing period visual:", error);
+                    if (statusEl) {
+                        statusEl.textContent = `Error: ${error.message}`;
+                        statusEl.classList.remove('hidden');
+                    }
+                }
+            }
+            // ============================================
+            // END V5.42.0: Passing Period Visual Functions
+            // ============================================
+
+            // ============================================
+            // NEW V5.29.0: Visual Background Color Picker
+            // ============================================
+            
+            // State for background color picker
+            let bgColorPickerState = {
+                originalValue: '',      // The original visual value (without BG prefix)
+                currentBgColor: '#1f2937',  // Default dark gray
+                targetSelectId: null,   // Which select element to update
+                periodName: 'Visual',   // For preview rendering
+                customBellId: null      // V5.43.1: For custom quick bell editing
+            };
+            const DEFAULT_VISUAL_BG = '#1f2937';  // bg-gray-800
+
+            /**
+             * V5.29.0: Parse a visual value to extract background color and base value
+             * Format: [BG:#hexcolor]originalValue or just originalValue
+             */
+            function parseVisualBgColor(value) {
+                if (!value) return { bgColor: null, baseValue: '' };
+                
+                const bgMatch = value.match(/^\[BG:(#[0-9A-Fa-f]{6})\](.*)$/);
+                if (bgMatch) {
+                    return { bgColor: bgMatch[1], baseValue: bgMatch[2] };
+                }
+                return { bgColor: null, baseValue: value };
+            }
+
+            /**
+             * V5.29.0: Format a visual value with background color
+             */
+            function formatVisualWithBg(baseValue, bgColor) {
+                // Don't add BG prefix if it's the default color or no color
+                if (!bgColor || bgColor === DEFAULT_VISUAL_BG) {
+                    return baseValue;
+                }
+                return `[BG:${bgColor}]${baseValue}`;
+            }
+
+            /**
+             * V5.29.0: Check if a visual value supports background color customization
+             * (SVGs and images, but not custom text which already has its own bg)
+             */
+            function supportsBackgroundColor(value) {
+                if (!value) return true;  // Default SVGs support it
+                const { baseValue } = parseVisualBgColor(value);
+                // Custom text already has its own background color
+                if (baseValue.startsWith('[CUSTOM_TEXT]')) return false;
+                // Upload and custom text triggers don't support it
+                if (baseValue === '[UPLOAD]' || baseValue === '[CUSTOM_TEXT]') return false;
+                return true;
+            }
+
+            /**
+             * V5.29.0: Open background color picker modal
+             */
+            function openBgColorPicker(visualValue, targetSelectId, periodName = 'Visual') {
+                const { bgColor, baseValue } = parseVisualBgColor(visualValue);
+                
+                bgColorPickerState = {
+                    originalValue: baseValue,
+                    currentBgColor: bgColor || DEFAULT_VISUAL_BG,
+                    targetSelectId: targetSelectId,
+                    periodName: periodName
+                };
+                
+                // Set color inputs
+                const colorInput = document.getElementById('visual-bg-color-input');
+                const hexInput = document.getElementById('visual-bg-color-hex');
+                if (colorInput) colorInput.value = bgColorPickerState.currentBgColor;
+                if (hexInput) hexInput.value = bgColorPickerState.currentBgColor;
+                
+                // Render before preview (with original/current color)
+                updateBgColorBeforePreview();
+                // Render after preview (starts same as before)
+                updateBgColorAfterPreview();
+                
+                // Show modal
+                document.getElementById('visual-bg-color-modal').classList.remove('hidden');
+            }
+
+            /**
+             * V5.29.0: Update the "before" preview in bg color picker
+             */
+            function updateBgColorBeforePreview() {
+                const preview = document.getElementById('visual-bg-before-preview');
+                if (!preview) return;
+                
+                const html = getVisualHtmlWithBg(bgColorPickerState.originalValue, bgColorPickerState.periodName, bgColorPickerState.currentBgColor);
+                preview.innerHTML = html;
+            }
+
+            /**
+             * V5.29.0: Update the "after" preview in bg color picker
+             */
+            function updateBgColorAfterPreview() {
+                const preview = document.getElementById('visual-bg-after-preview');
+                const hexInput = document.getElementById('visual-bg-color-hex');
+                if (!preview || !hexInput) return;
+                
+                const newColor = hexInput.value;
+                const html = getVisualHtmlWithBg(bgColorPickerState.originalValue, bgColorPickerState.periodName, newColor);
+                preview.innerHTML = html;
+                // Also update the preview container's background
+                preview.style.backgroundColor = newColor;
+            }
+
+            /**
+             * V5.29.0: Get visual HTML with a specific background color
+             * MODIFIED V5.45.3: Properly handle [DEFAULT] SVGs with custom backgrounds
+             */
+            function getVisualHtmlWithBg(value, periodName, bgColor) {
+                // For images, wrap with background
+                if (value && value.startsWith('http')) {
+                    return `<div class="w-full h-full flex items-center justify-center" style="background-color:${bgColor};">
+                        <img src="${value}" alt="Visual Cue" class="max-w-full max-h-full object-contain p-2">
+                    </div>`;
+                }
+                
+                // V5.45.3: For [DEFAULT] SVGs, render with the specified background
+                if (value && value.startsWith('[DEFAULT]')) {
+                    const rawSvg = getRawDefaultVisualCueSvg(value.replace('[DEFAULT] ', ''));
+                    return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${bgColor};">${rawSvg}</div>`;
+                }
+                
+                // V5.45.3: For empty value (auto-generated default), also use raw SVG with custom bg
+                if (!value || value === '') {
+                    const rawSvg = getRawDefaultVisualCueSvg(periodName);
+                    return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${bgColor};">${rawSvg}</div>`;
+                }
+                
+                // For custom text, it has its own background - just return as-is
+                if (value && value.startsWith('[CUSTOM_TEXT]')) {
+                    return getVisualHtml(value, periodName);
+                }
+                
+                // Fallback - use default SVG with custom background
+                const rawSvg = getRawDefaultVisualCueSvg(periodName);
+                return `<div class="w-full h-full ${VISUAL_CONFIG.full.padding} ${VISUAL_CONFIG.full.textColor} flex items-center justify-center" style="background-color:${bgColor};">${rawSvg}</div>`;
+            }
+
+            /**
+             * V5.29.0: Apply the selected background color
+             */
+            function applyBgColor() {
+                const hexInput = document.getElementById('visual-bg-color-hex');
+                if (!hexInput) return;
+                
+                const newColor = hexInput.value;
+                const newValue = formatVisualWithBg(bgColorPickerState.originalValue, newColor);
+                
+                // V5.43.1: Handle custom bell bg color
+                if (bgColorPickerState.customBellId) {
+                    const formContainer = document.getElementById('custom-quick-bell-list-container');
+                    const bellId = bgColorPickerState.customBellId;
+                    
+                    // Update hidden input
+                    const visualCueInput = formContainer.querySelector(`input[data-field="visualCue"][data-bell-id="${bellId}"]`);
+                    if (visualCueInput) {
+                        visualCueInput.value = newValue;
+                    }
+                    
+                    // Update dropdown
+                    const visualSelect = formContainer.querySelector(`.custom-bell-visual-select[data-bell-id="${bellId}"]`);
+                    if (visualSelect) {
+                        let option = visualSelect.querySelector(`option[value="${CSS.escape(newValue)}"]`);
+                        if (!option) {
+                            option = document.createElement('option');
+                            option.value = newValue;
+                            option.textContent = `Custom Background`;
+                            visualSelect.appendChild(option);
+                        }
+                        visualSelect.value = newValue;
+                    }
+                    
+                    // Update previews
+                    const row = formContainer.querySelector(`.custom-bell-full-preview[data-bell-id="${bellId}"]`)?.closest('.p-4');
+                    if (row) {
+                        const nameInput = row.querySelector(`input[data-field="name"]`);
+                        const bellName = nameInput?.value || 'Preview';
+                        
+                        const fullPreview = row.querySelector('.custom-bell-full-preview');
+                        if (fullPreview) {
+                            fullPreview.innerHTML = getVisualHtml(newValue, bellName);
+                        }
+                        
+                        const buttonPreview = row.querySelector('.custom-bell-button-preview');
+                        if (buttonPreview) {
+                            // V5.43.2: Set button preview background to match
+                            buttonPreview.style.backgroundColor = newColor;
+                            buttonPreview.innerHTML = getCustomBellIconHtml(newValue, '', newColor, '#FFFFFF');
+                        }
+                    }
+                    
+                    bgColorPickerState.customBellId = null;
+                }
+                // Update the target select's value (for period/bell modals)
+                else if (bgColorPickerState.targetSelectId) {
+                    const select = document.getElementById(bgColorPickerState.targetSelectId);
+                    if (select) {
+                        // We need to add a custom option if it doesn't exist
+                        let option = select.querySelector(`option[value="${CSS.escape(newValue)}"]`);
+                        if (!option) {
+                            option = document.createElement('option');
+                            option.value = newValue;
+                            option.textContent = `Custom Background`;
+                            select.appendChild(option);
+                        }
+                        select.value = newValue;
+                        // Trigger change event
+                        select.dispatchEvent(new Event('change'));
+                    }
+                }
+                
+                // Close modal
+                document.getElementById('visual-bg-color-modal').classList.add('hidden');
+            }
+
+            /**
+             * V5.29.0: Sync color picker and hex input
+             */
+            function syncBgColorInputs(source) {
+                const colorInput = document.getElementById('visual-bg-color-input');
+                const hexInput = document.getElementById('visual-bg-color-hex');
+                
+                if (source === 'picker' && colorInput && hexInput) {
+                    hexInput.value = colorInput.value;
+                } else if (source === 'hex' && colorInput && hexInput) {
+                    // Validate hex format
+                    const hex = hexInput.value;
+                    if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+                        colorInput.value = hex;
+                    }
+                }
+                
+                // Update after preview
+                updateBgColorAfterPreview();
+            }
+
+            /**
+             * V5.29.0: Make a preview element clickable for bg color customization
+             */
+            function makePreviewClickable(previewElement, selectId, periodName) {
+                if (!previewElement) return;
+                
+                previewElement.classList.add('clickable');
+                previewElement.title = 'Click to customize background color';
+                previewElement.onclick = () => {
+                    const select = document.getElementById(selectId);
+                    if (!select) return;
+                    
+                    const value = select.value;
+                    if (supportsBackgroundColor(value)) {
+                        openBgColorPicker(value, selectId, periodName);
+                    }
+                };
+            }
+            // ============================================
+            // END V5.29.0: Visual Background Color Picker
+            // ============================================
     
             /**
              * NEW: v4.58 - Shows a confirmation modal, returning a promise that resolves on OK/CONFIRM.
@@ -6377,6 +9377,11 @@
                 newPeriodStatus.classList.add('hidden');
                 updateVisualDropdowns();
                 
+                // Initialize visual previews with default
+                const defaultVisual = newPeriodImageSelect.value || '';
+                document.getElementById('new-period-image-preview-full').innerHTML = getVisualHtml(defaultVisual, 'New Period');
+                document.getElementById('new-period-image-preview-icon').innerHTML = getVisualIconHtml(defaultVisual, 'New Period');
+                
                 // NEW V4.81: Populate all sound dropdowns
                 const soundSelects = [
                     document.getElementById('new-period-start-sound'),
@@ -6396,9 +9401,13 @@
                 }
                 
                 // 2. Populate relative anchor period dropdowns
-                // Only use the BASE shared periods for anchoring
-                const basePeriodNames = localSchedulePeriods.map(p => p.name);
-                const periodOptionsHtml = basePeriodNames.map(name => `<option value="${name}">${name}</option>`).join('');
+                // FIX V5.44.1: Include ALL periods with bells (shared AND custom/fluke)
+                // Use calculatedPeriodsList which contains merged periods from both sources
+                const anchorPeriodNames = calculatedPeriodsList
+                    .filter(p => p.name !== 'Orphaned Bells' && p.bells && p.bells.length > 0)
+                    .map(p => p.name);
+                
+                const periodOptionsHtml = anchorPeriodNames.map(name => `<option value="${name}">${name}</option>`).join('');
                 
                 newPeriodStartParent.innerHTML = periodOptionsHtml;
                 newPeriodEndParent.innerHTML = periodOptionsHtml;
@@ -6412,9 +9421,9 @@
                 newPeriodEndAnchorType.value = 'period_start'; // Default end anchor to Period Start
 
                 // Add an empty option if no periods exist
-                if (basePeriodNames.length === 0) {
-                     newPeriodStartParent.innerHTML = '<option value="" disabled selected>No Base Periods Available</option>';
-                     newPeriodEndParent.innerHTML = '<option value="" disabled selected>No Base Periods Available</option>';
+                if (anchorPeriodNames.length === 0) {
+                     newPeriodStartParent.innerHTML = '<option value="" disabled selected>No periods with bells available</option>';
+                     newPeriodEndParent.innerHTML = '<option value="" disabled selected>No periods with bells available</option>';
                 }
 
 
@@ -6448,7 +9457,9 @@
                     newPeriodEndStaticDiv.classList.remove('hidden');
                     newPeriodStartRelativeDiv.classList.add('hidden');
                     newPeriodEndRelativeDiv.classList.add('hidden');
-                    // Mark static inputs as required
+                    // V5.44.7: Re-enable and mark static inputs as required
+                    newPeriodStartTime.disabled = false;
+                    newPeriodEndTime.disabled = false;
                     newPeriodStartTime.required = true;
                     newPeriodEndTime.required = true;
                 } else {
@@ -6485,7 +9496,10 @@
                 
                 // 1. Create the bells array and validate inputs
                 const newBells = [];
-                const basePeriodNames = localSchedulePeriods.map(p => p.name);
+                // V5.44.1: Use all calculated periods (including flukes) for anchor validation
+                const validAnchorPeriodNames = calculatedPeriodsList
+                    .filter(p => p.name !== 'Orphaned Bells' && p.bells && p.bells.length > 0)
+                    .map(p => p.name);
                 
                 // Helper to validate and build bell data
                 const buildBellData = (type, prefix) => {
@@ -6521,12 +9535,15 @@
                         const parentName = document.getElementById(`${prefix}-parent`).value;
                         const anchorType = document.getElementById(`${prefix}-anchor-type`).value;
                         const direction = document.getElementById(`${prefix}-direction`).value;
+                        const hours = parseInt(document.getElementById(`${prefix}-hours`)?.value) || 0;
                         const minutes = parseInt(document.getElementById(`${prefix}-minutes`).value) || 0;
                         const seconds = parseInt(document.getElementById(`${prefix}-seconds`).value) || 0;
                         
-                        if (!parentName || !basePeriodNames.includes(parentName)) throw new Error(`Invalid anchor period for ${prefix.split('-')[1]}.`);
+                        // V5.44.1: Validate against all periods including flukes
+                        if (!parentName || !validAnchorPeriodNames.includes(parentName)) throw new Error(`Invalid anchor period for ${prefix.split('-')[1]}.`);
 
-                        let offsetSeconds = (minutes * 60) + seconds;
+                        // V5.44.6: Include hours in offset calculation
+                        let offsetSeconds = (hours * 3600) + (minutes * 60) + seconds;
                         if (direction === 'before') offsetSeconds = -offsetSeconds;
                         
                         return {
@@ -6546,18 +9563,18 @@
                     const startBellData = buildBellData(mode, 'new-period-start');
                     newBells.push({
                         ...startBellData,
-                        name: 'Period Start', // Critical for anchoring/fluke logic
-                        // sound: 'ellisBell.mp3', // DELETED V4.81: Sound is now in startBellData
-                        bellId: generateBellId()
+                        name: 'Period Start',
+                        bellId: generateBellId(),
+                        anchorRole: 'start' // V5.44.1: Explicit anchor identification
                     });
 
                     // --- End Bell ---
                     const endBellData = buildBellData(mode, 'new-period-end');
                     newBells.push({
                         ...endBellData,
-                        name: 'Period End', // Critical for anchoring/fluke logic
-                        // sound: 'ellisBell.mp3', // DELETED V4.81: Sound is now in endBellData
-                        bellId: generateBellId()
+                        name: 'Period End',
+                        bellId: generateBellId(),
+                        anchorRole: 'end' // V5.44.1: Explicit anchor identification
                     });
 
                     // 2. Create the new period object
@@ -6583,15 +9600,16 @@
                         return;
                     }
 
-                    const updatedPeriods = [...existingPeriods, newPeriod];
-                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
-
-                    // 4. Save visual cue override if selected
+                    // V5.44.4: Save visual cue override BEFORE Firestore update
+                    // This ensures the visual is available when the listener re-renders the list
                     if (visualCue) {
                         const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
                         periodVisualOverrides[visualKey] = visualCue;
                         saveVisualOverrides();
                     }
+
+                    const updatedPeriods = [...existingPeriods, newPeriod];
+                    await updateDoc(personalScheduleRef, { periods: updatedPeriods });
 
                     showUserMessage(`New period "${periodName}" created successfully!`);
                     closeNewPeriodModal();
@@ -7657,9 +10675,41 @@
                     versionElement.textContent = `v${APP_VERSION}`;
                 }
                 
+                // V5.49.2: CSS version display - read from CSS custom property
+                const cssVersionElement = document.getElementById('css-version-display');
+                if (cssVersionElement) {
+                    const cssVersion = getComputedStyle(document.documentElement).getPropertyValue('--css-version').trim().replace(/"/g, '');
+                    cssVersionElement.textContent = `v${cssVersion || '?.?.?'}`;
+                }
+                
                 // Optional: Also update the Browser Tab Title automatically
                 document.title = `Ellis Web Bell ${APP_VERSION}`;
                 console.log(`App Version Loaded: ${APP_VERSION}`);
+                
+                // V5.51.0: Register Service Worker for PWA support
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('/service-worker.js')
+                        .then((registration) => {
+                            console.log('[PWA] Service Worker registered:', registration.scope);
+                            
+                            // Check for updates
+                            registration.addEventListener('updatefound', () => {
+                                const newWorker = registration.installing;
+                                console.log('[PWA] New Service Worker installing...');
+                                
+                                newWorker.addEventListener('statechange', () => {
+                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        // New content available, show update notification
+                                        console.log('[PWA] New version available!');
+                                        showUserMessage('New version available! Refresh to update.');
+                                    }
+                                });
+                            });
+                        })
+                        .catch((error) => {
+                            console.warn('[PWA] Service Worker registration failed:', error);
+                        });
+                }
                 
                 // MODIFIED V4.74: All local storage loads
                 // are now handled inside onAuthStateChanged
@@ -7692,7 +10742,7 @@
                 });
     
                 // NEW: v3.09 - Add click-to-refresh for Audio Manager
-                const audioManagerHeader = document.querySelector('#audio-manager-panel h2');
+                const audioManagerHeader = document.querySelector('#audio-manager-panel h3');
                 if (audioManagerHeader) {
                     audioManagerHeader.addEventListener('click', () => {
                         console.log("User clicked audio manager header, refreshing file lists...");
@@ -7807,7 +10857,8 @@
                             if (!slotData.name || slotData.name.trim() === '') {
                                 return null; // No name = empty slot
                             }
-                            if (slotData.minutes === '0' && slotData.seconds === '0') {
+                            // V5.44.9: Include hours in time validation
+                            if (slotData.hours === '0' && slotData.minutes === '0' && slotData.seconds === '0') {
                                 return null; // No time = invalid bell
                             }
 
@@ -7819,6 +10870,7 @@
                             return {
                                 id: id,
                                 name: slotData.name.trim(),
+                                hours: parseInt(slotData.hours) || 0, // V5.44.9: Include hours
                                 minutes: parseInt(slotData.minutes) || 0,
                                 seconds: parseInt(slotData.seconds) || 0,
                                 
@@ -7839,6 +10891,7 @@
                                 console.log(`  Bell ${bell.id}:`, {
                                     name: bell.name,
                                     sound: bell.sound,
+                                    hours: bell.hours,
                                     minutes: bell.minutes,
                                     seconds: bell.seconds
                                 });
@@ -7868,10 +10921,13 @@
                 customQuickBellListContainer.addEventListener('click', (e) => {
                     const clearBtn = e.target.closest('.clear-custom-quick-bell');
                     const previewBtn = e.target.closest('.preview-audio-btn');
-                    const iconBtn = e.target.closest('.custom-bell-icon-btn'); // NEW V5.00: Icon button
+                    const fullPreview = e.target.closest('.custom-bell-full-preview'); // V5.43.1: Full preview click
                     
                     // NEW 5.22: Handle Add button
                     if (e.target.id === 'add-custom-bell-slot-btn') {
+                        // V5.43.3: Sync current form values before adding new bell
+                        syncCustomBellFormToArray();
+                        
                         const usedIds = customQuickBells.filter(b => b).map(b => b.id);
                         let newId = 1;
                         while (usedIds.includes(newId) && newId <= 4) {
@@ -7897,6 +10953,9 @@
                         
                     // Re-written in 5.19.4
                     if (clearBtn) {
+                        // V5.43.3: Sync form values before clearing to preserve other bells' edits
+                        syncCustomBellFormToArray();
+                        
                         const id = parseInt(clearBtn.dataset.bellId);
                         const index = customQuickBells.findIndex(b => b && b.id === id);
                         if (index > -1) {
@@ -7906,49 +10965,44 @@
                         } // Only one bracket here!
                     } else if (previewBtn) {
                         playBell(previewBtn.dataset.sound);
-                    } else if (iconBtn) { // NEW V5.00: Open Icon Modal
-                        //5.20: Added logging.
-                        console.log('Icon button clicked!', iconBtn.dataset.bellId);
-                        currentCustomBellIconSlot = parseInt(iconBtn.dataset.bellId);
+                    } else if (fullPreview) {
+                        // V5.43.1: Handle full preview click - open custom text or bg color picker
+                        const bellId = parseInt(fullPreview.dataset.bellId);
+                        const row = fullPreview.closest('.p-4');
+                        const visualSelect = row?.querySelector('.custom-bell-visual-select');
+                        const visualCue = visualSelect?.value || '';
                         
-                        const bellData = customQuickBells.find(b => b && b.id === currentCustomBellIconSlot);
-                        console.log('Bell data:', bellData);
-                        // V5.03: Use the new data attribute for the visual cue
-                        const visualCue = iconBtn.dataset.visualCue; 
-                        const bellName = bellData?.name || `Slot ${currentCustomBellIconSlot}`;
-
-                        // 1. Update modal title
-                        customTextVisualModal.querySelector('h3').textContent = `Edit Visual for: ${bellName}`;
-                        
-                        // 5.21: Use the existing quick bell sound select that's in the custom text visual modal
-                        const visualSelectElement = document.getElementById('quick-bell-visual-select');
-                        console.log('Visual select element:', visualSelectElement);
-                        if (visualSelectElement) {
-                            updateVisualDropdowns(); // 5.22.3: No parameter - it updates all dropdowns including quickBellVisualSelect
-                            console.log('Options after update:', visualSelectElement.innerHTML);
-                            console.log('Trying to set value to:', visualCue);
-                            visualSelectElement.value = visualCue;
-                            console.log('Actual value set:', visualSelectElement.value);
+                        if (visualCue.startsWith('[CUSTOM_TEXT]')) {
+                            // Open custom text editor
+                            currentCustomBellIconSlot = bellId;
+                            const bellData = customQuickBells.find(b => b && b.id === bellId);
+                            const bellName = bellData?.name || `Slot ${bellId}`;
                             
-                            // NEW 5.30.1: Manually trigger preview update for existing custom text
-                            const changeEvent = new Event('change', { bubbles: true });
-                            visualSelectElement.dispatchEvent(changeEvent);
+                            customTextVisualModal.querySelector('h3').textContent = `Edit Visual for: ${bellName}`;
+                            
+                            if (visualCue.startsWith('[CUSTOM_TEXT] ')) {
+                                const parts = visualCue.replace('[CUSTOM_TEXT] ', '').split('|');
+                                customTextInput.value = parts[0] || '';
+                                customTextBgColorInput.value = parts[1] || '#4338CA';
+                                customTextColorInput.value = parts[2] || '#FFFFFF';
+                            }
+                            
+                            customTextVisualModal.style.zIndex = '60';
+                            customTextVisualModal.classList.remove('hidden');
+                            
+                            // V5.44.10: Set up live preview with square icon shape for quick bells
+                            setupCustomTextModalPreviews(true);
+                            
+                            setTimeout(() => customTextInput.select(), 50);
+                        } else if (supportsBackgroundColor(visualCue)) {
+                            // Open background color picker
+                            currentCustomBellIconSlot = bellId;
+                            const bellData = customQuickBells.find(b => b && b.id === bellId);
+                            const bellName = bellData?.name || `Slot ${bellId}`;
+                            openBgColorPicker(visualCue, null, bellName);
+                            // Store a reference so we know to update the custom bell
+                            bgColorPickerState.customBellId = bellId;
                         }
-
-                        // 3. Load text/color inputs for the custom text section (for pre-fill)
-                        customTextInput.value = iconBtn.dataset.iconText;
-                        customTextBgColorInput.value = iconBtn.dataset.bgColor;
-                        customTextColorInput.value = iconBtn.dataset.fgColor;
-                        
-                        // 4. Force change event to update previews and toggle custom text container
-                        // Updated 5.24 to replace quickBellVisualSelect.dispatchEvent(new Event('change'));
-                        if (visualSelectElement) {
-                            visualSelectElement.dispatchEvent(new Event('change'));
-                        }
-
-                        // 5. Show the modal (needs higher z-index than manager's z-50)
-                        customTextVisualModal.style.zIndex = '60';
-                        customTextVisualModal.classList.remove('hidden');
                     }
                 });
                 
@@ -7975,33 +11029,57 @@
                     // 1. Find the corresponding hidden inputs in the custom bell form
                     const formContainer = document.getElementById('custom-quick-bell-list-container');
                     
-                    // Update hidden inputs for the specific slot - FIX: Use parentheses not backticks
+                    // Update hidden inputs for the specific slot
                     const iconTextInput = formContainer.querySelector(`input[data-field="iconText"][data-bell-id="${currentCustomBellIconSlot}"]`);
                     const bgColorInput = formContainer.querySelector(`input[data-field="iconBgColor"][data-bell-id="${currentCustomBellIconSlot}"]`);
                     const fgColorInput = formContainer.querySelector(`input[data-field="iconFgColor"][data-bell-id="${currentCustomBellIconSlot}"]`);
+                    const visualCueInput = formContainer.querySelector(`input[data-field="visualCue"][data-bell-id="${currentCustomBellIconSlot}"]`);
                     
-                    // 2. Find the visible button to update its style - FIX: Use parentheses not backticks
-                    const iconButton = formContainer.querySelector(`.custom-bell-icon-btn[data-bell-id="${currentCustomBellIconSlot}"]`);
+                    const storedValue = `[CUSTOM_TEXT] ${customText}|${bgColor}|${fgColor}`;
                     
-                    if (iconTextInput && iconButton) {
-                        // Update hidden inputs (read by the main form submit)
-                        iconTextInput.value = customText;
-                        if (bgColorInput) bgColorInput.value = bgColor;
-                        if (fgColorInput) fgColorInput.value = fgColor;
-                            
-                        // NEW 5.30: Update the visualCue hidden input with the full custom text format
-                        const visualCueInput = formContainer.querySelector(`input[data-field="visualCue"][data-bell-id="${currentCustomBellIconSlot}"]`);
-                        if (visualCueInput) {
-                            visualCueInput.value = `[CUSTOM_TEXT] ${customText}|${bgColor}|${fgColor}`;
+                    if (iconTextInput) iconTextInput.value = customText;
+                    if (bgColorInput) bgColorInput.value = bgColor;
+                    if (fgColorInput) fgColorInput.value = fgColor;
+                    if (visualCueInput) visualCueInput.value = storedValue;
+                    
+                    // V5.43.1: Update the visual dropdown to show the custom text option
+                    const visualSelect = formContainer.querySelector(`.custom-bell-visual-select[data-bell-id="${currentCustomBellIconSlot}"]`);
+                    if (visualSelect) {
+                        // Add option if it doesn't exist
+                        let option = visualSelect.querySelector(`option[value="${storedValue}"]`);
+                        if (!option) {
+                            option = document.createElement('option');
+                            option.value = storedValue;
+                            option.textContent = `Custom Text: ${customText}`;
+                            const customTextTrigger = visualSelect.querySelector('option[value="[CUSTOM_TEXT]"]');
+                            if (customTextTrigger) {
+                                customTextTrigger.insertAdjacentElement('afterend', option);
+                            } else {
+                                visualSelect.appendChild(option);
+                            }
+                        } else {
+                            option.textContent = `Custom Text: ${customText}`;
                         }
-                            
-                        // Update visible button (for immediate visual feedback)
-                        iconButton.dataset.iconText = customText;
-                        iconButton.dataset.bgColor = bgColor;
-                        iconButton.dataset.fgColor = fgColor;
-                        iconButton.style.backgroundColor = bgColor;
-                        iconButton.style.color = fgColor;
-                        iconButton.querySelector('span:first-child').textContent = customText;
+                        visualSelect.value = storedValue;
+                    }
+                    
+                    // V5.43.1: Update the previews
+                    const row = formContainer.querySelector(`.custom-bell-full-preview[data-bell-id="${currentCustomBellIconSlot}"]`)?.closest('.p-4');
+                    if (row) {
+                        const nameInput = row.querySelector(`input[data-field="name"]`);
+                        const bellName = nameInput?.value || 'Preview';
+                        
+                        const fullPreview = row.querySelector('.custom-bell-full-preview');
+                        if (fullPreview) {
+                            fullPreview.innerHTML = getVisualHtml(storedValue, bellName);
+                        }
+                        
+                        const buttonPreview = row.querySelector('.custom-bell-button-preview');
+                        if (buttonPreview) {
+                            buttonPreview.style.backgroundColor = bgColor;
+                            buttonPreview.style.color = fgColor;
+                            buttonPreview.innerHTML = getCustomBellIconHtml(storedValue, customText, bgColor, fgColor);
+                        }
                     }
                     
                     // 3. Clear state and hide modal
@@ -8011,10 +11089,13 @@
                 });
                 
                 // NEW V5.01: Listener for the Active/Deactive checkbox (Toggle interaction)
+                // V5.43.1: Also handle visual dropdown changes
                 customQuickBellListContainer.addEventListener('change', (e) => {
                     const toggle = e.target.closest('.custom-quick-bell-toggle');
+                    const visualSelect = e.target.closest('.custom-bell-visual-select');
+                    
                     if (toggle) {
-                        const row = toggle.closest('.p-3');
+                        const row = toggle.closest('.p-4');
                         
                         if (!row) return;
 
@@ -8034,9 +11115,113 @@
                                 }
                             }
                         });
-
-                        // All inputs/buttons are now handled by the generic .custom-bell-editable-input query.
-                        // The special handling is now unnecessary and removed for V5.02.
+                        
+                        // V5.43.1: Also handle the preview divs
+                        const fullPreview = row.querySelector('.custom-bell-full-preview');
+                        const buttonPreview = row.querySelector('.custom-bell-button-preview');
+                        if (fullPreview) {
+                            if (!isChecked) {
+                                fullPreview.classList.add('opacity-50', 'pointer-events-none');
+                            } else {
+                                fullPreview.classList.remove('opacity-50', 'pointer-events-none');
+                            }
+                        }
+                        if (buttonPreview) {
+                            if (!isChecked) {
+                                buttonPreview.classList.add('opacity-50', 'pointer-events-none');
+                            } else {
+                                buttonPreview.classList.remove('opacity-50', 'pointer-events-none');
+                            }
+                        }
+                    }
+                    
+                    // V5.43.1: Handle visual dropdown changes
+                    if (visualSelect) {
+                        const bellId = parseInt(visualSelect.dataset.bellId);
+                        const selectedValue = visualSelect.value;
+                        const row = visualSelect.closest('.p-4');
+                        
+                        console.log('Custom bell visual dropdown changed:', bellId, selectedValue);
+                        
+                        // Handle special values
+                        if (selectedValue === '[UPLOAD]') {
+                            currentCustomBellIconSlot = bellId;
+                            uploadVisualModal.style.zIndex = '70';
+                            uploadVisualModal.classList.remove('hidden');
+                            visualUploadStatus.classList.add('hidden');
+                            return;
+                        }
+                        
+                        if (selectedValue === '[CUSTOM_TEXT]' || selectedValue.startsWith('[CUSTOM_TEXT] ')) {
+                            currentCustomBellIconSlot = bellId;
+                            const bellData = customQuickBells.find(b => b && b.id === bellId);
+                            const bellName = bellData?.name || `Slot ${bellId}`;
+                            
+                            // Pre-fill custom text modal
+                            customTextVisualModal.querySelector('h3').textContent = `Edit Visual for: ${bellName}`;
+                            
+                            if (selectedValue.startsWith('[CUSTOM_TEXT] ')) {
+                                const parts = selectedValue.replace('[CUSTOM_TEXT] ', '').split('|');
+                                customTextInput.value = parts[0] || '';
+                                customTextBgColorInput.value = parts[1] || '#4338CA';
+                                customTextColorInput.value = parts[2] || '#FFFFFF';
+                            } else {
+                                customTextInput.value = '';
+                                customTextBgColorInput.value = '#4338CA';
+                                customTextColorInput.value = '#FFFFFF';
+                            }
+                            
+                            customTextVisualModal.style.zIndex = '60';
+                            customTextVisualModal.classList.remove('hidden');
+                            
+                            // V5.44.10: Set up live preview with square icon shape for quick bells
+                            setupCustomTextModalPreviews(true);
+                            
+                            setTimeout(() => customTextInput.select(), 50);
+                            return;
+                        }
+                        
+                        // Update hidden inputs
+                        const visualCueInput = row.querySelector(`input[data-field="visualCue"][data-bell-id="${bellId}"]`);
+                        if (visualCueInput) {
+                            visualCueInput.value = selectedValue;
+                        }
+                        
+                        // Update previews
+                        const nameInput = row.querySelector(`input[data-field="name"][data-bell-id="${bellId}"]`);
+                        const bellName = nameInput?.value || 'Preview';
+                        
+                        const fullPreview = row.querySelector('.custom-bell-full-preview');
+                        if (fullPreview) {
+                            fullPreview.innerHTML = getVisualHtml(selectedValue, bellName);
+                        }
+                        
+                        const buttonPreview = row.querySelector('.custom-bell-button-preview');
+                        if (buttonPreview) {
+                            // V5.43.2: Determine bg/fg colors from value
+                            let bgColor = '#4338CA';
+                            let fgColor = '#FFFFFF';
+                            
+                            // Check for [BG:...] prefix first
+                            if (selectedValue.startsWith('[BG:')) {
+                                const parsed = parseVisualBgColor(selectedValue);
+                                bgColor = parsed.bgColor || bgColor;
+                            } else if (selectedValue.startsWith('[CUSTOM_TEXT] ')) {
+                                const parts = selectedValue.replace('[CUSTOM_TEXT] ', '').split('|');
+                                bgColor = parts[1] || bgColor;
+                                fgColor = parts[2] || fgColor;
+                            }
+                            
+                            buttonPreview.style.backgroundColor = bgColor;
+                            buttonPreview.style.color = fgColor;
+                            buttonPreview.innerHTML = getCustomBellIconHtml(selectedValue, '', bgColor, fgColor);
+                            
+                            // Update hidden icon inputs
+                            const bgColorInput = row.querySelector(`input[data-field="iconBgColor"][data-bell-id="${bellId}"]`);
+                            const fgColorInput = row.querySelector(`input[data-field="iconFgColor"][data-bell-id="${bellId}"]`);
+                            if (bgColorInput) bgColorInput.value = bgColor;
+                            if (fgColorInput) fgColorInput.value = fgColor;
+                        }
                     }
                 });
 
@@ -8044,11 +11229,12 @@
                 quickBellControls.addEventListener('click', (e) => {
                     const customBtn = e.target.closest('.custom-quick-launch-btn');
                     if (customBtn) {
-                        const minutes = parseInt(customBtn.dataset.minutes, 10);
-                        const seconds = parseInt(customBtn.dataset.seconds, 10);
+                        const hours = parseInt(customBtn.dataset.hours, 10) || 0;
+                        const minutes = parseInt(customBtn.dataset.minutes, 10) || 0;
+                        const seconds = parseInt(customBtn.dataset.seconds, 10) || 0;
                         const sound = customBtn.dataset.sound;
                         const name = customBtn.dataset.name;
-                        startQuickBell(minutes, seconds, sound, name);
+                        startQuickBell(hours, minutes, seconds, sound, name);
                     }
                 });
                 
@@ -8071,24 +11257,37 @@
                     let newSchedule;
                     
                     // v3.05: Check if we are duplicating or copying
+                    // V5.46.2: Fixed to copy ALL data including periods, bellOverrides, etc.
                     if (activePersonalScheduleId) {
-                        // DUPLICATING
+                        // DUPLICATING - copy everything from the source schedule
                         const scheduleToDupe = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
                         if (!scheduleToDupe) {
                              createPersonalScheduleStatus.textContent = "Error: Source schedule not found.";
                              return;
                         }
+                        
+                        // Deep copy all the important data
                         newSchedule = {
                             name: name,
-                            baseScheduleId: scheduleToDupe.baseScheduleId, // Use the dupe's base
-                            bells: [...scheduleToDupe.bells] // CRITICAL: new array copy of bells
+                            baseScheduleId: scheduleToDupe.baseScheduleId || null,
+                            isStandalone: scheduleToDupe.isStandalone || false,
+                            // Deep copy periods (includes all custom bells)
+                            periods: scheduleToDupe.periods ? JSON.parse(JSON.stringify(scheduleToDupe.periods)) : [],
+                            // Deep copy bell overrides (shared bell customizations)
+                            bellOverrides: scheduleToDupe.bellOverrides ? JSON.parse(JSON.stringify(scheduleToDupe.bellOverrides)) : {},
+                            // Copy passing period visual
+                            passingPeriodVisual: scheduleToDupe.passingPeriodVisual || null,
+                            // Legacy bells array (for backward compatibility)
+                            bells: scheduleToDupe.bells ? [...scheduleToDupe.bells] : []
                         };
                     } else if (activeBaseScheduleId) {
-                        // COPYING (existing logic)
+                        // COPYING (creating new personal schedule from shared)
                         newSchedule = {
                             name: name,
                             baseScheduleId: activeBaseScheduleId,
-                            bells: [] // Starts empty
+                            periods: [], // Starts empty
+                            bellOverrides: {},
+                            bells: [] // Legacy, starts empty
                         };
                     } else {
                         createPersonalScheduleStatus.textContent = "Error: No base schedule selected.";
@@ -8113,6 +11312,55 @@
                         createPersonalScheduleStatus.textContent = "Error creating schedule.";
                     } finally {
                         setTimeout(() => createPersonalScheduleStatus.classList.add('hidden'), 2000);
+                    }
+                });
+                
+                // V5.44: Standalone Schedule Modal Events
+                createStandaloneScheduleBtn.addEventListener('click', () => {
+                    createStandaloneScheduleModal.classList.remove('hidden');
+                    standaloneScheduleNameInput.value = '';
+                    createStandaloneStatus.classList.add('hidden');
+                });
+                createStandaloneCancelBtn.addEventListener('click', () => {
+                    createStandaloneScheduleModal.classList.add('hidden');
+                    createStandaloneScheduleForm.reset();
+                });
+                createStandaloneScheduleForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const name = standaloneScheduleNameInput.value.trim();
+                    if (!name) return;
+                    
+                    createStandaloneStatus.textContent = "Creating...";
+                    createStandaloneStatus.classList.remove('hidden');
+                    createStandaloneStatus.classList.remove('text-red-600');
+                    createStandaloneStatus.classList.add('text-blue-600');
+                    
+                    try {
+                        const personalSchedulesRef = collection(db, 'artifacts', appId, 'users', userId, 'personal_schedules');
+                        const newDocRef = await addDoc(personalSchedulesRef, {
+                            name: name,
+                            baseScheduleId: null,       // Key differentiator - no base
+                            isStandalone: true,         // Explicit flag
+                            periods: [],                // Starts empty
+                            passingPeriodVisual: '',
+                            createdAt: new Date()
+                        });
+                        
+                        console.log("Standalone schedule created with ID:", newDocRef.id);
+                        
+                        // Automatically select the new schedule
+                        scheduleSelector.value = `personal-${newDocRef.id}`;
+                        setActiveSchedule(scheduleSelector.value);
+                        
+                        createStandaloneScheduleModal.classList.add('hidden');
+                        createStandaloneScheduleForm.reset();
+                        
+                        showUserMessage(`Standalone schedule "${name}" created!`);
+                    } catch (error) {
+                        console.error("Error creating standalone schedule:", error);
+                        createStandaloneStatus.textContent = "Error: " + error.message;
+                        createStandaloneStatus.classList.remove('text-blue-600');
+                        createStandaloneStatus.classList.add('text-red-600');
                     }
                 });
     
@@ -8231,7 +11479,7 @@
                 quickBellControls.addEventListener('click', (e) => {
                     if (e.target.matches('.quick-bell-btn')) {
                         const minutes = parseInt(e.target.dataset.minutes, 10);
-                        startQuickBell(minutes);
+                        startQuickBell(0, minutes, 0); // V5.44.8: hours=0, minutes, seconds=0
                     }
                 });
                 quickBellSoundSelect.addEventListener('change', () => {
@@ -8272,6 +11520,32 @@
                     }
                 });
                 
+                // V5.49.0: Sound Preview Buttons - Added to all sound dropdowns
+                document.getElementById('preview-quick-bell-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('quickBellSoundSelect').value);
+                });
+                document.getElementById('preview-multi-bell-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('multi-bell-sound').value);
+                });
+                document.getElementById('preview-relative-bell-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('relative-bell-sound').value);
+                });
+                document.getElementById('preview-multi-relative-bell-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('multi-add-relative-bell-sound').value);
+                });
+                document.getElementById('preview-new-period-start-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('new-period-start-sound').value);
+                });
+                document.getElementById('preview-new-period-start-sound-relative')?.addEventListener('click', () => {
+                    playBell(document.getElementById('new-period-start-sound-relative').value);
+                });
+                document.getElementById('preview-new-period-end-sound')?.addEventListener('click', () => {
+                    playBell(document.getElementById('new-period-end-sound').value);
+                });
+                document.getElementById('preview-new-period-end-sound-relative')?.addEventListener('click', () => {
+                    playBell(document.getElementById('new-period-end-sound-relative').value);
+                });
+                
                 // Modals (Linked Edit)
                 linkedEditCancel.addEventListener('click', closeLinkedEditModal);
                 linkedEditThisOnly.addEventListener('click', () => handleLinkedEdit(false));
@@ -8295,6 +11569,7 @@
                 // MODIFIED: v4.10.2a - Use the new variable name
                 relativeAnchorBellSelect.addEventListener('change', updateCalculatedTime);
                 relativeDirection.addEventListener('change', updateCalculatedTime);
+                if (relativeHoursInput) relativeHoursInput.addEventListener('input', updateCalculatedTime);
                 relativeMinutesInput.addEventListener('input', updateCalculatedTime);
                 relativeSecondsInput.addEventListener('input', updateCalculatedTime);
 
@@ -8346,6 +11621,39 @@
                 });
                 // --- End New Period Modal Listeners ---
                 
+                // --- NEW V5.42.0: Passing Period Visual Modal Listeners ---
+                document.getElementById('passing-period-visual-btn')?.addEventListener('click', openPassingPeriodVisualModal);
+                document.getElementById('passing-period-visual-form')?.addEventListener('submit', handlePassingPeriodVisualSubmit);
+                document.getElementById('passing-period-visual-cancel')?.addEventListener('click', () => {
+                    document.getElementById('passing-period-visual-modal').classList.add('hidden');
+                });
+                document.getElementById('passing-period-visual-select')?.addEventListener('change', function(e) {
+                    // Handle [UPLOAD] and [CUSTOM_TEXT] special values
+                    visualSelectChangeHandler.call(this, e);
+                    // Update preview (only if not a special value that opens another modal)
+                    const val = e.target.value;
+                    if (val !== '[UPLOAD]' && val !== '[CUSTOM_TEXT]') {
+                        updatePassingPeriodVisualPreview();
+                    }
+                });
+                // --- End V5.42.0: Passing Period Visual Modal Listeners ---
+                
+                // --- NEW V5.29.0: Background Color Picker Modal Listeners ---
+                document.getElementById('visual-bg-color-input')?.addEventListener('input', () => syncBgColorInputs('picker'));
+                document.getElementById('visual-bg-color-hex')?.addEventListener('input', () => syncBgColorInputs('hex'));
+                document.getElementById('visual-bg-reset-btn')?.addEventListener('click', () => {
+                    const colorInput = document.getElementById('visual-bg-color-input');
+                    const hexInput = document.getElementById('visual-bg-color-hex');
+                    if (colorInput) colorInput.value = DEFAULT_VISUAL_BG;
+                    if (hexInput) hexInput.value = DEFAULT_VISUAL_BG;
+                    updateBgColorAfterPreview();
+                });
+                document.getElementById('visual-bg-apply')?.addEventListener('click', applyBgColor);
+                document.getElementById('visual-bg-cancel')?.addEventListener('click', () => {
+                    document.getElementById('visual-bg-color-modal').classList.add('hidden');
+                });
+                // --- End V5.29.0: Background Color Picker Modal Listeners ---
+                
                 signOutBtn.addEventListener('click', signOutUser);
                 // Sound previews
                 // DELETED in 4.40: This was for the old personal bell form
@@ -8380,7 +11688,7 @@
                 document.getElementById('visual-manager-panel').addEventListener('click', handleVisualListClick);
                 
                 // NEW in 4.44: Add click-to-refresh for Visual Manager header
-                document.querySelector('#visual-manager-panel h2').addEventListener('click', () => {
+                document.querySelector('#visual-manager-panel h3').addEventListener('click', () => {
                     visualUploadStatus.textContent = "Refreshing file lists...";
                     visualUploadStatus.classList.remove('hidden');
                     loadAllVisualFiles().then(() => {
@@ -8414,8 +11722,24 @@
                     // FIX: Use 'Default' fallback
                     const periodName = currentRenamingPeriod ? currentRenamingPeriod.name : "Default"; 
                     
-                    document.getElementById('edit-period-image-preview-full').innerHTML = getVisualHtml(selectedValue, periodName);
+                    const previewFull = document.getElementById('edit-period-image-preview-full');
+                    previewFull.innerHTML = getVisualHtml(selectedValue, periodName);
                     document.getElementById('edit-period-image-preview-icon').innerHTML = getVisualIconHtml(selectedValue, periodName);
+                    
+                    // FIX V5.42.12: Make preview clickable based on visual type
+                    if (selectedValue && selectedValue.startsWith('[CUSTOM_TEXT]')) {
+                        makePreviewClickableForCustomText(previewFull, editPeriodImageSelect);
+                    } else if (selectedValue && supportsBackgroundColor(selectedValue)) {
+                        makePreviewClickable(previewFull, 'edit-period-image-select', periodName);
+                    } else if (!selectedValue) {
+                        // Empty value (period default) - still allow bg color change
+                        makePreviewClickable(previewFull, 'edit-period-image-select', periodName);
+                    } else {
+                        previewFull.style.cursor = 'default';
+                        previewFull.onclick = null;
+                        previewFull.title = '';
+                        previewFull.classList.remove('clickable');
+                    }
                 });
 
                 // DELETED in 4.44: Old Period Rename Listeners
@@ -8625,6 +11949,8 @@
                     // MODIFIED V4.75: Do not reset the select, just close.
                     // The original value is preserved by the change handler.
                     currentVisualSelectTarget = null;
+                    // V5.44.9: Also clear custom bell slot
+                    currentCustomBellIconSlot = null;
                 });
 
                 document.getElementById('cancel-quick-bell-btn').addEventListener('click', () => {
@@ -8633,6 +11959,78 @@
                     document.getElementById('cancel-quick-bell-btn').classList.add('hidden');
                     updateClock(); // Refresh display
                 });
+                
+                // V5.47.13: Skip Bell button handler
+                document.getElementById('skip-bell-btn').addEventListener('click', () => {
+                    skipNextBell();
+                    updateMainPageSkipButtons();
+                });
+                
+                // V5.47.13: Unskip Bell button handler
+                document.getElementById('unskip-bell-btn').addEventListener('click', () => {
+                    const skippedBell = getNextSkippedBell();
+                    if (skippedBell) {
+                        unskipBell(skippedBell);
+                        updateMainPageSkipButtons();
+                    }
+                });
+                
+                // V5.47.0: Picture-in-Picture toggle button
+                const pipToggleBtn = document.getElementById('pip-toggle-btn');
+                if (pipToggleBtn) {
+                    // Check if Document PiP is supported and show/hide button accordingly
+                    if ('documentPictureInPicture' in window) {
+                        pipToggleBtn.addEventListener('click', togglePictureInPicture);
+                    } else {
+                        // Hide button if not supported
+                        pipToggleBtn.style.display = 'none';
+                    }
+                }
+                
+                // V5.49.0: Kiosk Mode toggle button
+                const kioskToggleBtn = document.getElementById('kiosk-toggle-btn');
+                if (kioskToggleBtn) {
+                    kioskToggleBtn.addEventListener('click', toggleKioskMode);
+                }
+                
+                // V5.49.0: Load kiosk mode preference on startup
+                loadKioskModePreference();
+                
+                // V5.52.0: Warning Settings
+                const settingsToggleBtn = document.getElementById('settings-toggle-btn');
+                const warningSettingsModal = document.getElementById('warning-settings-modal');
+                const warningSettingsCancel = document.getElementById('warning-settings-cancel');
+                const warningSettingsSave = document.getElementById('warning-settings-save');
+                const warningPreviewBtn = document.getElementById('warning-preview-btn');
+                
+                if (settingsToggleBtn) {
+                    settingsToggleBtn.addEventListener('click', openWarningSettingsModal);
+                }
+                if (warningSettingsCancel) {
+                    warningSettingsCancel.addEventListener('click', closeWarningSettingsModal);
+                }
+                if (warningSettingsSave) {
+                    warningSettingsSave.addEventListener('click', saveWarningSettingsFromModal);
+                }
+                if (warningPreviewBtn) {
+                    warningPreviewBtn.addEventListener('click', previewWarningEffect);
+                }
+                // V5.52.1: Reset colors button
+                const warningResetColorsBtn = document.getElementById('warning-reset-colors');
+                if (warningResetColorsBtn) {
+                    warningResetColorsBtn.addEventListener('click', resetWarningColors);
+                }
+                // Close modal on background click
+                if (warningSettingsModal) {
+                    warningSettingsModal.addEventListener('click', (e) => {
+                        if (e.target === warningSettingsModal) {
+                            closeWarningSettingsModal();
+                        }
+                    });
+                }
+                
+                // V5.52.0: Load warning settings on startup
+                loadWarningSettings();
                     
                 customTextVisualForm.addEventListener('submit', (e) => {
                     e.preventDefault();
@@ -8652,6 +12050,10 @@
                     // MODIFIED V4.75: The stored value now includes colors
                     const storedValue = `[CUSTOM_TEXT] ${customText}|${bgColor}|${fgColor}`;
                     console.log('Creating custom text value:', storedValue);
+                    
+                    // FIX V5.42.7: Set flag to prevent change handler from re-opening modal
+                    customTextJustSaved = true;
+                    setTimeout(() => { customTextJustSaved = false; }, 100);
                     
                     // Set the value in the original select element
                     // We must dynamically add the option first if it doesn't exist
@@ -8678,14 +12080,38 @@
                     
                     console.log('Setting dropdown value to:', storedValue);
                     console.log('Dropdown before set:', currentVisualSelectTarget.value);
+                    
+                    // FIX V5.42.7: Store target ID before clearing it
+                    const targetId = currentVisualSelectTarget.id;
                     currentVisualSelectTarget.value = storedValue;
                     console.log('Dropdown after set:', currentVisualSelectTarget.value);
                     
-                    // Update the preview if it's the period editor
-                    if (currentVisualSelectTarget.id === 'edit-period-image-select' && currentRenamingPeriod) {
+                    // FIX V5.42.7: Manually update the preview for this dropdown
+                    if (targetId === 'add-static-bell-visual') {
+                        updateAddStaticBellVisualPreview();
+                    } else if (targetId === 'relative-bell-visual') {
+                        updateRelativeBellVisualPreview();
+                    } else if (targetId === 'edit-bell-visual') {
+                        updateEditBellVisualPreview();
+                    } else if (targetId === 'multi-bell-visual') {
+                        updateMultiBellVisualPreview();
+                    } else if (targetId === 'multi-relative-bell-visual') {
+                        updateMultiRelativeBellVisualPreview();
+                    } else if (targetId === 'new-period-image-select') {
+                        // FIX V5.44.1: Update new period modal preview for custom text
+                        document.getElementById('new-period-image-preview-full').innerHTML = getVisualHtml(storedValue, 'New Period');
+                        document.getElementById('new-period-image-preview-icon').innerHTML = getVisualIconHtml(storedValue, 'New Period');
+                        const previewFull = document.getElementById('new-period-image-preview-full');
+                        makePreviewClickableForCustomText(previewFull, document.getElementById('new-period-image-select'));
+                        console.log('Updated new period modal preview');
+                    } else if (targetId === 'edit-period-image-select' && currentRenamingPeriod) {
                         const periodName = currentRenamingPeriod.name;
-                        document.getElementById('edit-period-image-preview-full').innerHTML = getVisualHtml(storedValue, periodName);
+                        const previewFull = document.getElementById('edit-period-image-preview-full');
+                        previewFull.innerHTML = getVisualHtml(storedValue, periodName);
                         document.getElementById('edit-period-image-preview-icon').innerHTML = getVisualIconHtml(storedValue, periodName);
+                        
+                        // FIX V5.42.12: Make preview clickable for custom text
+                        makePreviewClickableForCustomText(previewFull, document.getElementById('edit-period-image-select'));
                         console.log('Updated period editor preview');
                     }
                     
@@ -8707,6 +12133,7 @@
                 // This was accidentally removed with the broken code block.
                 // Converted to a 'function' to fix hoisting-related ReferenceError.
                 function visualSelectChangeHandler(e) {
+                    console.log('visualSelectChangeHandler called! target:', e.target.id, 'value:', e.target.value); // DEBUG
                     
                     // MODIFIED V4.75: Handle [UPLOAD] option to open the new modal
                     if (e.target.value === '[UPLOAD]') {
@@ -8775,39 +12202,14 @@
                         customTextVisualModal.classList.remove('hidden');
                         customTextVisualModal.style.zIndex = '80'; // NEW in 5.25.?: Make sure it's on top of everything
                         
-                        // NEW in 5.25.9: Show the custom text input section
-                        const customTextContainer = document.getElementById('custom-text-color-container');
-                        if (customTextContainer) {
-                            customTextContainer.classList.remove('hidden');
-                        }
-
-                        // NEW 5.30.2: Add live preview updates
-                        customTextInput.addEventListener('input', updateCustomTextPreviews);
-                        customTextColorInput.addEventListener('input', updateCustomTextPreviews);
-                        customTextBgColorInput.addEventListener('input', updateCustomTextPreviews);
+                        // Determine context from the target select ID
+                        const isQuickBell = e.target.id.includes('quick-bell') || e.target.closest('#custom-quick-bell-manager-modal');
                         
-                        function updateCustomTextPreviews() {
-                            const text = customTextInput.value.trim().substring(0, 3) || '?';
-                            const fgColor = customTextColorInput.value;
-                            const bgColor = customTextBgColorInput.value;
-                            
-                            // Update live preview (large)
-                            const livePreview = document.getElementById('quick-bell-visual-preview-full');
-                            livePreview.innerHTML = `<div class="w-full h-full flex items-center justify-center" style="background-color: ${bgColor};">
-                                <span class="text-6xl font-bold" style="color: ${fgColor};">${text}</span>
-                            </div>`;
-                            
-                            // Update quick bell button preview (small)
-                            const iconPreview = document.getElementById('quick-bell-visual-preview-icon-inner');
-                            iconPreview.innerHTML = `<span class="text-xl font-bold" style="color: ${fgColor};">${text}</span>`;
-                            iconPreview.style.backgroundColor = bgColor;
-                        }
+                        // V5.44.10: Use the centralized helper function for preview setup
+                        setupCustomTextModalPreviews(isQuickBell);
                             
                         // 5.25.7: More console logging
                         console.log('After removing hidden:', customTextVisualModal.classList.contains('hidden'));
-                            
-                        // Set focus and select current text
-                        setTimeout(() => customTextInput.select(), 50);
                             
                         // Set focus and select current text
                         setTimeout(() => customTextInput.select(), 50);
@@ -8816,10 +12218,12 @@
                 // --- END V4.75 (FIX) ---
 
                 // NEW 5.20: Update quick bell visual previews when dropdown changes
-                quickBellVisualSelect.addEventListener('change', (e) => {
+                // FIX V5.42.4: Add null check - element may not exist
+                if (quickBellVisualSelect) {
+                    quickBellVisualSelect.addEventListener('change', (e) => {
                     const value = e.target.value;
                     const previewFull = document.getElementById('quick-bell-visual-preview-full');
-                    const previewIcon = document.getElementById('quick-bell-visual-preview-icon-inner');
+                    const previewIcon = document.getElementById('quick-bell-visual-preview-icon');
                     
                     if (!previewFull || !previewIcon) return;
                     
@@ -8867,21 +12271,69 @@
                         }
                     }
                 });
+                } // FIX V5.42.4: Close null check for quickBellVisualSelect
                     
                 // NEW in 4.60.3: Attach the custom text handler to the main edit/new period selects
                 editPeriodImageSelect.addEventListener('change', visualSelectChangeHandler);
-                newPeriodImageSelect.addEventListener('change', visualSelectChangeHandler);
-                quickBellVisualSelect.addEventListener('change', visualSelectChangeHandler); // NEW 5.24.4: Add quick bell support
+                newPeriodImageSelect.addEventListener('change', (e) => {
+                    // First handle special cases like [UPLOAD] and [CUSTOM_TEXT]
+                    visualSelectChangeHandler(e);
+                    
+                    // Then update previews if it's a regular visual selection
+                    const selectedValue = e.target.value;
+                    if (selectedValue === '[UPLOAD]' || selectedValue === '[CUSTOM_TEXT]' || selectedValue.startsWith('[CUSTOM_TEXT] ')) {
+                        return; // Skip preview update for special triggers
+                    }
+                    document.getElementById('new-period-image-preview-full').innerHTML = getVisualHtml(selectedValue, 'New Period');
+                    document.getElementById('new-period-image-preview-icon').innerHTML = getVisualIconHtml(selectedValue, 'New Period');
+                });
+                // FIX V5.42.4: Add null check - element may not exist
+                quickBellVisualSelect?.addEventListener('change', visualSelectChangeHandler); // NEW 5.24.4: Add quick bell support
 
                 // NEW 5.31.1: Bell visual dropdowns
-                document.getElementById('add-static-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
-                document.getElementById('relative-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
+                console.log('Setting up bell visual dropdown listeners...'); // DEBUG
+                const addStaticEl = document.getElementById('add-static-bell-visual');
+                console.log('add-static-bell-visual element:', addStaticEl); // DEBUG
+                
+                // FIX V5.42.8: Use a named function so we can verify it's attached
+                function handleAddStaticVisualChange(e) {
+                    console.log('=== ADD STATIC VISUAL CHANGE ==='); // DEBUG
+                    console.log('Event target:', e.target.id);
+                    console.log('New value:', e.target.value);
+                    console.log('Calling visualSelectChangeHandler...');
+                    visualSelectChangeHandler.call(this, e);
+                    console.log('Calling updateAddStaticBellVisualPreview...');
+                    updateAddStaticBellVisualPreview();
+                    console.log('=== END CHANGE HANDLER ===');
+                }
+                
+                if (addStaticEl) {
+                    addStaticEl.addEventListener('change', handleAddStaticVisualChange);
+                    console.log('Event listener attached to add-static-bell-visual');
+                } else {
+                    console.error('add-static-bell-visual element NOT FOUND');
+                }
+                
+                document.getElementById('relative-bell-visual')?.addEventListener('change', function(e) {
+                    console.log('relative-bell-visual change fired!'); // DEBUG
+                    visualSelectChangeHandler.call(this, e);
+                    updateRelativeBellVisualPreview(); // NEW V5.41: Update preview
+                });
                 document.getElementById('edit-bell-visual')?.addEventListener('change', function(e) {
+                    console.log('edit-bell-visual change fired!'); // DEBUG
                     visualSelectChangeHandler.call(this, e);
                     updateEditBellVisualPreview(); // NEW 5.32: Update preview
                 });
-                document.getElementById('multi-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
-                document.getElementById('multi-relative-bell-visual')?.addEventListener('change', visualSelectChangeHandler);
+                document.getElementById('multi-bell-visual')?.addEventListener('change', function(e) {
+                    console.log('multi-bell-visual change fired!'); // DEBUG
+                    visualSelectChangeHandler.call(this, e);
+                    updateMultiBellVisualPreview(); // NEW V5.41: Update preview
+                });
+                document.getElementById('multi-relative-bell-visual')?.addEventListener('change', function(e) {
+                    console.log('multi-relative-bell-visual change fired!'); // DEBUG
+                    visualSelectChangeHandler.call(this, e);
+                    updateMultiRelativeBellVisualPreview(); // NEW V5.42: Update preview
+                });
                     
                 // --- NEW V4.76: Sound Select Change Handler (for [UPLOAD]) ---
                 function changeSoundSelectHandler(e) {
@@ -8951,6 +12403,476 @@
                     recalculateAndRenderAll();
                     updateClock();
                 });
+
+                // ============================================
+                // V5.46.0: BULK EDIT FUNCTIONALITY
+                // ============================================
+                const bulkEditToggleBtn = document.getElementById('bulk-edit-toggle-btn');
+                const bulkEditModal = document.getElementById('bulk-edit-modal');
+                const bulkEditCount = document.getElementById('bulk-edit-count');
+                const bulkEditSound = document.getElementById('bulk-edit-sound');
+                const bulkEditVisual = document.getElementById('bulk-edit-visual');
+                const bulkVisualModeContainer = document.getElementById('bulk-visual-mode-container');
+                const bulkEditApply = document.getElementById('bulk-edit-apply');
+                const bulkEditCancel = document.getElementById('bulk-edit-cancel');
+                const bulkPreviewSound = document.getElementById('bulk-preview-sound');
+                const bulkEditStatus = document.getElementById('bulk-edit-status');
+                
+                // V5.54.0: Time Shift elements
+                const bulkTimeShiftEnabled = document.getElementById('bulk-time-shift-enabled');
+                const bulkTimeShiftControls = document.getElementById('bulk-time-shift-controls');
+                const bulkTimeShiftDirection = document.getElementById('bulk-time-shift-direction');
+                const bulkTimeShiftHours = document.getElementById('bulk-time-shift-hours');
+                const bulkTimeShiftMinutes = document.getElementById('bulk-time-shift-minutes');
+                const bulkTimeShiftSeconds = document.getElementById('bulk-time-shift-seconds');
+                const bulkTimeShiftWarning = document.getElementById('bulk-time-shift-warning');
+                const bulkTimeShiftWarningText = document.getElementById('bulk-time-shift-warning-text');
+
+                // Show bulk edit button when user has a personal schedule
+                function updateBulkEditButtonVisibility() {
+                    if (bulkEditToggleBtn) {
+                        bulkEditToggleBtn.classList.toggle('hidden', !activePersonalScheduleId);
+                    }
+                }
+
+                // Toggle bulk edit mode
+                bulkEditToggleBtn?.addEventListener('click', () => {
+                    if (!bulkEditMode) {
+                        // Enter bulk edit mode
+                        bulkEditMode = true;
+                        bulkSelectedBells.clear();
+                        bulkEditToggleBtn.textContent = 'Done Selecting';
+                        bulkEditToggleBtn.classList.remove('bg-purple-100', 'text-purple-700');
+                        bulkEditToggleBtn.classList.add('bg-purple-600', 'text-white');
+                        recalculateAndRenderAll();
+                    } else if (bulkSelectedBells.size > 0) {
+                        // In bulk edit mode with selections - open modal
+                        openBulkEditModal();
+                    } else {
+                        // In bulk edit mode with no selections - exit
+                        bulkEditMode = false;
+                        bulkEditToggleBtn.textContent = 'Bulk Edit';
+                        bulkEditToggleBtn.classList.remove('bg-purple-600', 'text-white');
+                        bulkEditToggleBtn.classList.add('bg-purple-100', 'text-purple-700');
+                        recalculateAndRenderAll();
+                    }
+                });
+
+                // Handle checkbox changes via delegation
+                combinedBellListElement.addEventListener('change', (e) => {
+                    if (e.target.classList.contains('bulk-edit-checkbox')) {
+                        const bellId = e.target.dataset.bellId;
+                        if (e.target.checked) {
+                            bulkSelectedBells.add(bellId);
+                        } else {
+                            bulkSelectedBells.delete(bellId);
+                        }
+                        updateBulkEditUI();
+                    }
+                });
+
+                // Update UI based on selections
+                function updateBulkEditUI() {
+                    const count = bulkSelectedBells.size;
+                    
+                    // Update button text to show count
+                    if (bulkEditMode && count > 0) {
+                        bulkEditToggleBtn.textContent = `Edit ${count} Bell${count > 1 ? 's' : ''}`;
+                    } else if (bulkEditMode) {
+                        bulkEditToggleBtn.textContent = 'Done Selecting';
+                    }
+                }
+
+                function openBulkEditModal() {
+                    if (bulkSelectedBells.size === 0) return;
+                    
+                    // Populate dropdowns
+                    populateBulkEditDropdowns();
+                    
+                    // Update count
+                    bulkEditCount.textContent = `${bulkSelectedBells.size} bell${bulkSelectedBells.size > 1 ? 's' : ''} selected`;
+                    
+                    // Reset selections
+                    bulkEditSound.value = '[NO_CHANGE]';
+                    bulkEditVisual.value = '[NO_CHANGE]';
+                    bulkVisualModeContainer.classList.add('hidden');
+                    bulkEditStatus.classList.add('hidden');
+                    
+                    // V5.54.0: Reset time shift controls
+                    if (bulkTimeShiftEnabled) {
+                        bulkTimeShiftEnabled.checked = false;
+                        bulkTimeShiftControls.classList.add('hidden');
+                        bulkTimeShiftDirection.value = 'later';
+                        bulkTimeShiftHours.value = '0';
+                        bulkTimeShiftMinutes.value = '5';
+                        bulkTimeShiftSeconds.value = '0';
+                        bulkTimeShiftWarning.classList.add('hidden');
+                    }
+                    
+                    bulkEditModal.classList.remove('hidden');
+                }
+                
+                // V5.54.0: Time shift checkbox toggle
+                bulkTimeShiftEnabled?.addEventListener('change', () => {
+                    if (bulkTimeShiftEnabled.checked) {
+                        bulkTimeShiftControls.classList.remove('hidden');
+                    } else {
+                        bulkTimeShiftControls.classList.add('hidden');
+                    }
+                });
+
+                function populateBulkEditDropdowns() {
+                    // Populate sound dropdown
+                    const bulkMySounds = document.getElementById('bulk-my-sounds-optgroup');
+                    const bulkSharedSounds = document.getElementById('bulk-shared-sounds-optgroup');
+                    
+                    if (bulkMySounds) {
+                        bulkMySounds.innerHTML = '';
+                        userAudioFiles.forEach(file => {
+                            const opt = document.createElement('option');
+                            opt.value = file.url;
+                            opt.textContent = file.nickname || file.name;
+                            bulkMySounds.appendChild(opt);
+                        });
+                    }
+                    
+                    if (bulkSharedSounds) {
+                        bulkSharedSounds.innerHTML = '';
+                        sharedAudioFiles.forEach(file => {
+                            const opt = document.createElement('option');
+                            opt.value = file.url;
+                            opt.textContent = file.nickname || file.name;
+                            bulkSharedSounds.appendChild(opt);
+                        });
+                    }
+                    
+                    // Populate visual dropdown
+                    const bulkMyVisuals = document.getElementById('bulk-my-visuals-optgroup');
+                    const bulkSharedVisuals = document.getElementById('bulk-shared-visuals-optgroup');
+                    
+                    if (bulkMyVisuals) {
+                        bulkMyVisuals.innerHTML = '';
+                        userVisualFiles.forEach(file => {
+                            const opt = document.createElement('option');
+                            opt.value = file.url;
+                            opt.textContent = file.nickname || file.name;
+                            bulkMyVisuals.appendChild(opt);
+                        });
+                    }
+                    
+                    if (bulkSharedVisuals) {
+                        bulkSharedVisuals.innerHTML = '';
+                        sharedVisualFiles.forEach(file => {
+                            const opt = document.createElement('option');
+                            opt.value = file.url;
+                            opt.textContent = file.nickname || file.name;
+                            bulkSharedVisuals.appendChild(opt);
+                        });
+                    }
+                }
+
+                // Show visual mode options when visual is selected
+                bulkEditVisual?.addEventListener('change', () => {
+                    const val = bulkEditVisual.value;
+                    const showMode = val && val !== '[NO_CHANGE]' && val !== '';
+                    bulkVisualModeContainer.classList.toggle('hidden', !showMode);
+                    
+                    // Handle custom text selection
+                    if (val === '[CUSTOM_TEXT]') {
+                        // Open custom text modal, then return value
+                        openCustomTextModal('bulk');
+                    }
+                });
+
+                // Preview sound
+                bulkPreviewSound?.addEventListener('click', () => {
+                    const sound = bulkEditSound.value;
+                    if (sound && sound !== '[NO_CHANGE]') {
+                        playBell(sound);
+                    }
+                });
+
+                // Cancel
+                bulkEditCancel?.addEventListener('click', () => {
+                    bulkEditModal.classList.add('hidden');
+                });
+
+                // Apply bulk edits
+                bulkEditApply?.addEventListener('click', async () => {
+                    if (bulkSelectedBells.size === 0 || !activePersonalScheduleId) return;
+                    
+                    const newSound = bulkEditSound.value;
+                    const newVisual = bulkEditVisual.value;
+                    const newVisualMode = document.querySelector('input[name="bulk-visual-mode"]:checked')?.value || 'before';
+                    
+                    // V5.54.0: Get time shift values
+                    const isTimeShiftEnabled = bulkTimeShiftEnabled?.checked || false;
+                    const timeShiftDirection = bulkTimeShiftDirection?.value || 'later';
+                    const timeShiftHours = parseInt(bulkTimeShiftHours?.value) || 0;
+                    const timeShiftMinutes = parseInt(bulkTimeShiftMinutes?.value) || 0;
+                    const timeShiftSeconds = parseInt(bulkTimeShiftSeconds?.value) || 0;
+                    let totalShiftSeconds = (timeShiftHours * 3600) + (timeShiftMinutes * 60) + timeShiftSeconds;
+                    if (timeShiftDirection === 'earlier') {
+                        totalShiftSeconds = -totalShiftSeconds;
+                    }
+                    
+                    // Nothing to change
+                    if (newSound === '[NO_CHANGE]' && newVisual === '[NO_CHANGE]' && !isTimeShiftEnabled) {
+                        bulkEditStatus.textContent = 'Please select at least one change.';
+                        bulkEditStatus.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    // V5.54.0: Validate time shift
+                    if (isTimeShiftEnabled && totalShiftSeconds === 0) {
+                        bulkEditStatus.textContent = 'Time shift amount cannot be zero.';
+                        bulkEditStatus.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    try {
+                        bulkEditStatus.textContent = 'Applying changes...';
+                        bulkEditStatus.classList.remove('hidden');
+                        
+                        let updatedCustomCount = 0;
+                        let updatedSharedCount = 0;
+                        let timeShiftedCount = 0;
+                        let skippedSharedTimeShift = 0;
+                        
+                        // --- Identify which bells are custom vs shared ---
+                        const allCalculatedBells = [...localSchedule, ...personalBells];
+                        const customBellIds = new Set();
+                        const sharedBellsToUpdate = []; // Store actual bell objects for shared bells
+                        
+                        allCalculatedBells.forEach(bell => {
+                            const bellId = bell.bellId || getBellId(bell);
+                            if (bulkSelectedBells.has(bellId)) {
+                                if (bell.type === 'custom') {
+                                    customBellIds.add(bellId);
+                                } else if (bell.type === 'shared') {
+                                    sharedBellsToUpdate.push(bell);
+                                }
+                            }
+                        });
+                        
+                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                        
+                        // --- Handle CUSTOM bells (update periods in Firestore) ---
+                        let updatedPeriods = [...personalBellsPeriods];
+                        if (customBellIds.size > 0) {
+                            updatedPeriods = updatedPeriods.map(period => {
+                                const updatedBells = period.bells.map(bell => {
+                                    const bellId = bell.bellId || getBellId(bell);
+                                    if (customBellIds.has(bellId)) {
+                                        const updatedBell = { ...bell };
+                                        
+                                        if (newSound !== '[NO_CHANGE]') {
+                                            updatedBell.sound = newSound;
+                                        }
+                                        
+                                        if (newVisual !== '[NO_CHANGE]') {
+                                            updatedBell.visualCue = newVisual === '' ? '' : newVisual;
+                                            updatedBell.visualMode = newVisual === '' ? 'none' : newVisualMode;
+                                        }
+                                        
+                                        // V5.54.0: Handle time shift for custom bells
+                                        if (isTimeShiftEnabled && totalShiftSeconds !== 0) {
+                                            if (bell.relative) {
+                                                // Relative bell - adjust the offset
+                                                const currentOffset = bell.relative.offsetSeconds || 0;
+                                                updatedBell.relative = {
+                                                    ...bell.relative,
+                                                    offsetSeconds: currentOffset + totalShiftSeconds
+                                                };
+                                                timeShiftedCount++;
+                                            } else if (bell.time) {
+                                                // Static bell - adjust the actual time
+                                                const [h, m, s] = bell.time.split(':').map(Number);
+                                                let totalSeconds = (h * 3600) + (m * 60) + (s || 0);
+                                                totalSeconds += totalShiftSeconds;
+                                                
+                                                // Handle day wraparound
+                                                while (totalSeconds < 0) totalSeconds += 86400;
+                                                while (totalSeconds >= 86400) totalSeconds -= 86400;
+                                                
+                                                const newH = Math.floor(totalSeconds / 3600);
+                                                const newM = Math.floor((totalSeconds % 3600) / 60);
+                                                const newS = totalSeconds % 60;
+                                                
+                                                updatedBell.time = `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:${String(newS).padStart(2, '0')}`;
+                                                timeShiftedCount++;
+                                            }
+                                        }
+                                        
+                                        updatedCustomCount++;
+                                        return updatedBell;
+                                    }
+                                    return bell;
+                                });
+                                return { ...period, bells: updatedBells };
+                            });
+                        }
+                        
+                        // --- Handle SHARED bells ---
+                        // Get current bellOverrides from Firestore
+                        const docSnap = await getDoc(personalScheduleRef);
+                        const currentData = docSnap.exists() ? docSnap.data() : {};
+                        const bellOverrides = currentData.bellOverrides || {};
+                        
+                        sharedBellsToUpdate.forEach(bell => {
+                            const bellId = bell.bellId || getBellId(bell);
+                            
+                            // V5.54.1: Track if we actually change anything on this shared bell
+                            let sharedBellChanged = false;
+                            
+                            // Initialize override object if needed
+                            if (!bellOverrides[bellId]) {
+                                bellOverrides[bellId] = {};
+                            }
+                            
+                            // V5.46.4: Handle sound override (Firestore only for cross-device sync)
+                            if (newSound !== '[NO_CHANGE]') {
+                                bellOverrides[bellId].sound = newSound;
+                                sharedBellChanged = true;
+                            }
+                            
+                            // Handle visual override (uses Firestore bellOverrides)
+                            if (newVisual !== '[NO_CHANGE]') {
+                                if (newVisual === '') {
+                                    // Clear visual
+                                    delete bellOverrides[bellId].visualCue;
+                                    delete bellOverrides[bellId].visualMode;
+                                } else {
+                                    bellOverrides[bellId].visualCue = newVisual;
+                                    bellOverrides[bellId].visualMode = newVisualMode;
+                                }
+                                sharedBellChanged = true;
+                            }
+                            
+                            // V5.54.0: Time shift cannot apply to shared bells (unless admin)
+                            if (isTimeShiftEnabled) {
+                                skippedSharedTimeShift++;
+                            }
+                            
+                            // Clean up empty override objects
+                            if (Object.keys(bellOverrides[bellId]).length === 0) {
+                                delete bellOverrides[bellId];
+                            }
+                            
+                            // V5.54.1: Only count as updated if something actually changed
+                            if (sharedBellChanged) {
+                                updatedSharedCount++;
+                            }
+                        });
+                        
+                        // Save everything to Firestore
+                        await updateDoc(personalScheduleRef, { 
+                            periods: updatedPeriods,
+                            bellOverrides: bellOverrides
+                        });
+                        
+                        // V5.46.4: Update local state immediately
+                        personalBellOverrides = bellOverrides;
+                        
+                        // V5.54.1: Build accurate status message
+                        const totalUpdated = updatedCustomCount + updatedSharedCount;
+                        let statusMsg = '';
+                        
+                        if (totalUpdated > 0) {
+                            statusMsg = `Updated ${totalUpdated} bell${totalUpdated !== 1 ? 's' : ''}`;
+                        }
+                        
+                        if (isTimeShiftEnabled) {
+                            if (timeShiftedCount > 0) {
+                                const direction = totalShiftSeconds > 0 ? 'later' : 'earlier';
+                                const absSeconds = Math.abs(totalShiftSeconds);
+                                const shiftH = Math.floor(absSeconds / 3600);
+                                const shiftM = Math.floor((absSeconds % 3600) / 60);
+                                const shiftS = absSeconds % 60;
+                                let shiftStr = '';
+                                if (shiftH > 0) shiftStr += `${shiftH}h `;
+                                if (shiftM > 0) shiftStr += `${shiftM}m `;
+                                if (shiftS > 0) shiftStr += `${shiftS}s`;
+                                if (statusMsg) statusMsg += ' — ';
+                                statusMsg += `${timeShiftedCount} bell${timeShiftedCount !== 1 ? 's' : ''} shifted ${shiftStr.trim()} ${direction}`;
+                            }
+                            if (skippedSharedTimeShift > 0) {
+                                if (statusMsg) statusMsg += '. ';
+                                statusMsg += `⚠️ ${skippedSharedTimeShift} shared bell${skippedSharedTimeShift !== 1 ? 's' : ''} can't be time-shifted`;
+                            }
+                        }
+                        
+                        // Handle case where nothing was actually changed
+                        if (!statusMsg) {
+                            statusMsg = 'No changes applied';
+                        }
+                        
+                        bulkEditStatus.textContent = statusMsg + (statusMsg.includes('⚠️') ? '' : '!');
+                        
+                        // Exit bulk edit mode
+                        setTimeout(() => {
+                            bulkEditModal.classList.add('hidden');
+                            bulkEditMode = false;
+                            bulkSelectedBells.clear();
+                            bulkEditToggleBtn.textContent = 'Bulk Edit';
+                            bulkEditToggleBtn.classList.remove('bg-purple-600', 'text-white');
+                            bulkEditToggleBtn.classList.add('bg-purple-100', 'text-purple-700');
+                            recalculateAndRenderAll();
+                        }, 1000);
+                        
+                    } catch (error) {
+                        console.error('Bulk edit error:', error);
+                        bulkEditStatus.textContent = 'Error: ' + error.message;
+                    }
+                });
+                // ============================================
+                // END V5.46.0: BULK EDIT FUNCTIONALITY
+                // ============================================
+
+                // ============================================
+                // V5.46.2: GLOBAL ESC KEY HANDLER FOR MODALS
+                // ============================================
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        // List of all modal IDs and their cancel/close actions
+                        const modals = [
+                            { id: 'edit-bell-modal', close: () => editBellModal.classList.add('hidden') },
+                            { id: 'change-sound-modal', close: () => changeSoundModal.classList.add('hidden') },
+                            { id: 'upload-audio-modal', close: () => uploadAudioModal.classList.add('hidden') },
+                            { id: 'upload-visual-modal', close: () => uploadVisualModal.classList.add('hidden') },
+                            { id: 'create-personal-schedule-modal', close: () => { createPersonalScheduleModal.classList.add('hidden'); createPersonalScheduleForm.reset(); } },
+                            { id: 'create-standalone-schedule-modal', close: () => { createStandaloneScheduleModal.classList.add('hidden'); createStandaloneScheduleForm.reset(); } },
+                            { id: 'rename-personal-schedule-modal', close: () => { renamePersonalScheduleModal.classList.add('hidden'); renamePersonalScheduleForm.reset(); } },
+                            { id: 'rename-shared-schedule-modal', close: () => renameSharedScheduleModal.classList.add('hidden') },
+                            { id: 'confirm-restore-modal', close: () => confirmRestoreModal.classList.add('hidden') },
+                            { id: 'confirm-delete-modal', close: () => confirmDeleteModal.classList.add('hidden') },
+                            { id: 'edit-period-details-modal', close: () => { editPeriodModal.classList.add('hidden'); editPeriodForm.reset(); } },
+                            { id: 'add-period-modal', close: () => addPeriodModal?.classList.add('hidden') },
+                            { id: 'add-static-bell-modal', close: () => document.getElementById('add-static-bell-modal')?.classList.add('hidden') },
+                            { id: 'relative-bell-modal', close: () => document.getElementById('relative-bell-modal')?.classList.add('hidden') },
+                            { id: 'multi-add-relative-bell-modal', close: () => document.getElementById('multi-add-relative-bell-modal')?.classList.add('hidden') },
+                            { id: 'custom-text-visual-modal', close: () => customTextVisualModal?.classList.add('hidden') },
+                            { id: 'bg-color-picker-modal', close: () => document.getElementById('bg-color-picker-modal')?.classList.add('hidden') },
+                            { id: 'bulk-edit-modal', close: () => bulkEditModal.classList.add('hidden') },
+                            { id: 'custom-quick-bell-manager-modal', close: () => document.getElementById('custom-quick-bell-manager-modal')?.classList.add('hidden') },
+                            { id: 'passing-period-visual-modal', close: () => document.getElementById('passing-period-visual-modal')?.classList.add('hidden') },
+                        ];
+                        
+                        // Find the first visible modal and close it
+                        for (const modal of modals) {
+                            const el = document.getElementById(modal.id);
+                            if (el && !el.classList.contains('hidden')) {
+                                e.preventDefault();
+                                modal.close();
+                                console.log(`ESC closed: ${modal.id}`);
+                                break; // Only close one modal at a time
+                            }
+                        }
+                    }
+                });
+                // ============================================
+                // END V5.46.2: GLOBAL ESC KEY HANDLER
+                // ============================================
     
                 // Import/Export
                 exportSchedulesBtn.addEventListener('click', handleExportSchedules);
