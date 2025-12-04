@@ -1,4 +1,4 @@
-        const APP_VERSION = "5.55.7"
+        const APP_VERSION = "5.55.8"
         // V5.54.6: UX improvements
         // - Sound overrides now display nickname if available, instead of raw filename
         // - Fixed sound dropdown overflow in relative bell modal (added min-w-0)
@@ -2185,6 +2185,9 @@
                     // Remove the cancel button from quick bells (we have it in the countdown column now)
                     const oldCancelBtn = quickBellsClone.querySelector('#cancel-quick-bell-btn');
                     if (oldCancelBtn) oldCancelBtn.remove();
+                    // V5.55.8: Remove Q button - queue modal can't work in PiP
+                    const oldQueueBtn = quickBellsClone.querySelector('#quick-bell-queue-btn');
+                    if (oldQueueBtn) oldQueueBtn.remove();
                     container.appendChild(quickBellsClone);
                     
                     pipDoc.body.appendChild(container);
