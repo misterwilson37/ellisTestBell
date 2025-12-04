@@ -1,14 +1,10 @@
-        const APP_VERSION = "5.53.0"
-        // V5.53.0: Cloud Sync for User Preferences
-        // - Period visual overrides now sync to Firestore
-        // - Sound overrides now sync to Firestore
-        // - Period nicknames now sync to Firestore
-        // - Muted bells now sync to Firestore
-        // - Warning settings now sync to Firestore
-        // - Kiosk mode preference now syncs to Firestore
-        // - Real-time listener for cross-device sync
-        // - localStorage serves as offline cache
-        // V5.52.1: Warning Color Customization + Settings Button Move
+        const APP_VERSION = "5.49.2"
+        // V5.49.2: Kiosk Mode Tweaks + CSS Version Display
+        // - PiP kiosk: Keeps horizontal layout (just hides clock/next bell lines)
+        // - Main page kiosk: Stacked with ALL text centered
+        // - Added CSS version display in footer (reads from --css-version)
+        // - Updated HTML comment version format
+        // V5.49.1: Kiosk Mode Layout Fixes
         // - Now clones entire quickBellControls from main page instead of recreating
         // - Copies main page stylesheets (Tailwind) for consistent styling
         // - Custom quick bells work by cloning already-rendered buttons
@@ -540,7 +536,6 @@
         let activePersonalScheduleListenerUnsubscribe = null; // NEW: For personal schedule
         let personalSchedulesListenerUnsubscribe = null; // NEW: v3.09 - For the collection
         let customQuickBellsListenerUnsubscribe = null; // NEW V5.00: For custom quick bells
-        let userPreferencesListenerUnsubscribe = null; // NEW V5.53: For cloud-synced preferences
         let synths = {};
         let lastBellRingTime = null; 
         let lastRingTimestamp = 0; // NEW: For ring cooldown
@@ -659,21 +654,6 @@
         
         // NEW V5.49.0: Kiosk Mode state
         let kioskModeEnabled = false;
-        
-        // NEW V5.52.0: Countdown Warning state
-        let warningSettings = {
-            enabled: false,
-            time: 60,           // seconds before bell to start warning
-            style: 'pulse',     // pulse, color, breathe, shake, all
-            intensity: 'medium', // subtle, medium, urgent
-            scheduledBells: true,
-            quickBells: true,
-            // V5.52.1: Custom colors
-            colorSubtle: '#fbbf24',
-            colorMedium: '#f97316',
-            colorUrgent: '#ef4444'
-        };
-        let currentWarningClass = null; // Track currently applied warning class
 
         let currentSoundSelectTarget = null; // NEW V4.76: Stores <select> for audio modal
 
@@ -715,8 +695,6 @@
         function saveMutedBells() {
             try {
                 localStorage.setItem('mutedBellIds', JSON.stringify([...mutedBellIds]));
-                // V5.53: Also save to cloud
-                saveUserPreferencesToCloud();
             } catch (e) {
                 console.error("Failed to save muted bells", e);
             }
@@ -892,8 +870,6 @@
         function saveSoundOverrides() {
             try {
                 localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
-                // V5.53: Also save to cloud
-                saveUserPreferencesToCloud();
             } catch (e) {
                 console.error("Failed to save sound overrides", e);
             }
@@ -921,8 +897,6 @@
         function savePeriodNameOverrides() {
             try {
                 localStorage.setItem('periodNameOverrides', JSON.stringify(periodNameOverrides));
-                // V5.53: Also save to cloud
-                saveUserPreferencesToCloud();
             } catch (e) {
                 console.error("Failed to save period nicknames", e);
             }
@@ -955,180 +929,9 @@
                 console.log('Saving to localStorage:', periodVisualOverrides);
                 localStorage.setItem('periodVisualOverrides', JSON.stringify(periodVisualOverrides));
                 console.log('Successfully saved to localStorage');
-                // V5.53: Also save to cloud
-                saveUserPreferencesToCloud();
             } catch (e) {
                 console.error("Failed to save visual overrides", e);
             }
-        }
-
-        // ============================================
-        // V5.53: CLOUD SYNC FOR USER PREFERENCES
-        // Syncs all user preferences to Firestore
-        // ============================================
-        
-        /**
-         * V5.53: Save all user preferences to Firestore
-         * Only saves for non-anonymous users
-         */
-        async function saveUserPreferencesToCloud() {
-            if (isUserAnonymous || !userId || !db) {
-                console.log('[CloudSync] Skipping cloud save (anonymous or no user)');
-                return;
-            }
-            
-            try {
-                const prefsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'preferences');
-                
-                // Convert mutedBellIds Set to Array for storage
-                const mutedBellIdsArray = Array.from(mutedBellIds);
-                
-                const prefsData = {
-                    periodVisualOverrides: periodVisualOverrides || {},
-                    bellSoundOverrides: bellSoundOverrides || {},
-                    periodNameOverrides: periodNameOverrides || {},
-                    mutedBellIds: mutedBellIdsArray,
-                    warningSettings: warningSettings || {},
-                    kioskModeEnabled: kioskModeEnabled || false,
-                    lastUpdated: new Date().toISOString()
-                };
-                
-                await setDoc(prefsDocRef, prefsData, { merge: true });
-                console.log('[CloudSync] User preferences saved to cloud');
-                
-            } catch (error) {
-                console.error('[CloudSync] Error saving preferences to cloud:', error);
-            }
-        }
-        
-        /**
-         * V5.53: Load user preferences from Firestore
-         * Falls back to localStorage if cloud data doesn't exist
-         */
-        async function loadUserPreferencesFromCloud() {
-            if (isUserAnonymous || !userId || !db) {
-                console.log('[CloudSync] Skipping cloud load (anonymous or no user)');
-                return false;
-            }
-            
-            try {
-                const prefsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'preferences');
-                const docSnap = await getDoc(prefsDocRef);
-                
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    console.log('[CloudSync] Loaded preferences from cloud:', data);
-                    
-                    // Apply cloud data to local state
-                    if (data.periodVisualOverrides) {
-                        periodVisualOverrides = data.periodVisualOverrides;
-                        localStorage.setItem('periodVisualOverrides', JSON.stringify(periodVisualOverrides));
-                    }
-                    
-                    if (data.bellSoundOverrides) {
-                        bellSoundOverrides = data.bellSoundOverrides;
-                        localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
-                    }
-                    
-                    if (data.periodNameOverrides) {
-                        periodNameOverrides = data.periodNameOverrides;
-                        localStorage.setItem('periodNameOverrides', JSON.stringify(periodNameOverrides));
-                    }
-                    
-                    if (data.mutedBellIds && Array.isArray(data.mutedBellIds)) {
-                        mutedBellIds = new Set(data.mutedBellIds);
-                        localStorage.setItem('mutedBellIds', JSON.stringify(data.mutedBellIds));
-                    }
-                    
-                    if (data.warningSettings) {
-                        warningSettings = { ...warningSettings, ...data.warningSettings };
-                        localStorage.setItem('countdownWarningSettings', JSON.stringify(warningSettings));
-                        applyWarningColors();
-                    }
-                    
-                    if (typeof data.kioskModeEnabled === 'boolean') {
-                        kioskModeEnabled = data.kioskModeEnabled;
-                        localStorage.setItem('kioskModeEnabled', kioskModeEnabled ? 'true' : 'false');
-                        applyKioskMode(kioskModeEnabled);
-                    }
-                    
-                    return true; // Cloud data was loaded
-                } else {
-                    console.log('[CloudSync] No cloud preferences found, using localStorage');
-                    // First time user - save current localStorage data to cloud
-                    await saveUserPreferencesToCloud();
-                    return false;
-                }
-                
-            } catch (error) {
-                console.error('[CloudSync] Error loading preferences from cloud:', error);
-                return false;
-            }
-        }
-        
-        /**
-         * V5.53: Set up real-time listener for user preferences
-         * Syncs changes from other devices
-         */
-        function setupUserPreferencesListener() {
-            if (isUserAnonymous || !userId || !db) {
-                return;
-            }
-            
-            // Unsubscribe from previous listener if exists
-            if (userPreferencesListenerUnsubscribe) {
-                userPreferencesListenerUnsubscribe();
-            }
-            
-            const prefsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'preferences');
-            
-            console.log('[CloudSync] Setting up preferences listener...');
-            
-            userPreferencesListenerUnsubscribe = onSnapshot(prefsDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    console.log('[CloudSync] Preferences updated from cloud');
-                    
-                    // Apply cloud data to local state (same as loadUserPreferencesFromCloud)
-                    if (data.periodVisualOverrides) {
-                        periodVisualOverrides = data.periodVisualOverrides;
-                        localStorage.setItem('periodVisualOverrides', JSON.stringify(periodVisualOverrides));
-                    }
-                    
-                    if (data.bellSoundOverrides) {
-                        bellSoundOverrides = data.bellSoundOverrides;
-                        localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
-                    }
-                    
-                    if (data.periodNameOverrides) {
-                        periodNameOverrides = data.periodNameOverrides;
-                        localStorage.setItem('periodNameOverrides', JSON.stringify(periodNameOverrides));
-                    }
-                    
-                    if (data.mutedBellIds && Array.isArray(data.mutedBellIds)) {
-                        mutedBellIds = new Set(data.mutedBellIds);
-                        localStorage.setItem('mutedBellIds', JSON.stringify(data.mutedBellIds));
-                        updateMuteButtonStates();
-                    }
-                    
-                    if (data.warningSettings) {
-                        warningSettings = { ...warningSettings, ...data.warningSettings };
-                        localStorage.setItem('countdownWarningSettings', JSON.stringify(warningSettings));
-                        applyWarningColors();
-                    }
-                    
-                    if (typeof data.kioskModeEnabled === 'boolean') {
-                        kioskModeEnabled = data.kioskModeEnabled;
-                        localStorage.setItem('kioskModeEnabled', kioskModeEnabled ? 'true' : 'false');
-                        applyKioskMode(kioskModeEnabled);
-                    }
-                    
-                    // Re-render the bell list to reflect any visual/sound changes
-                    renderCombinedBellList();
-                }
-            }, (error) => {
-                console.error('[CloudSync] Error listening to preferences:', error);
-            });
         }
 
         // NEW: Helper to format 24h time to 12h AM/PM
@@ -1569,274 +1372,6 @@
             }
 
             // ============================================
-            // V5.52.0: COUNTDOWN WARNING FUNCTIONALITY
-            // ============================================
-            
-            /**
-             * Load warning settings from localStorage
-             */
-            function loadWarningSettings() {
-                try {
-                    const stored = localStorage.getItem('countdownWarningSettings');
-                    if (stored) {
-                        const parsed = JSON.parse(stored);
-                        warningSettings = { ...warningSettings, ...parsed };
-                        console.log('[Warning] Settings loaded:', warningSettings);
-                    }
-                    // V5.52.1: Apply custom colors on load
-                    applyWarningColors();
-                } catch (e) {
-                    console.error('[Warning] Error loading settings:', e);
-                }
-            }
-            
-            /**
-             * Save warning settings to localStorage
-             */
-            function saveWarningSettings() {
-                try {
-                    localStorage.setItem('countdownWarningSettings', JSON.stringify(warningSettings));
-                    console.log('[Warning] Settings saved:', warningSettings);
-                    // V5.52.1: Apply custom colors after saving
-                    applyWarningColors();
-                    // V5.53: Also save to cloud
-                    saveUserPreferencesToCloud();
-                } catch (e) {
-                    console.error('[Warning] Error saving settings:', e);
-                }
-            }
-            
-            /**
-             * V5.52.1: Apply custom warning colors to CSS variables
-             */
-            function applyWarningColors() {
-                const root = document.documentElement;
-                root.style.setProperty('--warning-color-subtle', warningSettings.colorSubtle);
-                root.style.setProperty('--warning-color-medium', warningSettings.colorMedium);
-                root.style.setProperty('--warning-color-urgent', warningSettings.colorUrgent);
-            }
-            
-            /**
-             * V5.52.1: Reset warning colors to defaults
-             */
-            function resetWarningColors() {
-                warningSettings.colorSubtle = '#fbbf24';
-                warningSettings.colorMedium = '#f97316';
-                warningSettings.colorUrgent = '#ef4444';
-                
-                // Update color inputs in modal
-                const subtleInput = document.getElementById('warning-color-subtle');
-                const mediumInput = document.getElementById('warning-color-medium');
-                const urgentInput = document.getElementById('warning-color-urgent');
-                
-                if (subtleInput) subtleInput.value = warningSettings.colorSubtle;
-                if (mediumInput) mediumInput.value = warningSettings.colorMedium;
-                if (urgentInput) urgentInput.value = warningSettings.colorUrgent;
-                
-                applyWarningColors();
-            }
-            
-            /**
-             * Get the appropriate warning class based on settings and time remaining
-             * @param {number} secondsRemaining - Seconds until bell
-             * @param {boolean} isQuickBell - Whether this is a quick bell timer
-             * @returns {string|null} CSS class to apply, or null if no warning
-             */
-            function getWarningClass(secondsRemaining, isQuickBell = false) {
-                if (!warningSettings.enabled) return null;
-                if (isQuickBell && !warningSettings.quickBells) return null;
-                if (!isQuickBell && !warningSettings.scheduledBells) return null;
-                if (secondsRemaining > warningSettings.time || secondsRemaining <= 0) return null;
-                
-                // Calculate intensity based on time remaining
-                const timeRatio = secondsRemaining / warningSettings.time;
-                let intensity;
-                
-                if (timeRatio > 0.5) {
-                    intensity = 'subtle';
-                } else if (timeRatio > 0.2) {
-                    intensity = 'medium';
-                } else {
-                    intensity = 'urgent';
-                }
-                
-                // If user set a fixed intensity, use that instead
-                if (warningSettings.intensity !== 'auto') {
-                    // Progressive: start at subtle, escalate based on user's max
-                    if (warningSettings.intensity === 'subtle') {
-                        intensity = 'subtle';
-                    } else if (warningSettings.intensity === 'medium') {
-                        intensity = timeRatio > 0.5 ? 'subtle' : 'medium';
-                    } else if (warningSettings.intensity === 'urgent') {
-                        intensity = timeRatio > 0.5 ? 'subtle' : (timeRatio > 0.2 ? 'medium' : 'urgent');
-                    }
-                }
-                
-                return `warning-${warningSettings.style}-${intensity}`;
-            }
-            
-            /**
-             * Apply warning effect to visual cue container
-             * @param {number} secondsRemaining - Seconds until bell
-             * @param {boolean} isQuickBell - Whether this is a quick bell timer
-             */
-            function applyWarningEffect(secondsRemaining, isQuickBell = false) {
-                const container = document.getElementById('visual-cue-container');
-                if (!container) return;
-                
-                const newClass = getWarningClass(secondsRemaining, isQuickBell);
-                
-                // Remove old warning class if different
-                if (currentWarningClass && currentWarningClass !== newClass) {
-                    container.classList.remove(currentWarningClass);
-                }
-                
-                // Apply new warning class
-                if (newClass && newClass !== currentWarningClass) {
-                    container.classList.add(newClass);
-                    currentWarningClass = newClass;
-                } else if (!newClass && currentWarningClass) {
-                    container.classList.remove(currentWarningClass);
-                    currentWarningClass = null;
-                }
-                
-                // Also apply to PiP window if open
-                if (pipWindow && !pipWindow.closed) {
-                    const pipContainer = pipWindow.document.getElementById('pip-visual');
-                    if (pipContainer) {
-                        // Remove all warning classes first
-                        pipContainer.className = pipContainer.className.replace(/warning-\S+/g, '').trim();
-                        if (newClass) {
-                            pipContainer.classList.add(newClass);
-                        }
-                    }
-                }
-            }
-            
-            /**
-             * Clear all warning effects
-             */
-            function clearWarningEffects() {
-                const container = document.getElementById('visual-cue-container');
-                if (container && currentWarningClass) {
-                    container.classList.remove(currentWarningClass);
-                }
-                currentWarningClass = null;
-                
-                // Also clear from PiP
-                if (pipWindow && !pipWindow.closed) {
-                    const pipContainer = pipWindow.document.getElementById('pip-visual');
-                    if (pipContainer) {
-                        pipContainer.className = pipContainer.className.replace(/warning-\S+/g, '').trim();
-                    }
-                }
-            }
-            
-            /**
-             * Open warning settings modal
-             */
-            function openWarningSettingsModal() {
-                const modal = document.getElementById('warning-settings-modal');
-                if (!modal) return;
-                
-                // Populate form with current settings
-                document.getElementById('warning-enabled').checked = warningSettings.enabled;
-                document.getElementById('warning-time').value = warningSettings.time;
-                document.getElementById('warning-style').value = warningSettings.style;
-                document.getElementById('warning-intensity').value = warningSettings.intensity;
-                document.getElementById('warning-scheduled-bells').checked = warningSettings.scheduledBells;
-                document.getElementById('warning-quick-bells').checked = warningSettings.quickBells;
-                
-                // V5.52.1: Populate color inputs
-                document.getElementById('warning-color-subtle').value = warningSettings.colorSubtle;
-                document.getElementById('warning-color-medium').value = warningSettings.colorMedium;
-                document.getElementById('warning-color-urgent').value = warningSettings.colorUrgent;
-                
-                modal.classList.remove('hidden');
-            }
-            
-            /**
-             * Close warning settings modal
-             */
-            function closeWarningSettingsModal() {
-                const modal = document.getElementById('warning-settings-modal');
-                if (modal) {
-                    modal.classList.add('hidden');
-                }
-                // Stop any preview animation
-                stopWarningPreview();
-            }
-            
-            /**
-             * Save warning settings from modal
-             */
-            function saveWarningSettingsFromModal() {
-                warningSettings.enabled = document.getElementById('warning-enabled').checked;
-                warningSettings.time = parseInt(document.getElementById('warning-time').value) || 60;
-                warningSettings.style = document.getElementById('warning-style').value;
-                warningSettings.intensity = document.getElementById('warning-intensity').value;
-                warningSettings.scheduledBells = document.getElementById('warning-scheduled-bells').checked;
-                warningSettings.quickBells = document.getElementById('warning-quick-bells').checked;
-                
-                // V5.52.1: Save custom colors
-                warningSettings.colorSubtle = document.getElementById('warning-color-subtle').value;
-                warningSettings.colorMedium = document.getElementById('warning-color-medium').value;
-                warningSettings.colorUrgent = document.getElementById('warning-color-urgent').value;
-                
-                saveWarningSettings();
-                closeWarningSettingsModal();
-                
-                // Clear any existing warnings so they recalculate
-                clearWarningEffects();
-            }
-            
-            /**
-             * Preview warning effect in modal
-             */
-            let warningPreviewTimeout = null;
-            function previewWarningEffect() {
-                const preview = document.getElementById('warning-preview');
-                if (!preview) return;
-                
-                // Get current form values
-                const style = document.getElementById('warning-style').value;
-                const intensity = document.getElementById('warning-intensity').value;
-                
-                // V5.52.1: Apply current color settings from form for preview
-                const root = document.documentElement;
-                root.style.setProperty('--warning-color-subtle', document.getElementById('warning-color-subtle').value);
-                root.style.setProperty('--warning-color-medium', document.getElementById('warning-color-medium').value);
-                root.style.setProperty('--warning-color-urgent', document.getElementById('warning-color-urgent').value);
-                
-                // Clear previous preview
-                preview.className = 'mx-auto w-24 h-24 bg-gray-800 rounded-lg flex items-center justify-center';
-                
-                // Apply preview class
-                const previewClass = `warning-${style}-${intensity}`;
-                preview.classList.add(previewClass);
-                
-                // Stop after 3 seconds
-                if (warningPreviewTimeout) clearTimeout(warningPreviewTimeout);
-                warningPreviewTimeout = setTimeout(() => {
-                    stopWarningPreview();
-                }, 3000);
-            }
-            
-            /**
-             * Stop warning preview
-             */
-            function stopWarningPreview() {
-                const preview = document.getElementById('warning-preview');
-                if (preview) {
-                    preview.className = 'mx-auto w-24 h-24 bg-gray-800 rounded-lg flex items-center justify-center';
-                }
-                if (warningPreviewTimeout) {
-                    clearTimeout(warningPreviewTimeout);
-                    warningPreviewTimeout = null;
-                }
-            }
-
-            // ============================================
             // V5.49.0: KIOSK MODE FUNCTIONALITY
             // ============================================
             
@@ -1861,8 +1396,6 @@
             function saveKioskModePreference() {
                 try {
                     localStorage.setItem('kioskModeEnabled', kioskModeEnabled ? 'true' : 'false');
-                    // V5.53: Also save to cloud
-                    saveUserPreferencesToCloud();
                 } catch (e) {
                     console.error('Error saving kiosk mode preference:', e);
                 }
@@ -2408,11 +1941,6 @@
                     }
                     countdownElement.textContent = countdownString;
                     
-                    // V5.52.0: Apply countdown warning effect
-                    const totalSecondsRemaining = Math.max(0, Math.floor(activeTimerMillis / 1000));
-                    const isQuickBellActive = millisToQuickBell < millisToScheduleBell;
-                    applyWarningEffect(totalSecondsRemaining, isQuickBellActive);
-                    
                     // Updated 5.26.1 - Add Period context to the label
                     let bellLabel = activeTimerLabel;
 
@@ -2438,10 +1966,6 @@
                     countdownElement.textContent = "--:--";
                     // MODIFICATION: Added period
                     nextBellElement.textContent = "until the next bell.";
-                    
-                    // V5.52.0: Clear warning effects when no active countdown
-                    clearWarningEffects();
-                    
                     // "Next Bell" info is already set to "No more bells today."
                     // Or, if school is out, scheduleBellObject is the first bell tomorrow.
                     if (scheduleBellObject) {
@@ -4677,9 +4201,6 @@
                                 listenForPersonalSchedules(user.uid);
                                 // NEW V5.00: Start Custom Quick Bell listener
                                 listenForCustomQuickBells(user.uid);
-                                // V5.53: Load cloud preferences and set up listener
-                                await loadUserPreferencesFromCloud();
-                                setupUserPreferencesListener();
                                 // NEW V5.00: Enable custom quick bell button
                                 showCustomQuickBellManagerBtn.disabled = false;
                                 showCustomQuickBellManagerBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -4761,11 +4282,6 @@
                             if (customQuickBellsListenerUnsubscribe) {
                                 customQuickBellsListenerUnsubscribe();
                                 customQuickBellsListenerUnsubscribe = null;
-                            }
-                            // V5.53: Unsubscribe from user preferences
-                            if (userPreferencesListenerUnsubscribe) {
-                                userPreferencesListenerUnsubscribe();
-                                userPreferencesListenerUnsubscribe = null;
                             }
                             
                             document.body.classList.remove('authenticated', 'not-anonymous', 'admin-mode');
@@ -10692,31 +10208,6 @@
                 document.title = `Ellis Web Bell ${APP_VERSION}`;
                 console.log(`App Version Loaded: ${APP_VERSION}`);
                 
-                // V5.51.0: Register Service Worker for PWA support
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('/service-worker.js')
-                        .then((registration) => {
-                            console.log('[PWA] Service Worker registered:', registration.scope);
-                            
-                            // Check for updates
-                            registration.addEventListener('updatefound', () => {
-                                const newWorker = registration.installing;
-                                console.log('[PWA] New Service Worker installing...');
-                                
-                                newWorker.addEventListener('statechange', () => {
-                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                        // New content available, show update notification
-                                        console.log('[PWA] New version available!');
-                                        showUserMessage('New version available! Refresh to update.');
-                                    }
-                                });
-                            });
-                        })
-                        .catch((error) => {
-                            console.warn('[PWA] Service Worker registration failed:', error);
-                        });
-                }
-                
                 // MODIFIED V4.74: All local storage loads
                 // are now handled inside onAuthStateChanged
                 // to prevent race conditions.
@@ -12001,42 +11492,6 @@
                 
                 // V5.49.0: Load kiosk mode preference on startup
                 loadKioskModePreference();
-                
-                // V5.52.0: Warning Settings
-                const settingsToggleBtn = document.getElementById('settings-toggle-btn');
-                const warningSettingsModal = document.getElementById('warning-settings-modal');
-                const warningSettingsCancel = document.getElementById('warning-settings-cancel');
-                const warningSettingsSave = document.getElementById('warning-settings-save');
-                const warningPreviewBtn = document.getElementById('warning-preview-btn');
-                
-                if (settingsToggleBtn) {
-                    settingsToggleBtn.addEventListener('click', openWarningSettingsModal);
-                }
-                if (warningSettingsCancel) {
-                    warningSettingsCancel.addEventListener('click', closeWarningSettingsModal);
-                }
-                if (warningSettingsSave) {
-                    warningSettingsSave.addEventListener('click', saveWarningSettingsFromModal);
-                }
-                if (warningPreviewBtn) {
-                    warningPreviewBtn.addEventListener('click', previewWarningEffect);
-                }
-                // V5.52.1: Reset colors button
-                const warningResetColorsBtn = document.getElementById('warning-reset-colors');
-                if (warningResetColorsBtn) {
-                    warningResetColorsBtn.addEventListener('click', resetWarningColors);
-                }
-                // Close modal on background click
-                if (warningSettingsModal) {
-                    warningSettingsModal.addEventListener('click', (e) => {
-                        if (e.target === warningSettingsModal) {
-                            closeWarningSettingsModal();
-                        }
-                    });
-                }
-                
-                // V5.52.0: Load warning settings on startup
-                loadWarningSettings();
                     
                 customTextVisualForm.addEventListener('submit', (e) => {
                     e.preventDefault();
