@@ -1,4 +1,4 @@
-        const APP_VERSION = "5.56"
+        const APP_VERSION = "5.56.2"
         // V5.54.6: UX improvements
         // - Sound overrides now display nickname if available, instead of raw filename
         // - Fixed sound dropdown overflow in relative bell modal (added min-w-0)
@@ -604,8 +604,8 @@
         let mutedBellIds = new Set(); 
         let skippedBellOccurrences = new Set(); // V5.47.9: Temporarily skipped bells (format: "bellId:YYYY-MM-DD")
         let bellSoundOverrides = {}; // NEW: Store local sound overrides
-        let bellVisualOverrides = {}; // V5.56: Store bell visual overrides (for use without personal schedule)
-        let bellNameOverrides = {}; // V5.56: Store bell nickname overrides (for use without personal schedule)
+        let bellVisualOverrides = {}; // V5.55.9: Store bell visual overrides (for use without personal schedule)
+        let bellNameOverrides = {}; // V5.55.9: Store bell nickname overrides (for use without personal schedule)
         let periodNameOverrides = {}; // NEW in 4.22: Store local period nicknames
         
         // --- NEW in 4.57: New Period state ---
@@ -925,7 +925,7 @@
             }
         }
 
-        // V5.56: Bell Visual Override Functions (for use without personal schedule)
+        // V5.55.9: Bell Visual Override Functions (for use without personal schedule)
         function loadBellVisualOverrides() {
             try {
                 const stored = localStorage.getItem('bellVisualOverrides');
@@ -948,7 +948,7 @@
             }
         }
 
-        // V5.56: Bell Name Override Functions (for use without personal schedule)
+        // V5.55.9: Bell Name Override Functions (for use without personal schedule)
         function loadBellNameOverrides() {
             try {
                 const stored = localStorage.getItem('bellNameOverrides');
@@ -1056,8 +1056,8 @@
                 const prefsData = {
                     periodVisualOverrides: periodVisualOverrides || {},
                     bellSoundOverrides: bellSoundOverrides || {},
-                    bellVisualOverrides: bellVisualOverrides || {}, // V5.56
-                    bellNameOverrides: bellNameOverrides || {}, // V5.56
+                    bellVisualOverrides: bellVisualOverrides || {}, // V5.55.9
+                    bellNameOverrides: bellNameOverrides || {}, // V5.55.9
                     periodNameOverrides: periodNameOverrides || {},
                     warningSettings: warningSettings || {},
                     kioskModeEnabled: kioskModeEnabled || false,
@@ -1102,7 +1102,7 @@
                         localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
                     }
                     
-                    // V5.56: Load bell visual and name overrides
+                    // V5.55.9: Load bell visual and name overrides
                     if (data.bellVisualOverrides) {
                         bellVisualOverrides = data.bellVisualOverrides;
                         localStorage.setItem('bellVisualOverrides', JSON.stringify(bellVisualOverrides));
@@ -1192,7 +1192,7 @@
                         localStorage.setItem('bellSoundOverrides', JSON.stringify(bellSoundOverrides));
                     }
                     
-                    // V5.56: Bell visual and name overrides
+                    // V5.55.9: Bell visual and name overrides
                     if (data.bellVisualOverrides) {
                         bellVisualOverrides = data.bellVisualOverrides;
                         localStorage.setItem('bellVisualOverrides', JSON.stringify(bellVisualOverrides));
@@ -3714,7 +3714,8 @@
                 // NEW V5.46.0: Update bulk edit button visibility
                 const bulkEditBtn = document.getElementById('bulk-edit-toggle-btn');
                 if (bulkEditBtn) {
-                    bulkEditBtn.classList.toggle('hidden', !activePersonalScheduleId);
+                    // V5.56.1: Show bulk edit even without personal schedule (for sound/visual overrides)
+                    bulkEditBtn.classList.remove('hidden');
                 }
                 
                 // Use the calculated, merged, and time-resolved periods passed from the engine
@@ -4558,7 +4559,7 @@
                                 }
                             }
                             
-                            // V5.56: Apply visual overrides from user preferences (when no personal schedule)
+                            // V5.55.9: Apply visual overrides from user preferences (when no personal schedule)
                             if (!personalOverride?.visualCue && !personalOverride?.visualMode) {
                                 const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
                                 const visualOverride = bellVisualOverrides[overrideKey];
@@ -4572,7 +4573,7 @@
                                 }
                             }
                             
-                            // V5.56: Apply name overrides from user preferences (when no personal schedule)
+                            // V5.55.9: Apply name overrides from user preferences (when no personal schedule)
                             if (!personalOverride?.nickname) {
                                 const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
                                 const nameOverride = bellNameOverrides[overrideKey];
@@ -5085,7 +5086,7 @@
                     const bellId = oldBell.bellId || getBellId(oldBell);
                     const overrideKey = getBellOverrideKey(activeBaseScheduleId, oldBell);
                     
-                    // V5.56: If we have a personal schedule, save to Firestore for cross-device sync
+                    // V5.55.9: If we have a personal schedule, save to Firestore for cross-device sync
                     // Otherwise, save to user preferences (also synced to cloud)
                     if (activePersonalScheduleId) {
                         try {
@@ -5123,7 +5124,7 @@
                             showUserMessage("Error saving sound: " + error.message);
                         }
                     } else {
-                        // V5.56: No personal schedule - save to user preferences instead
+                        // V5.55.9: No personal schedule - save to user preferences instead
                         // This allows sound overrides on pure shared schedules
                         if (newSound === oldBell.originalSound) {
                             // Remove the override
@@ -5247,8 +5248,8 @@
                             // This fixes the race condition where icons wouldn't load.
                             loadMutedBells();
                             loadSoundOverrides();
-                            loadBellVisualOverrides(); // V5.56
-                            loadBellNameOverrides(); // V5.56
+                            loadBellVisualOverrides(); // V5.55.9
+                            loadBellNameOverrides(); // V5.55.9
                             loadPeriodNameOverrides();
                             loadVisualOverrides();
                             // --- END V4.74 FIX ---
@@ -6933,7 +6934,7 @@
                             const nameChanged = newBell.name !== oldBell.name;
                             const visualChanged = visualCue || visualMode !== 'none';
                             
-                            // V5.56: If we have a personal schedule, save to Firestore
+                            // V5.55.9: If we have a personal schedule, save to Firestore
                             // Otherwise, save to user preferences (also synced to cloud)
                             if (activePersonalScheduleId) {
                                 const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
@@ -6971,7 +6972,7 @@
                                 
                                 editBellStatus.textContent = "Personal customization saved.";
                             } else {
-                                // V5.56: No personal schedule - save to user preferences
+                                // V5.55.9: No personal schedule - save to user preferences
                                 // Sound override
                                 if (soundChanged) {
                                     bellSoundOverrides[overrideKey] = editBellSoundInput.value;
@@ -13296,6 +13297,17 @@
                         bulkTimeShiftMinutes.value = '5';
                         bulkTimeShiftSeconds.value = '0';
                         bulkTimeShiftWarning.classList.add('hidden');
+                        
+                        // V5.56.1: Disable time shift when no personal schedule
+                        if (!activePersonalScheduleId) {
+                            bulkTimeShiftEnabled.disabled = true;
+                            bulkTimeShiftEnabled.parentElement.classList.add('opacity-50');
+                            bulkTimeShiftEnabled.parentElement.title = 'Time shift requires a personal schedule copy';
+                        } else {
+                            bulkTimeShiftEnabled.disabled = false;
+                            bulkTimeShiftEnabled.parentElement.classList.remove('opacity-50');
+                            bulkTimeShiftEnabled.parentElement.title = '';
+                        }
                     }
                     
                     bulkEditModal.classList.remove('hidden');
@@ -13388,7 +13400,7 @@
 
                 // Apply bulk edits
                 bulkEditApply?.addEventListener('click', async () => {
-                    if (bulkSelectedBells.size === 0 || !activePersonalScheduleId) return;
+                    if (bulkSelectedBells.size === 0) return;
                     
                     const newSound = bulkEditSound.value;
                     const newVisual = bulkEditVisual.value;
@@ -13419,14 +13431,26 @@
                         return;
                     }
                     
+                    // V5.56.1: Time shift requires personal schedule
+                    if (isTimeShiftEnabled && !activePersonalScheduleId) {
+                        bulkEditStatus.textContent = 'Time shift requires a personal schedule copy.';
+                        bulkEditStatus.classList.remove('hidden');
+                        return;
+                    }
+                    
                     try {
                         bulkEditStatus.textContent = 'Applying changes...';
                         bulkEditStatus.classList.remove('hidden');
+                        
+                        // V5.56.2: Check if user is admin for shared bell time shifts
+                        const isAdmin = document.body.classList.contains('admin-mode');
                         
                         let updatedCustomCount = 0;
                         let updatedSharedCount = 0;
                         let timeShiftedCount = 0;
                         let skippedSharedTimeShift = 0;
+                        let adminSharedTimeShiftCount = 0; // V5.56.2: Track admin-shifted shared bells
+                        let skippedCustomNoPersched = 0;
                         
                         // --- Identify which bells are custom vs shared ---
                         const allCalculatedBells = [...localSchedule, ...personalBells];
@@ -13444,38 +13468,87 @@
                             }
                         });
                         
-                        const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
-                        
-                        // --- Handle CUSTOM bells (update periods in Firestore) ---
-                        let updatedPeriods = [...personalBellsPeriods];
-                        if (customBellIds.size > 0) {
-                            updatedPeriods = updatedPeriods.map(period => {
-                                const updatedBells = period.bells.map(bell => {
-                                    const bellId = bell.bellId || getBellId(bell);
-                                    if (customBellIds.has(bellId)) {
-                                        const updatedBell = { ...bell };
-                                        
-                                        if (newSound !== '[NO_CHANGE]') {
-                                            updatedBell.sound = newSound;
+                        // V5.56.1: Handle case where we have personal schedule
+                        if (activePersonalScheduleId) {
+                            const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+                            
+                            // --- Handle CUSTOM bells (update periods in Firestore) ---
+                            let updatedPeriods = [...personalBellsPeriods];
+                            if (customBellIds.size > 0) {
+                                updatedPeriods = updatedPeriods.map(period => {
+                                    const updatedBells = period.bells.map(bell => {
+                                        const bellId = bell.bellId || getBellId(bell);
+                                        if (customBellIds.has(bellId)) {
+                                            const updatedBell = { ...bell };
+                                            
+                                            if (newSound !== '[NO_CHANGE]') {
+                                                updatedBell.sound = newSound;
+                                            }
+                                            
+                                            if (newVisual !== '[NO_CHANGE]') {
+                                                updatedBell.visualCue = newVisual === '' ? '' : newVisual;
+                                                updatedBell.visualMode = newVisual === '' ? 'none' : newVisualMode;
+                                            }
+                                            
+                                            // V5.54.0: Handle time shift for custom bells
+                                            if (isTimeShiftEnabled && totalShiftSeconds !== 0) {
+                                                if (bell.relative) {
+                                                    // Relative bell - adjust the offset
+                                                    const currentOffset = bell.relative.offsetSeconds || 0;
+                                                    updatedBell.relative = {
+                                                        ...bell.relative,
+                                                        offsetSeconds: currentOffset + totalShiftSeconds
+                                                    };
+                                                    timeShiftedCount++;
+                                                } else if (bell.time) {
+                                                    // Static bell - adjust the actual time
+                                                    const [h, m, s] = bell.time.split(':').map(Number);
+                                                    let totalSeconds = (h * 3600) + (m * 60) + (s || 0);
+                                                    totalSeconds += totalShiftSeconds;
+                                                    
+                                                    // Handle day wraparound
+                                                    while (totalSeconds < 0) totalSeconds += 86400;
+                                                    while (totalSeconds >= 86400) totalSeconds -= 86400;
+                                                    
+                                                    const newH = Math.floor(totalSeconds / 3600);
+                                                    const newM = Math.floor((totalSeconds % 3600) / 60);
+                                                    const newS = totalSeconds % 60;
+                                                    
+                                                    updatedBell.time = `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:${String(newS).padStart(2, '0')}`;
+                                                    timeShiftedCount++;
+                                                }
+                                            }
+                                            
+                                            updatedCustomCount++;
+                                            return updatedBell;
                                         }
-                                        
-                                        if (newVisual !== '[NO_CHANGE]') {
-                                            updatedBell.visualCue = newVisual === '' ? '' : newVisual;
-                                            updatedBell.visualMode = newVisual === '' ? 'none' : newVisualMode;
-                                        }
-                                        
-                                        // V5.54.0: Handle time shift for custom bells
-                                        if (isTimeShiftEnabled && totalShiftSeconds !== 0) {
-                                            if (bell.relative) {
-                                                // Relative bell - adjust the offset
-                                                const currentOffset = bell.relative.offsetSeconds || 0;
-                                                updatedBell.relative = {
-                                                    ...bell.relative,
-                                                    offsetSeconds: currentOffset + totalShiftSeconds
-                                                };
-                                                timeShiftedCount++;
-                                            } else if (bell.time) {
-                                                // Static bell - adjust the actual time
+                                        return bell;
+                                    });
+                                    return { ...period, bells: updatedBells };
+                                });
+                            }
+                            
+                            // --- Handle SHARED bells (with personal schedule) ---
+                            const docSnap = await getDoc(personalScheduleRef);
+                            const currentData = docSnap.exists() ? docSnap.data() : {};
+                            const bellOverrides = currentData.bellOverrides || {};
+                            
+                            // V5.56.2: Admin can time-shift shared bells by modifying the actual schedule
+                            if (isAdmin && isTimeShiftEnabled && sharedBellsToUpdate.length > 0) {
+                                // Get the current shared schedule
+                                const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                                if (currentSchedule) {
+                                    // Create a set of bell IDs to update
+                                    const sharedBellIdsToShift = new Set(sharedBellsToUpdate.map(b => b.bellId || getBellId(b)));
+                                    
+                                    // Update the periods with time-shifted bells
+                                    const updatedSharedPeriods = currentSchedule.periods.map(period => {
+                                        const updatedBells = period.bells.map(bell => {
+                                            const bellId = bell.bellId || getBellId(bell);
+                                            if (sharedBellIdsToShift.has(bellId) && bell.time) {
+                                                const updatedBell = { ...bell };
+                                                
+                                                // Shift the time
                                                 const [h, m, s] = bell.time.split(':').map(Number);
                                                 let totalSeconds = (h * 3600) + (m * 60) + (s || 0);
                                                 totalSeconds += totalShiftSeconds;
@@ -13489,81 +13562,145 @@
                                                 const newS = totalSeconds % 60;
                                                 
                                                 updatedBell.time = `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:${String(newS).padStart(2, '0')}`;
-                                                timeShiftedCount++;
+                                                adminSharedTimeShiftCount++;
+                                                return updatedBell;
                                             }
-                                        }
-                                        
-                                        updatedCustomCount++;
-                                        return updatedBell;
+                                            return bell;
+                                        });
+                                        return { ...period, bells: updatedBells };
+                                    });
+                                    
+                                    // Save to Firestore
+                                    const legacyBells = flattenPeriodsToLegacyBells(updatedSharedPeriods);
+                                    await updateDoc(scheduleRef, { periods: updatedSharedPeriods, bells: legacyBells });
+                                    
+                                    // Update local state
+                                    localSchedulePeriods = updatedSharedPeriods;
+                                }
+                            }
+                            
+                            sharedBellsToUpdate.forEach(bell => {
+                                const bellId = bell.bellId || getBellId(bell);
+                                let sharedBellChanged = false;
+                                
+                                if (!bellOverrides[bellId]) {
+                                    bellOverrides[bellId] = {};
+                                }
+                                
+                                if (newSound !== '[NO_CHANGE]') {
+                                    bellOverrides[bellId].sound = newSound;
+                                    sharedBellChanged = true;
+                                }
+                                
+                                if (newVisual !== '[NO_CHANGE]') {
+                                    if (newVisual === '') {
+                                        delete bellOverrides[bellId].visualCue;
+                                        delete bellOverrides[bellId].visualMode;
+                                    } else {
+                                        bellOverrides[bellId].visualCue = newVisual;
+                                        bellOverrides[bellId].visualMode = newVisualMode;
                                     }
-                                    return bell;
-                                });
-                                return { ...period, bells: updatedBells };
+                                    sharedBellChanged = true;
+                                }
+                                
+                                // V5.56.2: Only skip for non-admins
+                                if (isTimeShiftEnabled && !isAdmin) {
+                                    skippedSharedTimeShift++;
+                                }
+                                
+                                if (Object.keys(bellOverrides[bellId]).length === 0) {
+                                    delete bellOverrides[bellId];
+                                }
+                                
+                                if (sharedBellChanged) {
+                                    updatedSharedCount++;
+                                }
                             });
+                            
+                            // Save to Firestore
+                            await updateDoc(personalScheduleRef, { 
+                                periods: updatedPeriods,
+                                bellOverrides: bellOverrides
+                            });
+                            
+                            personalBellOverrides = bellOverrides;
+                            
+                        } else {
+                            // V5.56.1: No personal schedule - save to user preferences
+                            // Custom bells cannot be updated without personal schedule
+                            skippedCustomNoPersched = customBellIds.size;
+                            
+                            // V5.56.2: Admin can time-shift shared bells even without personal schedule
+                            if (isAdmin && isTimeShiftEnabled && sharedBellsToUpdate.length > 0) {
+                                const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+                                if (currentSchedule) {
+                                    const sharedBellIdsToShift = new Set(sharedBellsToUpdate.map(b => b.bellId || getBellId(b)));
+                                    
+                                    const updatedSharedPeriods = currentSchedule.periods.map(period => {
+                                        const updatedBells = period.bells.map(bell => {
+                                            const bellId = bell.bellId || getBellId(bell);
+                                            if (sharedBellIdsToShift.has(bellId) && bell.time) {
+                                                const updatedBell = { ...bell };
+                                                
+                                                const [h, m, s] = bell.time.split(':').map(Number);
+                                                let totalSeconds = (h * 3600) + (m * 60) + (s || 0);
+                                                totalSeconds += totalShiftSeconds;
+                                                
+                                                while (totalSeconds < 0) totalSeconds += 86400;
+                                                while (totalSeconds >= 86400) totalSeconds -= 86400;
+                                                
+                                                const newH = Math.floor(totalSeconds / 3600);
+                                                const newM = Math.floor((totalSeconds % 3600) / 60);
+                                                const newS = totalSeconds % 60;
+                                                
+                                                updatedBell.time = `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:${String(newS).padStart(2, '0')}`;
+                                                adminSharedTimeShiftCount++;
+                                                return updatedBell;
+                                            }
+                                            return bell;
+                                        });
+                                        return { ...period, bells: updatedBells };
+                                    });
+                                    
+                                    const legacyBells = flattenPeriodsToLegacyBells(updatedSharedPeriods);
+                                    await updateDoc(scheduleRef, { periods: updatedSharedPeriods, bells: legacyBells });
+                                    localSchedulePeriods = updatedSharedPeriods;
+                                }
+                            }
+                            
+                            // Handle SHARED bells (save to user preferences)
+                            sharedBellsToUpdate.forEach(bell => {
+                                const overrideKey = getBellOverrideKey(activeBaseScheduleId, bell);
+                                let sharedBellChanged = false;
+                                
+                                if (newSound !== '[NO_CHANGE]') {
+                                    bellSoundOverrides[overrideKey] = newSound;
+                                    sharedBellChanged = true;
+                                }
+                                
+                                if (newVisual !== '[NO_CHANGE]') {
+                                    if (newVisual === '') {
+                                        delete bellVisualOverrides[overrideKey];
+                                    } else {
+                                        bellVisualOverrides[overrideKey] = {
+                                            visualCue: newVisual,
+                                            visualMode: newVisualMode
+                                        };
+                                    }
+                                    sharedBellChanged = true;
+                                }
+                                
+                                if (sharedBellChanged) {
+                                    updatedSharedCount++;
+                                }
+                            });
+                            
+                            // Save to localStorage and cloud
+                            saveSoundOverrides();
+                            saveBellVisualOverrides();
                         }
                         
-                        // --- Handle SHARED bells ---
-                        // Get current bellOverrides from Firestore
-                        const docSnap = await getDoc(personalScheduleRef);
-                        const currentData = docSnap.exists() ? docSnap.data() : {};
-                        const bellOverrides = currentData.bellOverrides || {};
-                        
-                        sharedBellsToUpdate.forEach(bell => {
-                            const bellId = bell.bellId || getBellId(bell);
-                            
-                            // V5.54.1: Track if we actually change anything on this shared bell
-                            let sharedBellChanged = false;
-                            
-                            // Initialize override object if needed
-                            if (!bellOverrides[bellId]) {
-                                bellOverrides[bellId] = {};
-                            }
-                            
-                            // V5.46.4: Handle sound override (Firestore only for cross-device sync)
-                            if (newSound !== '[NO_CHANGE]') {
-                                bellOverrides[bellId].sound = newSound;
-                                sharedBellChanged = true;
-                            }
-                            
-                            // Handle visual override (uses Firestore bellOverrides)
-                            if (newVisual !== '[NO_CHANGE]') {
-                                if (newVisual === '') {
-                                    // Clear visual
-                                    delete bellOverrides[bellId].visualCue;
-                                    delete bellOverrides[bellId].visualMode;
-                                } else {
-                                    bellOverrides[bellId].visualCue = newVisual;
-                                    bellOverrides[bellId].visualMode = newVisualMode;
-                                }
-                                sharedBellChanged = true;
-                            }
-                            
-                            // V5.54.0: Time shift cannot apply to shared bells (unless admin)
-                            if (isTimeShiftEnabled) {
-                                skippedSharedTimeShift++;
-                            }
-                            
-                            // Clean up empty override objects
-                            if (Object.keys(bellOverrides[bellId]).length === 0) {
-                                delete bellOverrides[bellId];
-                            }
-                            
-                            // V5.54.1: Only count as updated if something actually changed
-                            if (sharedBellChanged) {
-                                updatedSharedCount++;
-                            }
-                        });
-                        
-                        // Save everything to Firestore
-                        await updateDoc(personalScheduleRef, { 
-                            periods: updatedPeriods,
-                            bellOverrides: bellOverrides
-                        });
-                        
-                        // V5.46.4: Update local state immediately
-                        personalBellOverrides = bellOverrides;
-                        
-                        // V5.54.1: Build accurate status message
+                        // Build status message
                         const totalUpdated = updatedCustomCount + updatedSharedCount;
                         let statusMsg = '';
                         
@@ -13572,7 +13709,9 @@
                         }
                         
                         if (isTimeShiftEnabled) {
-                            if (timeShiftedCount > 0) {
+                            // V5.56.2: Combine custom and admin-shifted shared bells
+                            const totalTimeShifted = timeShiftedCount + adminSharedTimeShiftCount;
+                            if (totalTimeShifted > 0) {
                                 const direction = totalShiftSeconds > 0 ? 'later' : 'earlier';
                                 const absSeconds = Math.abs(totalShiftSeconds);
                                 const shiftH = Math.floor(absSeconds / 3600);
@@ -13583,7 +13722,7 @@
                                 if (shiftM > 0) shiftStr += `${shiftM}m `;
                                 if (shiftS > 0) shiftStr += `${shiftS}s`;
                                 if (statusMsg) statusMsg += ' — ';
-                                statusMsg += `${timeShiftedCount} bell${timeShiftedCount !== 1 ? 's' : ''} shifted ${shiftStr.trim()} ${direction}`;
+                                statusMsg += `${totalTimeShifted} bell${totalTimeShifted !== 1 ? 's' : ''} shifted ${shiftStr.trim()} ${direction}`;
                             }
                             if (skippedSharedTimeShift > 0) {
                                 if (statusMsg) statusMsg += '. ';
@@ -13591,7 +13730,12 @@
                             }
                         }
                         
-                        // Handle case where nothing was actually changed
+                        // V5.56.1: Note skipped custom bells
+                        if (skippedCustomNoPersched > 0) {
+                            if (statusMsg) statusMsg += '. ';
+                            statusMsg += `⚠️ ${skippedCustomNoPersched} custom bell${skippedCustomNoPersched !== 1 ? 's' : ''} skipped (need personal schedule)`;
+                        }
+                        
                         if (!statusMsg) {
                             statusMsg = 'No changes applied';
                         }
