@@ -1,4 +1,81 @@
-const APP_VERSION = "5.57.0"
+const APP_VERSION = "5.59.1"
+// V5.59.1: Fixed Simplified View wiping schedule
+// - Removed renderCombinedList() call from toggleSimplifiedView()
+// - CSS handles all visibility changes, no re-render needed
+// V5.59.0: Simplified View Mode + Bulk Edit Select All
+// - Added Simplified View toggle button in Active Schedule section
+// - Simplified View hides all edit/add/delete buttons in schedule display
+// - Keeps Collapse/Expand/Mute/Unmute and Quick Bells visible
+// - Preference saved in localStorage (per-machine)
+// - Added master checkbox to select/deselect all bells in Bulk Edit mode
+// - Added period-level checkboxes to select/deselect all bells in a period
+// - Checkboxes show indeterminate state when partially selected
+// V5.58.9: Fixed relative bell detection to use correct property structure
+// - Relative bells use bell.relative object, not bell.relativeToAnchor
+// - Two anchor types: parentBellId (direct) or parentPeriodName+parentAnchorType (period anchor)
+// - Period anchor references (parentPeriodName) check if target period has matching anchor bell
+// - Properly copies bell.relative object instead of wrong properties
+// V5.58.8: Properly detect and exclude orphaned relative bells
+// - Relative bells whose anchors aren't in the import are now detected and excluded
+// - First pass collects all bellIds present in the import
+// - Bells with relativeToAnchor pointing to missing anchors are skipped
+// - Empty periods (all bells orphaned) are excluded from import
+// - Period and bell counts now reflect actual importable content
+// - Orphaned relative bells shown prominently in "Will Not Be Imported" section
+// - Console logs which bells/periods are being skipped for debugging
+// V5.58.7: Fixed syntax error (extra closing brace in showImportPreviewModal)
+// V5.58.6: Import improvements
+// - Added rename input to import preview modal (pre-filled with original name)
+// - Added warning banner for linked schedules (based on shared schedule)
+// - Better handling of empty periods (shows clear message instead of importing nothing)
+// - Added reconstructPeriodsFromLegacyBells to recover periods from older backup formats
+// - Added logging to debug import issues
+// - Shows warning when no periods/bells found in backup
+// V5.58.5: Import and dropdown fixes
+// - Fixed import error with undefined field values (Firestore doesn't accept undefined)
+// - Now properly copies relative bell properties (relativeToAnchor, relativeDirection, relativeOffset, anchorRole)
+// - Handles bells without static time (relative bells)
+// - Fixed sound dropdown overflow in multiple modals (added min-w-0)
+// V5.58.4: Smart Import Preview for Admin
+// - Detects personal schedule backups when importing as admin
+// - Shows preview modal with analysis of what can/will be imported
+// - Identifies sounds not in shared storage (replaces with default)
+// - Identifies visual cues not in shared storage (removes them)
+// - Shows what personal-only data will NOT be imported (quick bells, overrides, etc.)
+// - Checkboxes let admin choose what to include
+// - Admin exports now include exportedAt and exportedAs metadata
+// V5.58.3: Admin period creation improvements
+// - Pre-check the currently active schedule when opening period modal
+// - Added visual cue picker to period creation (applies to both Period Start and Period End bells)
+// - Improved error messages: now shows specific schedule names for conflicts
+// - "Period already exists" now lists which schedules were skipped
+// - Time conflicts now show the specific bell name, period name, and time
+// - Button text changed to "Add Period to Schedule(s)..."
+// V5.58.2: Period modal UX fixes
+// - Fixed sound dropdown overflow (added min-w-0 to prevent horizontal scrolling)
+// - Modal now closes on successful period creation
+// - Success message shown via showUserMessage() toast instead of modal status
+// V5.58.1: Null safety fixes for period modal
+// - Added guard clauses to prevent errors if modal elements don't exist
+// - Used optional chaining throughout period modal functions
+// - Prevents potential blocking issues from null element access
+// V5.58.0: Admin Period Creation
+// - Added "Add Period to Schedules" button in admin zone (purple, next to Add Bell)
+// - New modal allows creating periods with Period Start and Period End bells
+// - Can add period to multiple schedules at once via checkboxes
+// - Validates that end time is after start time
+// - Checks for time conflicts (within 59s) before adding
+// - Skips schedules where period name already exists
+// - Each bell gets unique bellId (no shared IDs across schedules)
+// V5.57.2: Bell proximity threshold and error messages
+// - Changed bell proximity threshold from 60 to 59 seconds (was blocking bells 60s apart)
+// - Enhanced error messages to include the period name of the blocking bell
+// - Error now shows: bell name, period name, and time (e.g., "Period Start" in "1st Period" at 8:00 AM)
+// V5.57.1: Fix personal period bells not editable
+// - BUG FIX: Personal period anchor bells (fluke bells) were showing "Only admin can change" message
+// - Root cause: handleEditBellClick had no else clause for custom bells, so time input stayed locked
+// - Added else clause to properly enable time editing for all custom bells (type !== 'shared')
+// - Users now have full control over their personal period anchor bells
 // V5.54.6: UX improvements
 // - Sound overrides now display nickname if available, instead of raw filename
 // - Fixed sound dropdown overflow in relative bell modal (added min-w-0)
@@ -103,6 +180,7 @@ const userDisplayNameElement = document.getElementById('user-display-name');
 const scheduleSelector = document.getElementById('schedule-selector');
 const scheduleTitle = document.getElementById('schedule-title');
 const adminToggleBtn = document.getElementById('admin-toggle');
+const simplifiedViewToggle = document.getElementById('simplified-view-toggle'); // V5.59.0
 
 // MODIFIED: v3.21 -> v3.22 - Renamed from v3.21
 const nextBellInfoElement = document.getElementById('next-bell-info');
@@ -440,6 +518,23 @@ const multiAddStatus = document.getElementById('multi-add-status');
 const multiSelectAllBtn = document.getElementById('multi-select-all');
 const multiSelectNoneBtn = document.getElementById('multi-select-none');
 
+// V5.58.0: Multi-Add Period Modal (Admin)
+const addPeriodModal = document.getElementById('add-period-modal');
+const showAddPeriodModalBtn = document.getElementById('show-add-period-modal-btn');
+const multiAddPeriodForm = document.getElementById('multi-add-period-form');
+const multiPeriodNameInput = document.getElementById('multi-period-name');
+const multiPeriodStartTimeInput = document.getElementById('multi-period-start-time');
+const multiPeriodStartSoundInput = document.getElementById('multi-period-start-sound');
+const multiPeriodEndTimeInput = document.getElementById('multi-period-end-time');
+const multiPeriodEndSoundInput = document.getElementById('multi-period-end-sound');
+const multiPeriodVisualSelect = document.getElementById('multi-period-visual'); // V5.58.3
+const periodScheduleListContainer = document.getElementById('period-schedule-list-container');
+const multiPeriodCancelBtn = document.getElementById('multi-period-cancel');
+const multiPeriodSubmitBtn = document.getElementById('multi-period-submit');
+const multiPeriodStatus = document.getElementById('multi-period-status');
+const periodSelectAllBtn = document.getElementById('period-select-all');
+const periodSelectNoneBtn = document.getElementById('period-select-none');
+
 // Conflict Modals (Admin)
 const internalConflictWarningModal = document.getElementById('internal-conflict-warning-modal');
 const internalConflictNewTime = document.getElementById('internal-conflict-new-time');
@@ -484,6 +579,24 @@ const exportCurrentScheduleBtn = document.getElementById('export-current-schedul
 const importCurrentScheduleBtn = document.getElementById('import-current-schedule-btn');
 const importCurrentFileInput = document.getElementById('import-current-file-input');
 // --- END: v4.14d RESTORE ---
+
+// V5.58.4: Import Preview Modal (Admin)
+const importPreviewModal = document.getElementById('import-preview-modal');
+const importPreviewWarning = document.getElementById('import-preview-warning');
+const importPreviewFilename = document.getElementById('import-preview-filename');
+const importPreviewScheduleName = document.getElementById('import-preview-schedule-name');
+const importPreviewDate = document.getElementById('import-preview-date');
+const importPreviewAvailable = document.getElementById('import-preview-available');
+const importPreviewModifiedSection = document.getElementById('import-preview-modified-section');
+const importPreviewModified = document.getElementById('import-preview-modified');
+const importPreviewExcludedSection = document.getElementById('import-preview-excluded-section');
+const importPreviewExcluded = document.getElementById('import-preview-excluded');
+const importPreviewStatus = document.getElementById('import-preview-status');
+const importPreviewCancelBtn = document.getElementById('import-preview-cancel');
+const importPreviewConfirmBtn = document.getElementById('import-preview-confirm');
+const importPreviewNewName = document.getElementById('import-preview-new-name'); // V5.58.6
+const importPreviewLinkedWarning = document.getElementById('import-preview-linked-warning'); // V5.58.6
+let pendingImportData = null; // Stores analyzed import data
 
 // --- END: v4.14 Global Scope Fix ---
 
@@ -3794,6 +3907,12 @@ combinedBellListElement.innerHTML = renderablePeriods.map(period => {
     let periodHtml = `
         <details class="group border-b border-gray-200" ${isPeriodOpen ? 'open' : ''} data-period-name-raw="${safePeriodName}">
             <summary class="flex items-start justify-between p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                <!-- V5.59.0: Period-level bulk select checkbox -->
+                <input type="checkbox" 
+                    class="bulk-select-period h-5 w-5 text-sky-600 rounded focus:ring-sky-500 mr-3 flex-shrink-0 self-center ${bulkEditMode ? '' : 'hidden'}"
+                    data-period-name="${safePeriodName}"
+                    title="Select/deselect all bells in ${displayPeriodName}">
+                    
                 <!-- NEW in 4.44: Small Visual Cue Icon -->
                 <!-- MODIFIED in 4.47: Changed back to rounded-full -->
                 <div class="period-visual-cue-icon w-10 h-10 bg-gray-800 rounded-full flex-shrink-0 flex items-center justify-center mr-3 overflow-hidden">
@@ -4920,11 +5039,11 @@ function sortPeriodsByFirstBell(periods) {
     });
 }
 /**
-    * Finds a bell within 60 seconds of the given time.
+    * V5.57.2: Finds a bell within 59 seconds of the given time.
     * @param {string} time - The time to check (HH:MM:SS)
     * @param {Array} bellList - The list of bells to check against
     * @param {object} [excludeBell=null] - A bell object {time, name} to exclude from the check
-    * @returns {object|null} The nearby bell object or null
+    * @returns {object|null} The nearby bell object or null (includes periodName if available)
     */
 function findNearbyBell(time, bellList, excludeBell = null) {
     const newTimeInSeconds = timeToSeconds(time);
@@ -4939,8 +5058,9 @@ function findNearbyBell(time, bellList, excludeBell = null) {
         const existingTimeInSeconds = timeToSeconds(bell.time);
         if (isNaN(existingTimeInSeconds)) continue;
 
-        if (Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 60) {
-            return bell; // Found a bell within 60 seconds
+        // V5.57.2: Changed from 60 to 59 seconds threshold
+        if (Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 59) {
+            return bell; // Found a bell within 59 seconds
         }
     }
     return null;
@@ -6605,11 +6725,12 @@ function handleEditBellClick(bell) {
         editBellSoundInput.value = soundToShow; // Set again after dropdown update
         
         // NEW 5.32.3: Handle anchor bells (shared type) - lock time but allow visual/sound/name
+        // FIX V5.57.1: Added else clause for custom bells to ensure time input is enabled
         if (bell.type === 'shared') {
             const isAdmin = document.body.classList.contains('admin-mode');
                 
             if (isAdmin) {
-                // Admin editing anchor bell - full control with override checkbox
+                // Admin editing shared bell - full control with override checkbox
                 editBellTimeInput.disabled = false;
                 editBellTimeInput.style.opacity = '1';
                 editBellTimeInput.style.cursor = 'text';
@@ -6619,11 +6740,11 @@ function handleEditBellClick(bell) {
                 if (lockMsgDiv) lockMsgDiv.classList.add('hidden');
                     
                 editBellOverrideContainer.classList.remove('hidden');
-                document.getElementById('edit-bell-visual-override-container')?.classList.remove('hidden'); // NEW 5.32
+                document.getElementById('edit-bell-visual-override-container')?.classList.remove('hidden');
                 if (editBellOverrideCheckbox) editBellOverrideCheckbox.checked = false;
                 editBellSoundInput.disabled = true;
             } else {
-                // Teacher editing anchor bell - lock time, auto-override sound/name/visual
+                // Non-admin editing shared bell - lock time, auto-override sound/name/visual
                 editBellTimeInput.disabled = true;
                 editBellTimeInput.style.opacity = '0.5';
                 editBellTimeInput.style.cursor = 'not-allowed';
@@ -6634,11 +6755,28 @@ function handleEditBellClick(bell) {
                     
                 // Hide override checkboxes - teachers always override
                 editBellOverrideContainer.classList.add('hidden');
-                document.getElementById('edit-bell-visual-override-container')?.classList.add('hidden'); // NEW 5.32
+                document.getElementById('edit-bell-visual-override-container')?.classList.add('hidden');
                 // Enable sound editing (auto-override for teachers)
                 editBellSoundInput.disabled = false;
             }
-    }
+        } else {
+            // FIX V5.57.1: Custom bells (including personal period anchor/fluke bells)
+            // Users have full control over their own custom bells
+            editBellTimeInput.disabled = false;
+            editBellTimeInput.style.opacity = '1';
+            editBellTimeInput.style.cursor = 'text';
+            
+            // Hide lock message - custom bells are fully editable
+            const lockMsgDiv = document.getElementById('edit-time-lock-message');
+            if (lockMsgDiv) lockMsgDiv.classList.add('hidden');
+            
+            // Hide override containers - not applicable to custom bells
+            editBellOverrideContainer.classList.add('hidden');
+            document.getElementById('edit-bell-visual-override-container')?.classList.add('hidden');
+            
+            // Enable sound editing
+            editBellSoundInput.disabled = false;
+        }
         
         editBellModal.classList.remove('hidden');
     }
@@ -6913,7 +7051,9 @@ async function handleEditBellSubmit(e) {
     const nearbyBell = findNearbyBell(newBell.time, allBells, oldBell);
     
     if (nearbyBell) {
-        editBellStatus.textContent = `Warning: Bell is too close to ${nearbyBell.name} at ${formatTime12Hour(nearbyBell.time, true)}. Please adjust time.`;
+        // V5.57.2: Enhanced error message with period name
+        const periodInfo = nearbyBell.periodName ? ` in "${nearbyBell.periodName}"` : '';
+        editBellStatus.textContent = `Warning: Bell is too close to "${nearbyBell.name}"${periodInfo} at ${formatTime12Hour(nearbyBell.time, true)}. Please adjust time.`;
         editBellStatus.classList.remove('hidden');
         return;
     }
@@ -7314,9 +7454,261 @@ function showMultiAddModal() {
 
     addBellModal.classList.remove('hidden');
 }
+
+/**
+ * V5.58.0: Renders schedule checkboxes for the Add Period modal
+ * V5.58.3: Pre-checks the currently active schedule
+ */
+function renderPeriodScheduleCheckboxes() {
+    if (!periodScheduleListContainer) return; // Guard clause
+    
+    if (allSchedules.length === 0) {
+        periodScheduleListContainer.innerHTML = '<p class="text-gray-500">No shared schedules available.</p>';
+        if (multiPeriodSubmitBtn) multiPeriodSubmitBtn.disabled = true;
+        return;
+    }
+    
+    if (multiPeriodSubmitBtn) multiPeriodSubmitBtn.disabled = false;
+
+    // V5.58.3: Pre-check the currently active schedule
+    periodScheduleListContainer.innerHTML = allSchedules.map(schedule => {
+        const isCurrentSchedule = schedule.id === activeBaseScheduleId;
+        return `
+        <div class="flex items-center">
+            <input type="checkbox" id="period-schedule-${schedule.id}" name="period-schedule" value="${schedule.id}" 
+                   class="period-schedule-check h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                   ${isCurrentSchedule ? 'checked' : ''}>
+            <label for="period-schedule-${schedule.id}" class="ml-2 block text-sm text-gray-900">${schedule.name}</label>
+        </div>
+    `}).join('');
+}
+
+/**
+ * V5.58.0: Opens the Add Period to Schedules modal
+ * V5.58.3: Added visual cue support
+ */
+function showAddPeriodModal() {
+    if (!addPeriodModal) return; // Guard clause
+    
+    // Re-render the schedule list every time
+    renderPeriodScheduleCheckboxes();
+    
+    // Populate sound dropdowns for both start and end bells
+    updateSoundDropdowns();
+    
+    // V5.58.3: Populate visual dropdown and initialize preview
+    updateVisualDropdowns();
+    updatePeriodVisualPreview();
+    
+    addPeriodModal.classList.remove('hidden');
+}
+
+/**
+ * V5.58.3: Update visual preview in period modal
+ */
+function updatePeriodVisualPreview() {
+    const visualSelect = document.getElementById('multi-period-visual');
+    const previewFull = document.getElementById('multi-period-visual-preview');
+    if (!visualSelect || !previewFull) return;
+
+    const visualValue = visualSelect.value;
+    const periodName = multiPeriodNameInput?.value || 'Preview';
+    const htmlFull = getVisualHtml(visualValue, periodName);
+    previewFull.innerHTML = htmlFull || '<span class="visual-preview-placeholder">Select visual</span>';
+}
+
+/**
+ * V5.58.0: Handles submission of the Add Period form
+ * V5.58.3: Added visual cue support
+ * Creates a new period with Period Start and Period End bells in each selected schedule
+ */
+async function handleMultiAddPeriodSubmit(e) {
+    e.preventDefault();
+    
+    // Guard clause - ensure required elements exist
+    if (!multiPeriodNameInput || !multiPeriodStartTimeInput || !multiPeriodEndTimeInput) {
+        console.error("Period modal elements not found");
+        return;
+    }
+    
+    // Helper to set status safely
+    const setStatus = (msg, show = true) => {
+        if (multiPeriodStatus) {
+            multiPeriodStatus.textContent = msg;
+            if (show) multiPeriodStatus.classList.remove('hidden');
+            else multiPeriodStatus.classList.add('hidden');
+        }
+    };
+    
+    const periodName = multiPeriodNameInput.value.trim();
+    const startTime = multiPeriodStartTimeInput.value;
+    const startSound = multiPeriodStartSoundInput?.value || 'ellisBell.mp3';
+    const endTime = multiPeriodEndTimeInput.value;
+    const endSound = multiPeriodEndSoundInput?.value || 'ellisBell.mp3';
+    
+    // V5.58.3: Get visual cue data
+    const visualMode = document.querySelector('input[name="multi-period-visual-mode"]:checked')?.value || 'none';
+    const visualCue = document.getElementById('multi-period-visual')?.value || '';
+    
+    // Validation
+    if (!periodName) {
+        setStatus("Please enter a period name.");
+        return;
+    }
+    
+    if (!startTime || !endTime) {
+        setStatus("Please enter both start and end times.");
+        return;
+    }
+    
+    // Validate end time is after start time
+    if (startTime >= endTime) {
+        setStatus("End time must be after start time.");
+        return;
+    }
+    
+    const checkedScheduleIds = Array.from(document.querySelectorAll('.period-schedule-check:checked'))
+                                    .map(cb => cb.value);
+    
+    if (checkedScheduleIds.length === 0) {
+        setStatus("Please select at least one schedule.");
+        return;
+    }
+    
+    setStatus(`Adding period to ${checkedScheduleIds.length} schedule(s)...`);
+    if (multiPeriodSubmitBtn) multiPeriodSubmitBtn.disabled = true;
+    
+    const batch = writeBatch(db);
+    let added = 0;
+    const skippedExistsSchedules = []; // V5.58.3: Track which schedules already have the period
+    const conflictDetails = []; // Track time conflict details
+    
+    for (const scheduleId of checkedScheduleIds) {
+        const schedule = allSchedules.find(s => s.id === scheduleId);
+        if (!schedule) continue;
+        
+        // Check if period already exists
+        const existingPeriods = schedule.periods || [];
+        if (existingPeriods.some(p => p.name === periodName)) {
+            skippedExistsSchedules.push(schedule.name);
+            continue;
+        }
+        
+        // Get all bells in this schedule for conflict checking
+        const allBellsInSchedule = existingPeriods.flatMap(p => 
+            (p.bells || []).map(b => ({ ...b, periodName: p.name }))
+        );
+        
+        // Check for nearby bell conflicts for start time
+        const startConflict = findNearbyBell(startTime, allBellsInSchedule);
+        if (startConflict) {
+            const periodInfo = startConflict.periodName ? ` in "${startConflict.periodName}"` : '';
+            conflictDetails.push(`${schedule.name}: Start time conflicts with "${startConflict.name}"${periodInfo} at ${formatTime12Hour(startConflict.time, true)}`);
+            continue;
+        }
+        
+        // Check for nearby bell conflicts for end time
+        const endConflict = findNearbyBell(endTime, allBellsInSchedule);
+        if (endConflict) {
+            const periodInfo = endConflict.periodName ? ` in "${endConflict.periodName}"` : '';
+            conflictDetails.push(`${schedule.name}: End time conflicts with "${endConflict.name}"${periodInfo} at ${formatTime12Hour(endConflict.time, true)}`);
+            continue;
+        }
+        
+        // Create the new period with two anchor bells
+        // V5.58.3: Include visual cue data if specified
+        const startBell = {
+            bellId: generateBellId(),
+            name: 'Period Start',
+            time: startTime,
+            sound: startSound
+        };
+        const endBell = {
+            bellId: generateBellId(),
+            name: 'Period End',
+            time: endTime,
+            sound: endSound
+        };
+        
+        // Only add visual properties if a visual is selected
+        if (visualCue && visualMode !== 'none') {
+            startBell.visualMode = visualMode;
+            startBell.visualCue = visualCue;
+            endBell.visualMode = visualMode;
+            endBell.visualCue = visualCue;
+        }
+        
+        const newPeriod = {
+            name: periodName,
+            isEnabled: true,
+            bells: [startBell, endBell]
+        };
+        
+        // Add to batch
+        const updatedPeriods = [...existingPeriods, newPeriod];
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', scheduleId);
+        batch.update(docRef, { periods: updatedPeriods });
+        added++;
+    }
+    
+    try {
+        if (added > 0) {
+            await batch.commit();
+        }
+        
+        // V5.58.3: Build detailed status message
+        let statusMsg = '';
+        if (added > 0) {
+            statusMsg = `Successfully added "${periodName}" to ${added} schedule(s).`;
+        }
+        if (skippedExistsSchedules.length > 0) {
+            statusMsg += ` Skipped (period already exists): ${skippedExistsSchedules.join(', ')}.`;
+        }
+        if (conflictDetails.length > 0) {
+            statusMsg += ` Skipped due to time conflicts: ${conflictDetails.length}.`;
+            // Log details to console for debugging
+            console.warn("Period creation skipped due to conflicts:", conflictDetails);
+        }
+        if (!statusMsg) {
+            statusMsg = "No schedules were updated.";
+        }
+        
+        // Reset form and close modal on success
+        if (added > 0) {
+            if (multiPeriodNameInput) multiPeriodNameInput.value = '';
+            if (multiPeriodStartTimeInput) multiPeriodStartTimeInput.value = '';
+            if (multiPeriodEndTimeInput) multiPeriodEndTimeInput.value = '';
+            if (multiPeriodStartSoundInput) multiPeriodStartSoundInput.value = 'ellisBell.mp3';
+            if (multiPeriodEndSoundInput) multiPeriodEndSoundInput.value = 'ellisBell.mp3';
+            // V5.58.3: Reset visual cue fields
+            const periodVisual = document.getElementById('multi-period-visual');
+            if (periodVisual) periodVisual.value = '';
+            const noneRadio = document.querySelector('input[name="multi-period-visual-mode"][value="none"]');
+            if (noneRadio) noneRadio.checked = true;
+            document.querySelectorAll('.period-schedule-check:checked').forEach(cb => cb.checked = false);
+            
+            // Close modal and show success message
+            addPeriodModal?.classList.add('hidden');
+            setStatus('', false);
+            showUserMessage(statusMsg);
+        } else {
+            // No periods added - show status in modal
+            setStatus(statusMsg);
+            setTimeout(() => {
+                setStatus('', false);
+            }, 5000);
+        }
+        
+    } catch (error) {
+        console.error("Error adding period:", error);
+        setStatus(`Error: ${error.message}`);
+    } finally {
+        if (multiPeriodSubmitBtn) multiPeriodSubmitBtn.disabled = false;
+    }
+}
     
 /**
-    * NEW: v3.02 - Finds all shared bells within 60s of the new time.
+    * V5.57.2: Finds all shared bells within 59s of the new time.
     * @param {string} time - The time to check (HH:MM:SS)
     * @param {string} name - The name of the bell to check
     * @returns {object} { internal: bell|null, external: [{schedule, bell}] }
@@ -7338,13 +7730,13 @@ function findAllNearbySharedBells(time) {
         
         // Use findNearbyBell helper, but *only* check bells with the same name
         // This is a modification from the spec, which said *any* bell.
-        // Re-reading: "within 60s of an existing bell" - doesn't specify name.
+        // Re-reading: "within 59s of an existing bell" - doesn't specify name.
         // Re-reading v3.02 "Conflict in Other Shared Schedules" - "Similar Bell Found"
         // Let's assume the user *meant* to find bells with the *same name* for v3.02,
         // as that's what makes the "Match" and "Create/Match" options logical.
         // If we find bells with different names, matching them makes no sense.
         //
-        // **Decision: I will check for bells with the *same name* within 60 seconds.**
+        // **Decision: I will check for bells with the *same name* within 59 seconds.**
         // This aligns with the logic of "linked" bells.
         //
         // UPDATE: The original v3.02 code was checking *any* bell. Let's revert to that
@@ -7360,10 +7752,11 @@ function findAllNearbySharedBells(time) {
         if (bellList.length === 0) continue;
 
         // Find the *first* bell in this schedule that conflicts
+        // V5.57.2: Changed from 60 to 59 seconds threshold
         const conflictingBell = bellList.find(bell => {
             const existingTimeInSeconds = timeToSeconds(bell.time);
             if (isNaN(existingTimeInSeconds)) return false;
-            return Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 60;
+            return Math.abs(newTimeInSeconds - existingTimeInSeconds) <= 59;
         });
 
         if (!conflictingBell) continue; // No conflict in this schedule
@@ -8417,8 +8810,9 @@ async function handleAddStaticBellSubmit(e) {
     const nearbyBell = findNearbyBell(time, allBells);
     
     if (nearbyBell) {
-        // Show an error in the modal.
-        addStaticBellStatus.textContent = `Error: This time is within 60s of "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time, true)}).`;
+        // V5.57.2: Enhanced error message with period name
+        const periodInfo = nearbyBell.periodName ? ` in "${nearbyBell.periodName}"` : '';
+        addStaticBellStatus.textContent = `Error: This time is within 59s of "${nearbyBell.name}"${periodInfo} (${formatTime12Hour(nearbyBell.time, true)}).`;
         addStaticBellStatus.classList.remove('hidden');
         return;
     } 
@@ -9331,6 +9725,7 @@ function addNewVisualOption(url, name) {
 function updateVisualDropdowns() {
     // Added 5.31.1: Dropdowns to add images to individual bells
     // MODIFIED V5.42.0: Added passing period visual select
+    // MODIFIED V5.58.3: Added period modal visual select
     const selects = [ 
         editPeriodImageSelect, 
         newPeriodImageSelect, 
@@ -9340,7 +9735,8 @@ function updateVisualDropdowns() {
         document.getElementById('edit-bell-visual'),
         document.getElementById('multi-bell-visual'),
         document.getElementById('multi-relative-bell-visual'),
-        document.getElementById('passing-period-visual-select') // NEW V5.42.0
+        document.getElementById('passing-period-visual-select'), // NEW V5.42.0
+        document.getElementById('multi-period-visual') // V5.58.3: Period modal visual
     ];
     
     // 1. Create options for default SVGs (dynamically)
@@ -10244,7 +10640,9 @@ async function handleNewPeriodSubmit(e) {
             const nearbyBell = findNearbyBell(time, allBells);
             
             if (nearbyBell) {
-                throw new Error(`Time conflict: Period start/end is too close to "${nearbyBell.name}" (${formatTime12Hour(nearbyBell.time, true)}).`);
+                // V5.57.2: Enhanced error message with period name
+                const periodInfo = nearbyBell.periodName ? ` in "${nearbyBell.periodName}"` : '';
+                throw new Error(`Time conflict: Period start/end is too close to "${nearbyBell.name}"${periodInfo} (${formatTime12Hour(nearbyBell.time, true)}).`);
             }
             // MODIFIED V4.81: Return sound
             return { time, sound };
@@ -10478,6 +10876,42 @@ function toggleAdminMode() {
     setActiveSchedule(scheduleSelector.value);
 }
 
+// V5.59.0: Simplified View Mode
+// Hides all editing UI in the schedule display for a cleaner view
+function toggleSimplifiedView() {
+    const isSimplified = document.body.classList.toggle('simplified-mode');
+    
+    // Update button text
+    if (simplifiedViewToggle) {
+        simplifiedViewToggle.textContent = isSimplified ? 'Edit Mode' : 'Simplified View';
+        // Visual feedback - different color when in simplified mode
+        if (isSimplified) {
+            simplifiedViewToggle.classList.remove('bg-gray-200', 'text-gray-800');
+            simplifiedViewToggle.classList.add('bg-blue-100', 'text-blue-700');
+        } else {
+            simplifiedViewToggle.classList.remove('bg-blue-100', 'text-blue-700');
+            simplifiedViewToggle.classList.add('bg-gray-200', 'text-gray-800');
+        }
+    }
+    
+    // Save preference to localStorage
+    localStorage.setItem('simplifiedViewEnabled', isSimplified ? 'true' : 'false');
+    
+    // CSS handles all visibility changes - no re-render needed
+}
+
+function initializeSimplifiedView() {
+    const savedPref = localStorage.getItem('simplifiedViewEnabled');
+    if (savedPref === 'true') {
+        document.body.classList.add('simplified-mode');
+        if (simplifiedViewToggle) {
+            simplifiedViewToggle.textContent = 'Edit Mode';
+            simplifiedViewToggle.classList.remove('bg-gray-200', 'text-gray-800');
+            simplifiedViewToggle.classList.add('bg-blue-100', 'text-blue-700');
+        }
+    }
+}
+
 // --- Import/Export Logic ---
 function handleExportSchedules() {
     if (allSchedules.length === 0) {
@@ -10578,6 +11012,7 @@ async function handleFileInputChange(e) {
 }
 
 // --- NEW V4.90: Import/Export for CURRENT schedule ---
+// MODIFIED V5.58.4: Added export metadata
 function handleExportCurrentSchedule() {
     if (!activeBaseScheduleId || !document.body.classList.contains('admin-mode')) {
         showUserMessage("No active shared schedule selected or insufficient permissions.");
@@ -10591,8 +11026,11 @@ function handleExportCurrentSchedule() {
     }
 
     // Create a clean backup object for a *single* schedule
+    // V5.58.4: Added exportedAt and exportedAs metadata
     const backupData = {
         type: "EllisWebBell_SingleSchedule_v1",
+        exportedAt: new Date().toISOString(),
+        exportedAs: "admin", // Helps identify this as an admin export
         schedule: {
             name: schedule.name,
             periods: schedule.periods || [] // Export the raw periods array
@@ -10614,6 +11052,557 @@ function handleExportCurrentSchedule() {
     } catch (error) {
             console.error("Error backing up current schedule:", error);
             showUserMessage("Error exporting schedule: " + error.message);
+    }
+}
+
+/**
+ * V5.58.6: Reconstruct periods from legacy flat bell array
+ * This handles older backup formats that don't have period structure
+ */
+function reconstructPeriodsFromLegacyBells(legacyBells) {
+    if (!legacyBells || legacyBells.length === 0) return [];
+    
+    // Group bells by detecting period patterns in names
+    const periodMap = new Map();
+    const unmatchedBells = [];
+    
+    legacyBells.forEach(bell => {
+        // Try to extract period name from bell name patterns like "1st Period Start", "Lunch End", etc.
+        const periodMatch = bell.name?.match(/^(.+?)\s+(Start|End|Warning|Bell)$/i);
+        if (periodMatch) {
+            const periodName = periodMatch[1].trim();
+            if (!periodMap.has(periodName)) {
+                periodMap.set(periodName, []);
+            }
+            periodMap.get(periodName).push({
+                bellId: generateBellId(),
+                name: periodMatch[2], // Just "Start", "End", etc.
+                time: bell.time,
+                sound: bell.sound || 'ellisBell.mp3'
+            });
+        } else {
+            unmatchedBells.push(bell);
+        }
+    });
+    
+    // Convert map to periods array
+    const periods = [];
+    periodMap.forEach((bells, periodName) => {
+        periods.push({
+            name: periodName,
+            isEnabled: true,
+            bells: bells
+        });
+    });
+    
+    // If we have unmatched bells, put them in an "Other Bells" period
+    if (unmatchedBells.length > 0) {
+        periods.push({
+            name: 'Other Bells',
+            isEnabled: true,
+            bells: unmatchedBells.map(bell => ({
+                bellId: generateBellId(),
+                name: bell.name || 'Bell',
+                time: bell.time,
+                sound: bell.sound || 'ellisBell.mp3'
+            }))
+        });
+    }
+    
+    return periods;
+}
+
+/**
+ * V5.58.4: Analyze an import file and determine what can be imported
+ * @param {object} data - Parsed JSON from import file
+ * @param {string} filename - Name of the file being imported
+ * @returns {object} Analysis results with available, modified, and excluded items
+ */
+function analyzeImportFile(data, filename) {
+    const analysis = {
+        filename,
+        isPersonalBackup: false,
+        isAdminBackup: false,
+        isValid: false,
+        scheduleName: '',
+        exportDate: '',
+        periods: [],
+        totalBells: 0,
+        // Items that can be imported as-is
+        available: {
+            periods: { count: 0, checked: true },
+            bellNames: { count: 0, checked: true },
+            bellTimes: { count: 0, checked: true }
+        },
+        // Items that will be modified (sounds/visuals replaced with defaults)
+        modified: {
+            sounds: { items: [], defaultReplacement: 'ellisBell.mp3', checked: true },
+            visuals: { items: [], checked: true }
+        },
+        // Items that won't be imported at all
+        excluded: {
+            quickBells: false,
+            bellOverrides: false,
+            periodVisualOverrides: false,
+            baseScheduleId: false,
+            referencedMedia: { audio: 0, visuals: 0 },
+            orphanedRelativeBells: [] // V5.58.8: Relative bells whose anchors aren't in the import
+        },
+        // The sanitized data ready for import
+        sanitizedPeriods: []
+    };
+    
+    // Detect file type
+    if (data.type === "EllisWebBell_SingleSchedule_v1") {
+        analysis.isAdminBackup = true;
+        analysis.isValid = !!(data.schedule?.name && Array.isArray(data.schedule?.periods));
+        if (analysis.isValid) {
+            analysis.scheduleName = data.schedule.name;
+            analysis.periods = data.schedule.periods || [];
+        }
+    } else if (data.type === "EllisWebBell_PersonalSchedule_v2" || data.type === "EllisWebBell_PersonalSchedule_v1") {
+        analysis.isPersonalBackup = true;
+        analysis.isValid = !!(data.schedule?.name);
+        if (analysis.isValid) {
+            analysis.scheduleName = data.schedule.name;
+            // V5.58.6: Personal schedules may store periods in different places
+            // - data.schedule.periods: Custom periods (for linked schedules, only contains user-added periods)
+            // - data._legacyBells: Flattened bell list (v2 backups have this for compatibility)
+            analysis.periods = data.schedule?.periods || [];
+            analysis.exportDate = data.exportedAt || '';
+            analysis.baseScheduleId = data.schedule?.baseScheduleId || null;
+            analysis.isStandalone = data.schedule?.isStandalone || false;
+            
+            // V5.58.6: Log the structure for debugging
+            console.log("Import analysis - Personal backup structure:", {
+                name: analysis.scheduleName,
+                periodsCount: analysis.periods.length,
+                hasBaseScheduleId: !!analysis.baseScheduleId,
+                isStandalone: analysis.isStandalone,
+                hasBellOverrides: !!(data.bellOverrides && Object.keys(data.bellOverrides).length > 0),
+                hasLegacyBells: !!(data._legacyBells && data._legacyBells.length > 0),
+                legacyBellsCount: data._legacyBells?.length || 0
+            });
+            
+            // Check for excluded items
+            if (data.customQuickBells?.length > 0) analysis.excluded.quickBells = true;
+            if (data.bellOverrides && Object.keys(data.bellOverrides).length > 0) analysis.excluded.bellOverrides = true;
+            if (data.periodVisualOverrides && Object.keys(data.periodVisualOverrides).length > 0) analysis.excluded.periodVisualOverrides = true;
+            if (data.schedule.baseScheduleId) analysis.excluded.baseScheduleId = true;
+            if (data.referencedMedia) {
+                analysis.excluded.referencedMedia.audio = data.referencedMedia.audio?.length || 0;
+                analysis.excluded.referencedMedia.visuals = data.referencedMedia.visuals?.length || 0;
+            }
+            
+            // V5.58.6: If periods is empty but we have legacyBells, try to reconstruct
+            if (analysis.periods.length === 0 && data._legacyBells && data._legacyBells.length > 0) {
+                console.log("Import analysis - Attempting to reconstruct periods from legacy bells");
+                analysis.periods = reconstructPeriodsFromLegacyBells(data._legacyBells);
+                analysis.reconstructedFromLegacy = true;
+            }
+        }
+    }
+    
+    if (!analysis.isValid) return analysis;
+    
+    // Analyze periods and bells
+    analysis.available.periods.count = analysis.periods.length;
+    
+    // Build set of valid shared sounds and visuals for comparison
+    const sharedSoundUrls = new Set(sharedAudioFiles.map(f => f.url));
+    const sharedVisualUrls = new Set(sharedVisualFiles.map(f => f.url));
+    // Also include default sounds
+    const defaultSounds = new Set(['Bell', 'Chime', 'Beep', 'Alarm', 'ellisBell.mp3', '[SILENT]']);
+    
+    // V5.58.8: First pass - collect all bellIds present in this import
+    const presentBellIds = new Set();
+    for (const period of analysis.periods) {
+        const bells = period.bells || [];
+        for (const bell of bells) {
+            if (bell.bellId) presentBellIds.add(bell.bellId);
+        }
+    }
+    
+    // Analyze each period and bell
+    const sanitizedPeriods = [];
+    
+    for (const period of analysis.periods) {
+        const sanitizedPeriod = {
+            name: period.name,
+            isEnabled: period.isEnabled !== false,
+            bells: []
+        };
+        
+        const bells = period.bells || [];
+        for (const bell of bells) {
+            // V5.58.9: Check if this is a relative bell - uses bell.relative object
+            const isRelativeBell = bell.relative !== undefined && bell.relative !== null;
+            let anchorExists = true; // Assume true for non-relative bells
+            
+            if (isRelativeBell) {
+                // Two types of relative references:
+                // 1. parentBellId - direct reference to another bell
+                // 2. parentPeriodName + parentAnchorType - reference to period's anchor bell
+                
+                if (bell.relative.parentBellId) {
+                    // Check if this specific bell exists in our import
+                    anchorExists = presentBellIds.has(bell.relative.parentBellId);
+                } else if (bell.relative.parentPeriodName) {
+                    // References a period's anchor (period_start or period_end)
+                    // These anchors live in the SHARED schedule, not in personal backup
+                    // Check if we have a bell with matching anchorRole in the named period
+                    const targetPeriod = analysis.periods.find(p => p.name === bell.relative.parentPeriodName);
+                    if (targetPeriod) {
+                        const anchorBell = (targetPeriod.bells || []).find(b => 
+                            b.anchorRole === bell.relative.parentAnchorType ||
+                            b.anchorRole === bell.relative.parentAnchorType?.replace('period_', '') // "period_start" -> "start"
+                        );
+                        anchorExists = !!anchorBell;
+                    } else {
+                        // Period not found in this import - anchor doesn't exist
+                        anchorExists = false;
+                    }
+                }
+            }
+            
+            if (isRelativeBell && !anchorExists) {
+                // This relative bell's anchor is not in the import - it's orphaned
+                analysis.excluded.orphanedRelativeBells.push({
+                    bellName: bell.name,
+                    periodName: period.name,
+                    anchorInfo: bell.relative.parentBellId || 
+                        `${bell.relative.parentPeriodName} (${bell.relative.parentAnchorType})`
+                });
+                console.log(`Import: Skipping orphaned relative bell "${bell.name}" in "${period.name}" - anchor not present`);
+                continue; // Skip this bell entirely
+            }
+            
+            // Count this bell as importable
+            analysis.totalBells++;
+            analysis.available.bellNames.count++;
+            analysis.available.bellTimes.count++;
+            
+            // V5.58.5: Build sanitized bell more carefully to avoid undefined values
+            const sanitizedBell = {
+                bellId: bell.bellId || generateBellId(),
+                name: bell.name || 'Unnamed Bell'
+            };
+            
+            // Only add time if it exists (relative bells may not have static time)
+            if (bell.time !== undefined && bell.time !== null) {
+                sanitizedBell.time = bell.time;
+            }
+            
+            // Handle sound - default to ellisBell.mp3 if missing
+            let finalSound = bell.sound || 'ellisBell.mp3';
+            if (finalSound.startsWith('http')) {
+                if (!sharedSoundUrls.has(finalSound)) {
+                    analysis.modified.sounds.items.push({
+                        bellName: bell.name,
+                        periodName: period.name,
+                        originalSound: finalSound
+                    });
+                    finalSound = 'ellisBell.mp3';
+                }
+            } else if (!defaultSounds.has(finalSound) && !sharedSoundUrls.has(finalSound)) {
+                // Unknown sound reference
+                analysis.modified.sounds.items.push({
+                    bellName: bell.name,
+                    periodName: period.name,
+                    originalSound: finalSound
+                });
+                finalSound = 'ellisBell.mp3';
+            }
+            sanitizedBell.sound = finalSound;
+            
+            // V5.58.9: Copy relative bell properties using correct structure
+            // The relative object contains: parentBellId OR (parentPeriodName + parentAnchorType), plus offsetSeconds
+            if (bell.relative) {
+                sanitizedBell.relative = { ...bell.relative };
+            }
+            // Also copy anchorRole if present (for anchor bells like "period_start", "period_end")
+            if (bell.anchorRole !== undefined) sanitizedBell.anchorRole = bell.anchorRole;
+            
+            // Check visual cue
+            if (bell.visualCue) {
+                if (bell.visualCue.startsWith('http') && !sharedVisualUrls.has(bell.visualCue)) {
+                    analysis.modified.visuals.items.push({
+                        bellName: bell.name,
+                        periodName: period.name,
+                        originalVisual: bell.visualCue
+                    });
+                    // Don't add visualCue to sanitized bell
+                } else if (bell.visualCue.startsWith('[DEFAULT]') || bell.visualCue.startsWith('[CUSTOM_TEXT]') || sharedVisualUrls.has(bell.visualCue)) {
+                    // Keep valid visual cues
+                    sanitizedBell.visualCue = bell.visualCue;
+                    if (bell.visualMode) sanitizedBell.visualMode = bell.visualMode;
+                }
+            }
+            
+            // Copy visualMode only if visualCue exists
+            if (bell.visualMode && sanitizedBell.visualCue) {
+                sanitizedBell.visualMode = bell.visualMode;
+            }
+            
+            sanitizedPeriod.bells.push(sanitizedBell);
+        }
+        
+        // V5.58.8: Only include periods that have at least one importable bell
+        if (sanitizedPeriod.bells.length > 0) {
+            sanitizedPeriods.push(sanitizedPeriod);
+        } else {
+            console.log(`Import: Skipping empty period "${period.name}" - all bells were orphaned relatives`);
+        }
+    }
+    
+    // V5.58.8: Update period count to reflect actual importable periods
+    analysis.available.periods.count = sanitizedPeriods.length;
+    
+    analysis.sanitizedPeriods = sanitizedPeriods;
+    return analysis;
+}
+
+/**
+ * V5.58.4: Show the import preview modal with analysis results
+ * V5.58.6: Added rename field and linked schedule warning
+ */
+function showImportPreviewModal(analysis) {
+    if (!importPreviewModal) return;
+    
+    pendingImportData = analysis;
+    
+    // Update file info
+    if (importPreviewFilename) importPreviewFilename.textContent = analysis.filename;
+    if (importPreviewScheduleName) importPreviewScheduleName.textContent = analysis.scheduleName;
+    if (importPreviewDate) {
+        importPreviewDate.textContent = analysis.exportDate 
+            ? new Date(analysis.exportDate).toLocaleString() 
+            : '(not recorded)';
+    }
+    
+    // V5.58.6: Pre-fill rename input with original name
+    if (importPreviewNewName) {
+        importPreviewNewName.value = analysis.scheduleName;
+    }
+    
+    // Show/hide warning banner for personal backups
+    if (importPreviewWarning) {
+        importPreviewWarning.classList.toggle('hidden', !analysis.isPersonalBackup);
+    }
+    
+    // V5.58.6: Show/hide warning for linked schedules (based on a shared schedule)
+    if (importPreviewLinkedWarning) {
+        const isLinked = analysis.isPersonalBackup && analysis.baseScheduleId && !analysis.isStandalone;
+        importPreviewLinkedWarning.classList.toggle('hidden', !isLinked);
+    }
+    
+    // Build "Available" section
+    if (importPreviewAvailable) {
+        let availableHtml = '';
+        
+        if (analysis.available.periods.count > 0) {
+            availableHtml += `
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" id="import-opt-periods" checked class="h-4 w-4 text-green-600">
+                    <span><strong>${analysis.available.periods.count} periods</strong> with structure</span>
+                </label>
+            `;
+        }
+        
+        if (analysis.totalBells > 0) {
+            availableHtml += `
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" id="import-opt-times" checked class="h-4 w-4 text-green-600">
+                    <span><strong>${analysis.totalBells} bells</strong> with times</span>
+                </label>
+            `;
+        }
+        
+        // V5.58.6: Show warning if nothing to import
+        if (analysis.available.periods.count === 0 && analysis.totalBells === 0) {
+            availableHtml = `
+                <p class="text-red-600 font-medium">⚠️ No periods or bells found in this backup.</p>
+                <p class="text-sm text-gray-600 mt-1">This may be because the backup was from a personal schedule based on a shared schedule, and only contained customizations to shared bells (not standalone content).</p>
+            `;
+        }
+        
+        // V5.58.6: Show if reconstructed from legacy
+        if (analysis.reconstructedFromLegacy) {
+            availableHtml += `
+                <p class="text-sm text-blue-600 mt-2">ℹ️ Periods were reconstructed from legacy bell format.</p>
+            `;
+        }
+        
+        importPreviewAvailable.innerHTML = availableHtml;
+    }
+    
+    // Build "Modified" section
+    const hasModifications = analysis.modified.sounds.items.length > 0 || analysis.modified.visuals.items.length > 0;
+    if (importPreviewModifiedSection) {
+        importPreviewModifiedSection.classList.toggle('hidden', !hasModifications);
+    }
+    if (importPreviewModified && hasModifications) {
+        let modifiedHtml = '';
+        if (analysis.modified.sounds.items.length > 0) {
+            modifiedHtml += `
+                <label class="flex items-start gap-2">
+                    <input type="checkbox" id="import-opt-sounds" checked class="h-4 w-4 text-yellow-600 mt-1">
+                    <div>
+                        <span><strong>${analysis.modified.sounds.items.length} sound(s)</strong> will use default (Ellis Bell)</span>
+                        <ul class="text-xs text-gray-500 mt-1 ml-4 list-disc">
+                            ${analysis.modified.sounds.items.slice(0, 5).map(s => 
+                                `<li>"${s.bellName}" in "${s.periodName}"</li>`
+                            ).join('')}
+                            ${analysis.modified.sounds.items.length > 5 ? `<li>...and ${analysis.modified.sounds.items.length - 5} more</li>` : ''}
+                        </ul>
+                    </div>
+                </label>
+            `;
+        }
+        if (analysis.modified.visuals.items.length > 0) {
+            modifiedHtml += `
+                <label class="flex items-start gap-2">
+                    <input type="checkbox" id="import-opt-visuals" checked class="h-4 w-4 text-yellow-600 mt-1">
+                    <div>
+                        <span><strong>${analysis.modified.visuals.items.length} visual cue(s)</strong> will be removed</span>
+                        <ul class="text-xs text-gray-500 mt-1 ml-4 list-disc">
+                            ${analysis.modified.visuals.items.slice(0, 3).map(v => 
+                                `<li>"${v.bellName}" in "${v.periodName}"</li>`
+                            ).join('')}
+                            ${analysis.modified.visuals.items.length > 3 ? `<li>...and ${analysis.modified.visuals.items.length - 3} more</li>` : ''}
+                        </ul>
+                    </div>
+                </label>
+            `;
+        }
+        importPreviewModified.innerHTML = modifiedHtml;
+    }
+    
+    // Build "Excluded" section (for personal backups OR orphaned relative bells)
+    // V5.58.8: Added orphaned relative bells to exclusions
+    const orphanedCount = analysis.excluded.orphanedRelativeBells?.length || 0;
+    const hasExclusions = orphanedCount > 0 || (analysis.isPersonalBackup && (
+        analysis.excluded.quickBells || 
+        analysis.excluded.bellOverrides || 
+        analysis.excluded.periodVisualOverrides ||
+        analysis.excluded.baseScheduleId
+    ));
+    if (importPreviewExcludedSection) {
+        importPreviewExcludedSection.classList.toggle('hidden', !hasExclusions);
+    }
+    if (importPreviewExcluded && hasExclusions) {
+        let excludedHtml = '';
+        
+        // V5.58.8: Show orphaned relative bells prominently
+        if (orphanedCount > 0) {
+            excludedHtml += `<div class="mb-2 p-2 bg-red-50 rounded">`;
+            excludedHtml += `<p class="font-medium text-red-700">• ${orphanedCount} relative bell(s) - anchors not in backup</p>`;
+            excludedHtml += `<ul class="text-xs text-red-600 mt-1 ml-4 list-disc">`;
+            analysis.excluded.orphanedRelativeBells.slice(0, 5).forEach(b => {
+                excludedHtml += `<li>"${b.bellName}" in "${b.periodName}"</li>`;
+            });
+            if (orphanedCount > 5) {
+                excludedHtml += `<li>...and ${orphanedCount - 5} more</li>`;
+            }
+            excludedHtml += `</ul></div>`;
+        }
+        
+        if (analysis.excluded.quickBells) excludedHtml += '<p>• Custom quick bells</p>';
+        if (analysis.excluded.bellOverrides) excludedHtml += '<p>• Shared bell overrides/customizations</p>';
+        if (analysis.excluded.periodVisualOverrides) excludedHtml += '<p>• Period visual overrides</p>';
+        if (analysis.excluded.baseScheduleId) excludedHtml += '<p>• Base schedule reference (this will be a standalone shared schedule)</p>';
+        if (analysis.excluded.referencedMedia.audio > 0 || analysis.excluded.referencedMedia.visuals > 0) {
+            excludedHtml += `<p>• Media references (${analysis.excluded.referencedMedia.audio} audio, ${analysis.excluded.referencedMedia.visuals} visual files)</p>`;
+        }
+        importPreviewExcluded.innerHTML = excludedHtml;
+    }
+    
+    // Reset status
+    if (importPreviewStatus) importPreviewStatus.classList.add('hidden');
+    
+    // Show modal
+    importPreviewModal.classList.remove('hidden');
+}
+
+/**
+ * V5.58.4: Execute the import with user-selected options
+ * V5.58.6: Added rename support and better validation
+ */
+async function executeImportWithOptions() {
+    if (!pendingImportData || !activeBaseScheduleId) return;
+    
+    const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+    if (!currentSchedule) {
+        showUserMessage("Error: No active schedule to overwrite.");
+        return;
+    }
+    
+    // V5.58.6: Get the (possibly renamed) schedule name
+    const newName = importPreviewNewName?.value?.trim() || pendingImportData.scheduleName;
+    if (!newName) {
+        if (importPreviewStatus) {
+            importPreviewStatus.textContent = "Please enter a schedule name.";
+            importPreviewStatus.classList.remove('hidden');
+        }
+        return;
+    }
+    
+    // Get user selections
+    const importPeriods = document.getElementById('import-opt-periods')?.checked ?? true;
+    
+    // Build the final periods to import
+    let periodsToImport = pendingImportData.sanitizedPeriods;
+    
+    // V5.58.6: Validate we have something to import
+    if (!periodsToImport || periodsToImport.length === 0) {
+        if (importPreviewStatus) {
+            importPreviewStatus.textContent = "No periods to import. The backup may only contain customizations to a shared schedule.";
+            importPreviewStatus.classList.remove('hidden');
+        }
+        return;
+    }
+    
+    if (importPreviewStatus) {
+        importPreviewStatus.textContent = "Importing...";
+        importPreviewStatus.classList.remove('hidden');
+    }
+    if (importPreviewConfirmBtn) importPreviewConfirmBtn.disabled = true;
+    
+    try {
+        const scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
+        
+        // Save data for message before clearing
+        const modifiedSoundsCount = pendingImportData.modified?.sounds?.items?.length || 0;
+        
+        // V5.58.6: Log what we're importing for debugging
+        console.log("Importing schedule:", {
+            name: newName,
+            periodsCount: periodsToImport.length,
+            periods: periodsToImport.map(p => ({ name: p.name, bellCount: p.bells?.length || 0 }))
+        });
+        
+        await updateDoc(scheduleRef, { 
+            name: newName, 
+            periods: periodsToImport 
+        });
+        
+        // Success - close modal
+        importPreviewModal?.classList.add('hidden');
+        pendingImportData = null;
+        
+        let message = `Successfully imported "${newName}"`;
+        if (modifiedSoundsCount > 0) {
+            message += ` (${modifiedSoundsCount} sounds replaced with defaults)`;
+        }
+        showUserMessage(message);
+        
+    } catch (error) {
+        console.error("Import failed:", error);
+        if (importPreviewStatus) {
+            importPreviewStatus.textContent = `Error: ${error.message}`;
+        }
+    } finally {
+        if (importPreviewConfirmBtn) importPreviewConfirmBtn.disabled = false;
     }
 }
 
@@ -10639,46 +11628,55 @@ async function handleImportCurrentFileChange(e) {
         try {
             const data = JSON.parse(event.target.result);
             
-            // 1. Validate file
-            if (data.type !== "EllisWebBell_SingleSchedule_v1" || !data.schedule || !data.schedule.name || !Array.isArray(data.schedule.periods)) {
-                throw new Error("Invalid or corrupt single schedule backup file.");
-            }
-
-            // 2. Show confirmation
-            const confirmed = await showConfirmationModal(
-                `This will OVERWRITE your current schedule "${currentSchedule.name}" with the data from "${data.schedule.name}" (from file: ${file.name}). This action cannot be undone.`,
-                "Confirm Overwrite Current Schedule",
-                "Overwrite Current"
-            );
-
-            if (!confirmed) {
-                importStatus.textContent = "Import cancelled by user.";
-                setTimeout(() => importStatus.classList.add('hidden'), 3000);
-                importCurrentFileInput.value = ''; // Clear input
-                return; // Stop execution
-            }
-
-            // 3. Proceed with overwrite
-            importStatus.textContent = `Importing and overwriting "${currentSchedule.name}"...`;
+            // V5.58.4: Analyze the file first
+            const analysis = analyzeImportFile(data, file.name);
             
-            const scheduleData = data.schedule;
-            const scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
+            if (!analysis.isValid) {
+                throw new Error("Invalid or corrupt backup file. Expected EllisWebBell schedule backup.");
+            }
+            
+            // Hide the initial status
+            importStatus.classList.add('hidden');
+            
+            // If it's a personal backup OR has modifications, show preview modal
+            if (analysis.isPersonalBackup || analysis.modified.sounds.items.length > 0 || analysis.modified.visuals.items.length > 0) {
+                showImportPreviewModal(analysis);
+            } else {
+                // Admin backup with no modifications - show simple confirmation
+                const confirmed = await showConfirmationModal(
+                    `This will OVERWRITE your current schedule "${currentSchedule.name}" with the data from "${data.schedule.name}" (from file: ${file.name}). This action cannot be undone.`,
+                    "Confirm Overwrite Current Schedule",
+                    "Overwrite Current"
+                );
 
-            // We update the name AND the periods.
-            await updateDoc(scheduleRef, { 
-                name: scheduleData.name, 
-                periods: scheduleData.periods 
-            });
+                if (!confirmed) {
+                    importStatus.textContent = "Import cancelled by user.";
+                    setTimeout(() => importStatus.classList.add('hidden'), 3000);
+                    importCurrentFileInput.value = '';
+                    return;
+                }
 
-            importStatus.textContent = `Successfully overwrote "${currentSchedule.name}" with "${scheduleData.name}".`;
-            // The onSnapshot listener will handle the UI refresh.
+                // Proceed with direct import
+                importStatus.textContent = `Importing and overwriting "${currentSchedule.name}"...`;
+                importStatus.classList.remove('hidden');
+                
+                const scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
+                await updateDoc(scheduleRef, { 
+                    name: data.schedule.name, 
+                    periods: data.schedule.periods 
+                });
+
+                importStatus.textContent = `Successfully overwrote "${currentSchedule.name}" with "${data.schedule.name}".`;
+                setTimeout(() => importStatus.classList.add('hidden'), 4000);
+            }
 
         } catch (error) {
             console.error("Current schedule import failed:", error);
             importStatus.textContent = `Error: ${error.message}`;
+            importStatus.classList.remove('hidden');
+            setTimeout(() => importStatus.classList.add('hidden'), 4000);
         } finally {
             importCurrentFileInput.value = ''; // Clear input
-            setTimeout(() => importStatus.classList.add('hidden'), 4000);
         }
     };
     reader.readAsText(file);
@@ -11088,7 +12086,10 @@ function updateSoundDropdowns() {
         { el: quickBellSoundSelect, myGroup: 'quick-my-sounds-optgroup', sharedGroup: 'quick-shared-sounds-optgroup' },
         // NEW in 4.29: Add the missing modal dropdowns from v4.28
         { el: addStaticBellSound, myGroup: 'add-static-my-sounds-optgroup', sharedGroup: 'add-static-shared-sounds-optgroup' },
-        { el: relativeBellSoundSelect, myGroup: 'relative-my-sounds-optgroup', sharedGroup: 'relative-shared-sounds-optgroup' }
+        { el: relativeBellSoundSelect, myGroup: 'relative-my-sounds-optgroup', sharedGroup: 'relative-shared-sounds-optgroup' },
+        // V5.58.0: Add period modal sound selects
+        { el: multiPeriodStartSoundInput, myGroup: 'period-start-my-sounds-optgroup', sharedGroup: 'period-start-shared-sounds-optgroup' },
+        { el: multiPeriodEndSoundInput, myGroup: 'period-end-my-sounds-optgroup', sharedGroup: 'period-end-shared-sounds-optgroup' }
     ];
 
     // NEW V4.76: Add [UPLOAD] option
@@ -11480,6 +12481,10 @@ function init() {
 
     scheduleSelector.addEventListener('change', () => setActiveSchedule(scheduleSelector.value));
     adminToggleBtn.addEventListener('click', toggleAdminMode);
+    
+    // V5.59.0: Simplified View Toggle
+    simplifiedViewToggle?.addEventListener('click', toggleSimplifiedView);
+    initializeSimplifiedView(); // Load saved preference
 
     // Forms
     // DELETED in 4.40: addPersonalBellForm.addEventListener('submit', handleAddPersonalBell);
@@ -12246,6 +13251,44 @@ function init() {
     multiSelectNoneBtn.addEventListener('click', () => {
         document.querySelectorAll('.multi-schedule-check').forEach(cb => cb.checked = false);
     });
+    
+    // V5.58.0: Modals (Multi-Add Period)
+    showAddPeriodModalBtn?.addEventListener('click', showAddPeriodModal);
+    multiAddPeriodForm?.addEventListener('submit', handleMultiAddPeriodSubmit);
+    multiPeriodCancelBtn?.addEventListener('click', () => {
+        addPeriodModal?.classList.add('hidden');
+        multiAddPeriodForm?.reset();
+        if (multiPeriodStartSoundInput) multiPeriodStartSoundInput.value = 'ellisBell.mp3';
+        if (multiPeriodEndSoundInput) multiPeriodEndSoundInput.value = 'ellisBell.mp3';
+        // V5.58.3: Reset visual cue fields
+        const periodVisual = document.getElementById('multi-period-visual');
+        if (periodVisual) periodVisual.value = '';
+        const noneRadio = document.querySelector('input[name="multi-period-visual-mode"][value="none"]');
+        if (noneRadio) noneRadio.checked = true;
+        updatePeriodVisualPreview();
+        multiPeriodStatus?.classList.add('hidden');
+    });
+    periodSelectAllBtn?.addEventListener('click', () => {
+        document.querySelectorAll('.period-schedule-check').forEach(cb => cb.checked = true);
+    });
+    periodSelectNoneBtn?.addEventListener('click', () => {
+        document.querySelectorAll('.period-schedule-check').forEach(cb => cb.checked = false);
+    });
+    // V5.58.0: Sound preview buttons for period modal
+    document.getElementById('preview-period-start-sound')?.addEventListener('click', () => {
+        if (multiPeriodStartSoundInput) playBell(multiPeriodStartSoundInput.value);
+    });
+    document.getElementById('preview-period-end-sound')?.addEventListener('click', () => {
+        if (multiPeriodEndSoundInput) playBell(multiPeriodEndSoundInput.value);
+    });
+    // V5.58.3: Visual preview update listeners for period modal
+    document.getElementById('multi-period-visual')?.addEventListener('change', (e) => {
+        handleVisualSelectChange(e.target, 'multi-period-visual-preview', multiPeriodNameInput?.value || 'Preview');
+    });
+    document.querySelectorAll('input[name="multi-period-visual-mode"]').forEach(radio => {
+        radio.addEventListener('change', updatePeriodVisualPreview);
+    });
+    document.getElementById('multi-period-name')?.addEventListener('input', updatePeriodVisualPreview);
     
     // Modals (Edit Bell)
     editBellForm.addEventListener('submit', handleEditBellSubmit);
@@ -13196,8 +14239,10 @@ function init() {
 
     // ============================================
     // V5.46.0: BULK EDIT FUNCTIONALITY
+    // V5.59.0: Added master and period checkboxes
     // ============================================
     const bulkEditToggleBtn = document.getElementById('bulk-edit-toggle-btn');
+    const bulkSelectAllMaster = document.getElementById('bulk-select-all-master'); // V5.59.0
     const bulkEditModal = document.getElementById('bulk-edit-modal');
     const bulkEditCount = document.getElementById('bulk-edit-count');
     const bulkEditSound = document.getElementById('bulk-edit-sound');
@@ -13224,6 +14269,54 @@ function init() {
             bulkEditToggleBtn.classList.toggle('hidden', !activePersonalScheduleId);
         }
     }
+    
+    // V5.59.0: Update master and period checkbox states
+    function updateBulkSelectCheckboxes() {
+        if (!bulkEditMode) return;
+        
+        // Get all bell checkboxes
+        const allBellCheckboxes = document.querySelectorAll('.bulk-edit-checkbox');
+        const allBellIds = Array.from(allBellCheckboxes).map(cb => cb.dataset.bellId);
+        const selectedCount = bulkSelectedBells.size;
+        const totalCount = allBellIds.length;
+        
+        // Update master checkbox state
+        if (bulkSelectAllMaster) {
+            if (selectedCount === 0) {
+                bulkSelectAllMaster.checked = false;
+                bulkSelectAllMaster.indeterminate = false;
+            } else if (selectedCount === totalCount) {
+                bulkSelectAllMaster.checked = true;
+                bulkSelectAllMaster.indeterminate = false;
+            } else {
+                bulkSelectAllMaster.checked = false;
+                bulkSelectAllMaster.indeterminate = true;
+            }
+        }
+        
+        // Update each period checkbox
+        document.querySelectorAll('.bulk-select-period').forEach(periodCheckbox => {
+            const periodName = periodCheckbox.dataset.periodName;
+            const periodDetails = periodCheckbox.closest('details');
+            if (!periodDetails) return;
+            
+            const periodBellCheckboxes = periodDetails.querySelectorAll('.bulk-edit-checkbox');
+            const periodBellIds = Array.from(periodBellCheckboxes).map(cb => cb.dataset.bellId);
+            const periodSelectedCount = periodBellIds.filter(id => bulkSelectedBells.has(id)).length;
+            const periodTotalCount = periodBellIds.length;
+            
+            if (periodSelectedCount === 0) {
+                periodCheckbox.checked = false;
+                periodCheckbox.indeterminate = false;
+            } else if (periodSelectedCount === periodTotalCount) {
+                periodCheckbox.checked = true;
+                periodCheckbox.indeterminate = false;
+            } else {
+                periodCheckbox.checked = false;
+                periodCheckbox.indeterminate = true;
+            }
+        });
+    }
 
     // Toggle bulk edit mode
     bulkEditToggleBtn?.addEventListener('click', () => {
@@ -13234,6 +14327,12 @@ function init() {
             bulkEditToggleBtn.textContent = 'Done Selecting';
             bulkEditToggleBtn.classList.remove('bg-sky-100', 'text-sky-700');
             bulkEditToggleBtn.classList.add('bg-sky-600', 'text-white');
+            // V5.59.0: Show master checkbox
+            if (bulkSelectAllMaster) {
+                bulkSelectAllMaster.classList.remove('hidden');
+                bulkSelectAllMaster.checked = false;
+                bulkSelectAllMaster.indeterminate = false;
+            }
             recalculateAndRenderAll();
         } else if (bulkSelectedBells.size > 0) {
             // In bulk edit mode with selections - open modal
@@ -13244,6 +14343,10 @@ function init() {
             bulkEditToggleBtn.textContent = 'Bulk Edit';
             bulkEditToggleBtn.classList.remove('bg-sky-600', 'text-white');
             bulkEditToggleBtn.classList.add('bg-sky-100', 'text-sky-700');
+            // V5.59.0: Hide master checkbox
+            if (bulkSelectAllMaster) {
+                bulkSelectAllMaster.classList.add('hidden');
+            }
             recalculateAndRenderAll();
         }
     });
@@ -13258,7 +14361,52 @@ function init() {
                 bulkSelectedBells.delete(bellId);
             }
             updateBulkEditUI();
+            updateBulkSelectCheckboxes(); // V5.59.0
         }
+        
+        // V5.59.0: Handle period-level checkbox changes
+        if (e.target.classList.contains('bulk-select-period')) {
+            const periodName = e.target.dataset.periodName;
+            const periodDetails = e.target.closest('details');
+            if (!periodDetails) return;
+            
+            const periodBellCheckboxes = periodDetails.querySelectorAll('.bulk-edit-checkbox');
+            periodBellCheckboxes.forEach(cb => {
+                const bellId = cb.dataset.bellId;
+                if (e.target.checked) {
+                    bulkSelectedBells.add(bellId);
+                    cb.checked = true;
+                } else {
+                    bulkSelectedBells.delete(bellId);
+                    cb.checked = false;
+                }
+            });
+            updateBulkEditUI();
+            updateBulkSelectCheckboxes();
+        }
+    });
+    
+    // V5.59.0: Handle master checkbox changes
+    bulkSelectAllMaster?.addEventListener('change', (e) => {
+        const allBellCheckboxes = document.querySelectorAll('.bulk-edit-checkbox');
+        allBellCheckboxes.forEach(cb => {
+            const bellId = cb.dataset.bellId;
+            if (e.target.checked) {
+                bulkSelectedBells.add(bellId);
+                cb.checked = true;
+            } else {
+                bulkSelectedBells.delete(bellId);
+                cb.checked = false;
+            }
+        });
+        
+        // Also update period checkboxes
+        document.querySelectorAll('.bulk-select-period').forEach(periodCb => {
+            periodCb.checked = e.target.checked;
+            periodCb.indeterminate = false;
+        });
+        
+        updateBulkEditUI();
     });
 
     // Update UI based on selections
@@ -13815,6 +14963,13 @@ function init() {
     exportCurrentScheduleBtn.addEventListener('click', handleExportCurrentSchedule);
     importCurrentScheduleBtn.addEventListener('click', handleImportCurrentScheduleClick);
     importCurrentFileInput.addEventListener('change', handleImportCurrentFileChange);
+    
+    // V5.58.4: Import Preview Modal Listeners
+    importPreviewCancelBtn?.addEventListener('click', () => {
+        importPreviewModal?.classList.add('hidden');
+        pendingImportData = null;
+    });
+    importPreviewConfirmBtn?.addEventListener('click', executeImportWithOptions);
 
     // NEW: Audio Manager Listeners
     // MODIFIED V4.76: Listeners for the new reusable modal
