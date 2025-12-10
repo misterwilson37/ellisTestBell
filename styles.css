@@ -1,10 +1,10 @@
 /* ============================================
    Ellis Web Bell Stylesheet
-   Version: 2.3.1
+   Version: 2.4
    ============================================ */
 
 :root {
-    --css-version: "2.3.1";
+    --css-version: "2.4";
     
     /* V5.52.1: Customizable warning colors */
     --warning-color-subtle: #fbbf24;
@@ -393,4 +393,51 @@ body.kiosk-mode #next-bell-info {
         min-height: 300px !important;
         width: 300px !important;
     }
+}
+
+/* ===== V5.59.0: Simplified View Mode ===== */
+/* Hides all editing UI in the schedule display area while keeping core functionality */
+
+/* Hide all edit/delete/add buttons on bells */
+body.simplified-mode .edit-btn,
+body.simplified-mode .edit-custom-btn,
+body.simplified-mode .delete-btn,
+body.simplified-mode .delete-custom-btn,
+body.simplified-mode .add-bell-to-period-btn {
+    display: none !important;
+}
+
+/* Hide period edit visual cue button */
+body.simplified-mode .edit-period-visual-btn {
+    display: none !important;
+}
+
+/* Hide bulk edit toggle and checkbox column */
+body.simplified-mode #bulk-edit-toggle-btn {
+    display: none !important;
+}
+
+body.simplified-mode .bulk-edit-checkbox {
+    display: none !important;
+}
+
+/* Hide any inline add buttons that appear in periods */
+body.simplified-mode [class*="add-bell"],
+body.simplified-mode [class*="add-period"] {
+    display: none !important;
+}
+
+/* But keep the main period structure and bell info visible */
+/* Also keep Collapse All, Expand All, Mute All, Unmute All buttons */
+
+/* Hide period management buttons in simplified mode */
+body.simplified-mode .rename-period-btn,
+body.simplified-mode .delete-list-period-btn {
+    display: none !important;
+}
+
+/* Hide bulk select checkboxes in simplified mode */
+body.simplified-mode #bulk-select-all-master,
+body.simplified-mode .bulk-select-period {
+    display: none !important;
 }
