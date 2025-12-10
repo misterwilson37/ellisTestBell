@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.41.2</title>
+    <title>Ellis Web Bell 5.43.0</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -97,7 +97,7 @@
                 <label for="multi-bell-sound" class="block text-sm font-medium text-gray-700">Sound</label>
                 <!-- V5.49: Added preview button -->
                 <div class="flex items-center gap-2 mt-1">
-                    <select id="multi-bell-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="multi-bell-sound" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <optgroup label="Default Sounds">
                             <option value="Bell">Bell</option>
                             <option value="Chime">Chime</option>
@@ -181,6 +181,219 @@
                 <button type="submit" id="multi-add-submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Bell</button>
             </div>
         </form>
+    </div>
+
+    <!-- V5.58.0: Add Period to Multiple Schedules Modal -->
+    <div id="add-period-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <form id="multi-add-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-6">Add Period to Schedules</h3>
+
+            <!-- Period Name -->
+            <div class="mb-4">
+                <label for="multi-period-name" class="block text-sm font-medium text-gray-700">Period Name</label>
+                <input type="text" id="multi-period-name" placeholder="e.g. 7th Period" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+            </div>
+
+            <!-- Start Time -->
+            <div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                <h4 class="text-sm font-semibold text-green-800 mb-3">Period Start Bell</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="multi-period-start-time" class="block text-sm font-medium text-gray-700">Start Time</label>
+                        <input type="time" id="multi-period-start-time" step="1" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    </div>
+                    <div>
+                        <label for="multi-period-start-sound" class="block text-sm font-medium text-gray-700">Sound</label>
+                        <div class="flex items-center gap-2 mt-1">
+                            <select id="multi-period-start-sound" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <optgroup label="Default Sounds">
+                                    <option value="Bell">Bell</option>
+                                    <option value="Chime">Chime</option>
+                                    <option value="Beep">Beep</option>
+                                    <option value="Alarm">Alarm</option>
+                                    <option value="ellisBell.mp3" selected>Ellis Bell</option>
+                                </optgroup>
+                                <optgroup label="My Sounds" id="period-start-my-sounds-optgroup"></optgroup>
+                                <optgroup label="Shared Sounds" id="period-start-shared-sounds-optgroup"></optgroup>
+                            </select>
+                            <button type="button" id="preview-period-start-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                                ▶
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- End Time -->
+            <div class="mb-4 p-4 bg-red-50 rounded-lg border border-red-200">
+                <h4 class="text-sm font-semibold text-red-800 mb-3">Period End Bell</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="multi-period-end-time" class="block text-sm font-medium text-gray-700">End Time</label>
+                        <input type="time" id="multi-period-end-time" step="1" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                    </div>
+                    <div>
+                        <label for="multi-period-end-sound" class="block text-sm font-medium text-gray-700">Sound</label>
+                        <div class="flex items-center gap-2 mt-1">
+                            <select id="multi-period-end-sound" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                                <optgroup label="Default Sounds">
+                                    <option value="Bell">Bell</option>
+                                    <option value="Chime">Chime</option>
+                                    <option value="Beep">Beep</option>
+                                    <option value="Alarm">Alarm</option>
+                                    <option value="ellisBell.mp3" selected>Ellis Bell</option>
+                                </optgroup>
+                                <optgroup label="My Sounds" id="period-end-my-sounds-optgroup"></optgroup>
+                                <optgroup label="Shared Sounds" id="period-end-shared-sounds-optgroup"></optgroup>
+                            </select>
+                            <button type="button" id="preview-period-end-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
+                                ▶
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- V5.58.3: Visual Cue for Period (applies to both bells) -->
+            <div class="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <h4 class="text-sm font-semibold text-purple-800 mb-3">Period Visual Cue (Optional)</h4>
+                <div class="mb-3">
+                    <label for="multi-period-visual" class="block text-sm font-medium text-gray-700 mb-1">Visual Cue</label>
+                    <select id="multi-period-visual" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">[None]</option>
+                        <option value="[UPLOAD]">Upload Image...</option>
+                        <option value="[CUSTOM_TEXT]">Custom Text/Color...</option>
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Visual Display</label>
+                        <div class="space-y-1">
+                            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+                                <input type="radio" name="multi-period-visual-mode" value="none" checked class="mr-2">
+                                <span class="text-sm">None</span>
+                            </label>
+                            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+                                <input type="radio" name="multi-period-visual-mode" value="before" class="mr-2">
+                                <span class="text-sm">Before</span>
+                            </label>
+                            <label class="flex items-center px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+                                <input type="radio" name="multi-period-visual-mode" value="after" class="mr-2">
+                                <span class="text-sm">After</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+                        <div id="multi-period-visual-preview" class="visual-preview-full">
+                            <span class="visual-preview-placeholder">Select visual</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule Checkboxes -->
+            <div class="mt-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Select Schedules to Add to:</label>
+                <div class="flex gap-2 mb-2">
+                    <button type="button" id="period-select-all" class="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300">Select All</button>
+                    <button type="button" id="period-select-none" class="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300">Select None</button>
+                </div>
+                <div id="period-schedule-list-container" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <!-- Checkboxes will be dynamically injected here -->
+                    <p class="text-gray-500">Loading schedules...</p>
+                </div>
+            </div>
+
+            <p id="multi-period-status" class="text-purple-600 text-sm mt-4 hidden"></p>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="multi-period-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" id="multi-period-submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Add Period</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- V5.58.4: Import Preview Modal (Admin) -->
+    <div id="import-preview-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-2">Import Preview</h3>
+            
+            <!-- Warning Banner (shown for personal -> admin imports) -->
+            <div id="import-preview-warning" class="mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg hidden">
+                <div class="flex items-start gap-3">
+                    <span class="text-yellow-600 text-xl">⚠️</span>
+                    <div>
+                        <p class="font-semibold text-yellow-800">Personal Schedule Detected</p>
+                        <p class="text-sm text-yellow-700">This backup was exported from a personal schedule. Some content may not be compatible with shared schedules.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- V5.58.6: Based on Shared Schedule Warning -->
+            <div id="import-preview-linked-warning" class="mb-4 p-4 bg-orange-50 border border-orange-300 rounded-lg hidden">
+                <div class="flex items-start gap-3">
+                    <span class="text-orange-600 text-xl">🔗</span>
+                    <div>
+                        <p class="font-semibold text-orange-800">Linked Schedule Backup</p>
+                        <p class="text-sm text-orange-700">This backup was from a schedule based on a shared schedule. It only contains custom periods and bells - not the original shared content.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- File Info -->
+            <div id="import-preview-info" class="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
+                <p><strong>File:</strong> <span id="import-preview-filename">-</span></p>
+                <p><strong>Original Name:</strong> <span id="import-preview-schedule-name">-</span></p>
+                <p><strong>Exported:</strong> <span id="import-preview-date">-</span></p>
+            </div>
+            
+            <!-- V5.58.6: Rename Input -->
+            <div class="mb-4">
+                <label for="import-preview-new-name" class="block text-sm font-medium text-gray-700 mb-1">Import As (rename if desired):</label>
+                <input type="text" id="import-preview-new-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Schedule name">
+            </div>
+            
+            <!-- What CAN be imported -->
+            <div class="mb-4">
+                <h4 class="font-semibold text-green-700 mb-2 flex items-center gap-2">
+                    <span class="text-green-600">✓</span> Can Be Imported
+                </h4>
+                <div id="import-preview-available" class="space-y-2 pl-6">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+            
+            <!-- What WILL BE MODIFIED -->
+            <div id="import-preview-modified-section" class="mb-4 hidden">
+                <h4 class="font-semibold text-yellow-700 mb-2 flex items-center gap-2">
+                    <span class="text-yellow-600">⚡</span> Will Be Modified
+                </h4>
+                <div id="import-preview-modified" class="space-y-2 pl-6 text-sm">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+            
+            <!-- What WON'T be imported -->
+            <div id="import-preview-excluded-section" class="mb-4 hidden">
+                <h4 class="font-semibold text-red-700 mb-2 flex items-center gap-2">
+                    <span class="text-red-600">✗</span> Will Not Be Imported
+                </h4>
+                <div id="import-preview-excluded" class="space-y-1 pl-6 text-sm text-gray-600">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+            
+            <!-- Status -->
+            <p id="import-preview-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+            
+            <!-- Buttons -->
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="import-preview-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="import-preview-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Import Selected</button>
+            </div>
+        </div>
     </div>
 
     <!-- NEW: Edit Bell Modal (Admin) -->
@@ -878,7 +1091,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.41.2</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.43.0</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
 
 
@@ -1034,7 +1247,13 @@
         <div class="kiosk-hide">
             <!-- NEW: Mute & Collapse Controls added -->
             <div class="flex justify-between items-center mb-4">
-                 <h2 id="schedule-title" class="text-2xl font-semibold">Current Schedule</h2>
+                 <!-- V5.59.0: Master checkbox for bulk edit + schedule title -->
+                 <div class="flex items-center">
+                     <input type="checkbox" id="bulk-select-all-master" 
+                            class="h-5 w-5 text-sky-600 rounded focus:ring-sky-500 mr-3 hidden"
+                            title="Select/deselect all bells">
+                     <h2 id="schedule-title" class="text-2xl font-semibold">Current Schedule</h2>
+                 </div>
                  <div class="flex-shrink-0 flex gap-2">
                      <!-- NEW in 4.49: Collapse/Expand Buttons -->
                      <button id="collapse-all-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Collapse All</button>
@@ -1062,10 +1281,16 @@
             
             <div class="flex justify-between items-center mb-2">
                 <label for="schedule-selector" class="block text-sm font-medium text-gray-700">Select Schedule</label>
-                <!-- MODIFIED: Disabled by default, enabled via JS for admins -->
-                <button id="admin-toggle" class="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded-full hover:bg-gray-300 transition-colors opacity-50 cursor-not-allowed" disabled title="Sign in to see admin options">
-                    Toggle Admin
-                </button>
+                <!-- V5.59.0: Simplified View toggle + Admin Toggle -->
+                <div class="flex gap-2">
+                    <button id="simplified-view-toggle" class="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded-full hover:bg-gray-300 transition-colors" title="Toggle between simplified view and full edit mode">
+                        Simplified View
+                    </button>
+                    <!-- MODIFIED: Disabled by default, enabled via JS for admins -->
+                    <button id="admin-toggle" class="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded-full hover:bg-gray-300 transition-colors opacity-50 cursor-not-allowed" disabled title="Sign in to see admin options">
+                        Toggle Admin
+                    </button>
+                </div>
             </div>
 
             <!-- NEW (FIXED): Re-inserted the missing select element -->
@@ -1160,12 +1385,20 @@
                 <p id="add-shared-status" class="text-blue-600 text-sm mt-3 hidden"></p>
             </form>
 
-            <!-- Add Bell to Schedules Button -->
-            <div class="border-t pt-6">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Add Bell to Multiple Schedules</label>
-                <button type="button" id="show-add-bell-modal-btn" class="w-full px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700">
-                    Add Bell to Schedules...
-                </button>
+            <!-- V5.58.0: Add Bell/Period to Schedules Buttons -->
+            <div class="border-t pt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Add Bell to Multiple Schedules</label>
+                    <button type="button" id="show-add-bell-modal-btn" class="w-full px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700">
+                        Add Bell to Schedules...
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Add Period to Multiple Schedules</label>
+                    <button type="button" id="show-add-period-modal-btn" class="w-full px-6 py-2 bg-purple-600 text-white font-medium rounded-lg shadow-md hover:bg-purple-700">
+                        Add Period to Schedule(s)...
+                    </button>
+                </div>
             </div>
 
             <!-- MOVED: Delete Selected Schedule Button -->
@@ -1661,7 +1894,7 @@
                             <label for="new-period-start-sound" class="block text-sm font-medium text-gray-700">Sound</label>
                             <!-- V5.49: Added preview button -->
                             <div class="flex items-center gap-2 mt-1">
-                                <select id="new-period-start-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <select id="new-period-start-sound" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <!-- Populated by JS -->
                                 </select>
                                 <button type="button" id="preview-new-period-start-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
@@ -1718,7 +1951,7 @@
                             <label for="new-period-start-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
                             <!-- V5.49: Added preview button -->
                             <div class="flex items-center gap-2 mt-1">
-                                <select id="new-period-start-sound-relative" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <select id="new-period-start-sound-relative" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <!-- Populated by JS -->
                                 </select>
                                 <button type="button" id="preview-new-period-start-sound-relative" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
@@ -1743,7 +1976,7 @@
                             <label for="new-period-end-sound" class="block text-sm font-medium text-gray-700">Sound</label>
                             <!-- V5.49: Added preview button -->
                             <div class="flex items-center gap-2 mt-1">
-                                <select id="new-period-end-sound" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <select id="new-period-end-sound" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <!-- Populated by JS -->
                                 </select>
                                 <button type="button" id="preview-new-period-end-sound" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
@@ -1800,7 +2033,7 @@
                             <label for="new-period-end-sound-relative" class="block text-sm font-medium text-gray-700">Sound</label>
                             <!-- V5.49: Added preview button -->
                             <div class="flex items-center gap-2 mt-1">
-                                <select id="new-period-end-sound-relative" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <select id="new-period-end-sound-relative" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <!-- Populated by JS -->
                                 </select>
                                 <button type="button" id="preview-new-period-end-sound-relative" class="w-10 h-10 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
@@ -2373,4 +2606,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.41.2 -->
+<!-- Version 5.43.0 -->
