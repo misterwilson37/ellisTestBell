@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bell Schedule Clock</title>
+    <!-- Clock Display v1.1.7 -->
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&family=Questrial&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Clock Display v1.1.7 - School Colors: Black, White, Grey, Carolina Blue */
+        :root {
+            --carolina-blue: #4B9CD3;
+            --carolina-blue-light: #7BAFD4;
+            --dark-grey: #1a1a1a;
+            --darker-grey: #111111;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Century Gothic', 'Urbanist', 'Questrial', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        /* Setup mode styles */
+        body.setup-mode {
+            background: var(--darker-grey);
+        }
+        
+        #setup-panel {
+            display: none;
+            background: var(--dark-grey);
+            border-radius: 12px;
+            padding: 24px 32px;
+            max-width: 650px;
+            width: 100%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+        }
+        
+        body.setup-mode #setup-panel {
+            display: block;
+        }
+        
+        body.setup-mode #clock-display {
+            display: none;
+        }
+        
+        #setup-panel h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--carolina-blue);
+        }
+        
+        .setup-row {
+            display: grid;
+            grid-template-columns: 80px 1fr 120px 60px;
+            gap: 12px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+        
+        .setup-row label {
+            font-weight: 600;
+            color: #a0a0a0;
+        }
+        
+        .setup-row select,
+        .setup-row input[type="text"] {
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #000;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .setup-row select:focus,
+        .setup-row input[type="text"]:focus {
+            outline: none;
+            border-color: var(--carolina-blue);
+        }
+        
+        .audio-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        
+        .audio-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .setup-actions {
+            margin-top: 24px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .setup-actions button {
+            padding: 12px 24px;
+            border-radius: 6px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--carolina-blue);
+            color: #fff;
+        }
+        
+        .btn-primary:hover {
+            background: var(--carolina-blue-light);
+        }
+        
+        .btn-secondary {
+            background: #333;
+            color: #fff;
+        }
+        
+        .btn-secondary:hover {
+            background: #444;
+        }
+        
+        #generated-url {
+            margin-top: 16px;
+            padding: 12px;
+            background: #000;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            display: none;
+            color: var(--carolina-blue-light);
+            border: 1px solid #333;
+        }
+        
+        #generated-url.visible {
+            display: block;
+        }
+        
+        .setup-note {
+            margin-top: 16px;
+            padding: 12px;
+            background: rgba(75, 156, 211, 0.1);
+            border-left: 3px solid var(--carolina-blue);
+            font-size: 13px;
+            color: #a0a0a0;
+        }
+        
+        /* Clock display styles */
+        #clock-display {
+            width: 100%;
+            max-width: 960px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        
+        /* Hover popup icon - hidden by default, shows on hover */
+        #popup-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            background: rgba(75, 156, 211, 0.8);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+        }
+        
+        #popup-icon:hover {
+            background: rgba(75, 156, 211, 1);
+        }
+        
+        #popup-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+        
+        /* Show on hover over the display area */
+        #clock-display:hover #popup-icon {
+            opacity: 1;
+        }
+        
+        /* Never show on touch devices (TVs, tablets) */
+        @media (hover: none) {
+            #popup-icon {
+                display: none !important;
+            }
+        }
+        
+        #main-clock {
+            font-size: clamp(4rem, 15vw, 10rem);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-align: center;
+            width: 100%;
+            line-height: 1.1;
+            margin-bottom: 20px;
+        }
+        
+        #schedule-columns {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            width: 100%;
+        }
+        
+        .schedule-column {
+            text-align: center;
+            padding: 16px;
+            border-radius: 8px;
+            background: var(--dark-grey);
+            border: 1px solid #333;
+        }
+        
+        .column-label {
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            font-weight: 600;
+            color: #a0a0a0;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .column-period {
+            font-size: clamp(1.4rem, 5vw, 2.5rem);
+            font-weight: 700;
+            color: #fff;
+            min-height: 1.5em;
+        }
+        
+        .column-countdown {
+            font-size: clamp(0.9rem, 2.5vw, 1.3rem);
+            color: var(--carolina-blue);
+            margin-top: 4px;
+            min-height: 1.3em;
+        }
+        
+        /* Loading state */
+        #loading-message {
+            font-size: 1.5rem;
+            color: #666;
+        }
+        
+        /* Error state */
+        .error-message {
+            color: var(--carolina-blue);
+            font-size: 1rem;
+            margin-top: 8px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            #schedule-columns {
+                gap: 10px;
+            }
+            
+            .schedule-column {
+                padding: 12px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Setup Panel (shown when no schedules configured) -->
+    <div id="setup-panel">
+        <h2 style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span>🕐 Clock Display Setup</span>
+            <span style="color: #444;">•</span>
+            <a href="dashboard.html" style="color: #a0a0a0; text-decoration: none; font-size: 0.85em;">📺 School Dashboard</a>
+        </h2>
+        
+        <div class="setup-row">
+            <label>Column 1:</label>
+            <select id="setup-schedule-1">
+                <option value="">Loading schedules...</option>
+            </select>
+            <input type="text" id="setup-label-1" placeholder="Label (e.g., 6th)">
+            <label class="audio-toggle"><input type="checkbox" id="setup-audio-1"> 🔔</label>
+        </div>
+        
+        <div class="setup-row">
+            <label>Column 2:</label>
+            <select id="setup-schedule-2">
+                <option value="">Loading schedules...</option>
+            </select>
+            <input type="text" id="setup-label-2" placeholder="Label (e.g., 7th)">
+            <label class="audio-toggle"><input type="checkbox" id="setup-audio-2"> 🔔</label>
+        </div>
+        
+        <div class="setup-row">
+            <label>Column 3:</label>
+            <select id="setup-schedule-3">
+                <option value="">Loading schedules...</option>
+            </select>
+            <input type="text" id="setup-label-3" placeholder="Label (e.g., 8th)">
+            <label class="audio-toggle"><input type="checkbox" id="setup-audio-3"> 🔔</label>
+        </div>
+        
+        <!-- Sound selector (shown for logged-in users) - between columns and buttons -->
+        <div id="sound-selector-section" class="mb-4 mt-2" style="display: none;">
+            <label class="block text-sm font-medium text-gray-400 mb-2">🔊 Bell Sound (for all audio-enabled columns):</label>
+            <select id="setup-sound" class="w-full px-3 py-2 border border-gray-600 rounded-lg bg-black text-white">
+                <option value="ellisBell.mp3">Ellis Bell (Default)</option>
+                <option value="Bell">Bell</option>
+                <option value="Chime">Chime</option>
+                <option value="Beep">Beep</option>
+                <option value="Alarm">Alarm</option>
+                <!-- Shared sounds populated dynamically -->
+            </select>
+        </div>
+        
+        <div class="setup-actions">
+            <button class="btn-primary" id="generate-url-btn">Generate URL</button>
+            <button class="btn-secondary" id="preview-btn">Launch Display</button>
+            <button class="btn-secondary" id="copy-url-btn" style="display:none;">Copy URL</button>
+            <button class="btn-secondary" id="last-config-btn" style="display:none;">🕐 Launch Last</button>
+        </div>
+        
+        <div id="generated-url"></div>
+        
+        <div class="setup-note">
+            <strong>Tip:</strong> Once generated, bookmark the URL or use it in your signage system. 
+            The display will automatically load with your configured schedules.
+        </div>
+        
+        <div class="version-info" style="margin-top: 16px; font-size: 11px; color: #666; text-align: center;">
+            Clock v1.1.7 | Dashboard v1.1.5 | Ellis Web Bell v5.46.0
+            <br>
+            <a href="index.html" style="color: var(--carolina-blue); text-decoration: none;">← Back to Bell Schedule</a>
+        </div>
+    </div>
+    
+    <!-- Clock Display (shown when schedules are configured) -->
+    <div id="clock-display">
+        <!-- Popup icon - appears on hover -->
+        <div id="popup-icon" title="Open in popup window" onclick="openPopupWindow()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+        </div>
+        
+        <div id="main-clock">--:--:-- --</div>
+        
+        <div id="schedule-columns">
+            <div class="schedule-column" id="col-1">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
+            <div class="schedule-column" id="col-2">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
+            <div class="schedule-column" id="col-3">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Clock Display v1.1.7
+        
+        // Firebase config (must match main app)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
+            authDomain: "ellisbell-c185c.firebaseapp.com", 
+            projectId: "ellisbell-c185c",
+            storageBucket: "ellisbell-c185c.firebasestorage.app",
+            appId: "1:441560045695:web:94e51a006663404b8f474a"
+        };
+        
+        // App ID for Firestore paths
+        const appId = firebaseConfig.appId;
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        
+        // State
+        let scheduleData = {}; // { scheduleId: { name, periods: [...] } }
+        let config = {
+            s1: null, s2: null, s3: null,  // Schedule IDs
+            l1: '', l2: '', l3: '',         // Labels
+            a1: false, a2: false, a3: false, // Audio enabled
+            sound: 'ellisBell.mp3'          // Sound file for all bells
+        };
+        let playedBells = new Set(); // Track bells that have played today
+        let lastDateCheck = null; // To reset playedBells at midnight
+        let isAnonymousUser = true; // Track if user is anonymous
+        
+        // Sound URL is determined by config.sound (set from URL parameter or default)
+        
+        // Wait for auth to be ready
+        function waitForAuth() {
+            return new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    resolve(user);
+                });
+            });
+        }
+        
+        // Parse URL parameters
+        function parseUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            config.s1 = params.get('s1') || null;
+            config.s2 = params.get('s2') || null;
+            config.s3 = params.get('s3') || null;
+            config.l1 = params.get('l1') || '';
+            config.l2 = params.get('l2') || '';
+            config.l3 = params.get('l3') || '';
+            config.a1 = params.get('a1') === '1';
+            config.a2 = params.get('a2') === '1';
+            config.a3 = params.get('a3') === '1';
+            config.sound = params.get('sound') || 'ellisBell.mp3';
+            
+            return config.s1 || config.s2 || config.s3;
+        }
+        
+        // Format time as 12-hour with seconds
+        function formatTime12Hour(date) {
+            let hours = date.getHours();
+            const minutes = date.getMinutes();
+            const seconds = date.getSeconds();
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12 || 12;
+            return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} ${ampm}`;
+        }
+        
+        // Format countdown
+        function formatCountdown(seconds) {
+            if (seconds < 0) return '';
+            
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (hours > 0) {
+                // Show hours and minutes only
+                return `${hours}h ${mins}m`;
+            } else {
+                // Show minutes:seconds
+                return `${mins}:${String(secs).padStart(2, '0')}`;
+            }
+        }
+        
+        // Format seconds since midnight as 12-hour time
+        function formatSecondsAs12Hour(totalSeconds) {
+            let hours = Math.floor(totalSeconds / 3600);
+            const mins = Math.floor((totalSeconds % 3600) / 60);
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12 || 12;
+            return `${hours}:${String(mins).padStart(2, '0')} ${ampm}`;
+        }
+        
+        // Convert time string (HH:MM:SS) to seconds since midnight
+        function timeToSeconds(timeStr) {
+            const [h, m, s] = timeStr.split(':').map(Number);
+            return h * 3600 + m * 60 + (s || 0);
+        }
+        
+        // Get current period status for a schedule
+        function getPeriodStatus(scheduleId) {
+            const schedule = scheduleData[scheduleId];
+            if (!schedule || !schedule.periods) {
+                console.log(`getPeriodStatus(${scheduleId}): No schedule or periods`);
+                return { status: 'error', message: 'No data' };
+            }
+            
+            console.log(`getPeriodStatus(${scheduleId}): ${schedule.periods.length} periods`);
+            
+            const now = new Date();
+            const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            
+            // Build period ranges - use first and last bell of each period
+            const periodRanges = {};
+            
+            for (const period of schedule.periods) {
+                if (period.isEnabled === false) continue;
+                
+                const bells = (period.bells || []).filter(b => b.time);
+                console.log(`  Period "${period.name}": ${bells.length} bells`);
+                
+                if (bells.length === 0) continue;
+                
+                // Log first bell to see structure
+                if (bells.length > 0) {
+                    console.log(`    First bell: name="${bells[0].name}", anchorRole="${bells[0].anchorRole}", time="${bells[0].time}"`);
+                }
+                
+                // Sort bells by time
+                bells.sort((a, b) => timeToSeconds(a.time) - timeToSeconds(b.time));
+                
+                // Use first bell as start, last bell as end
+                const startBell = bells[0];
+                const endBell = bells[bells.length - 1];
+                
+                periodRanges[period.name] = {
+                    name: period.name,
+                    start: timeToSeconds(startBell.time),
+                    end: timeToSeconds(endBell.time)
+                };
+            }
+            
+            console.log(`  Period ranges:`, Object.keys(periodRanges).map(k => 
+                `${k}: ${Math.floor(periodRanges[k].start/3600)}:${Math.floor((periodRanges[k].start%3600)/60)} - ${Math.floor(periodRanges[k].end/3600)}:${Math.floor((periodRanges[k].end%3600)/60)}`
+            ));
+            console.log(`  Current time in seconds: ${currentSeconds} (${Math.floor(currentSeconds/3600)}:${Math.floor((currentSeconds%3600)/60)})`);
+            
+            // Check if we're currently in a period
+            for (const [name, range] of Object.entries(periodRanges)) {
+                if (currentSeconds >= range.start && currentSeconds < range.end) {
+                    console.log(`  -> In period: ${name}`);
+                    return { 
+                        status: 'in-period', 
+                        periodName: name,
+                        endSeconds: range.end
+                    };
+                }
+            }
+            
+            // Not in a period - find next period start
+            const periodStarts = Object.entries(periodRanges)
+                .map(([name, r]) => ({ name, start: r.start }))
+                .sort((a, b) => a.start - b.start);
+            
+            // Find next period that starts after now
+            let nextPeriod = periodStarts.find(p => p.start > currentSeconds);
+            
+            if (!nextPeriod && periodStarts.length > 0) {
+                // After all periods - show first period of tomorrow
+                nextPeriod = periodStarts[0];
+                const secondsUntil = (24 * 3600 - currentSeconds) + nextPeriod.start;
+                console.log(`  -> After school, next is ${nextPeriod.name} tomorrow`);
+                return {
+                    status: 'waiting',
+                    nextPeriod: nextPeriod.name,
+                    countdown: secondsUntil
+                };
+            }
+            
+            if (nextPeriod) {
+                const secondsUntil = nextPeriod.start - currentSeconds;
+                console.log(`  -> Waiting for ${nextPeriod.name}, starts in ${secondsUntil}s`);
+                return {
+                    status: 'waiting',
+                    nextPeriod: nextPeriod.name,
+                    countdown: secondsUntil
+                };
+            }
+            
+            return { status: 'unknown', message: 'Unknown' };
+        }
+        
+        // Update clock display
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('main-clock').textContent = formatTime12Hour(now);
+        }
+        
+        // Play bell sound
+        function playBellSound() {
+            try {
+                const audio = new Audio(config.sound);
+                audio.play().catch(err => {
+                    console.log('Audio play failed (user interaction may be required):', err);
+                });
+            } catch (err) {
+                console.error('Error creating audio:', err);
+            }
+        }
+        
+        // Check for bells that need to ring
+        function checkBellTimes() {
+            const now = new Date();
+            const today = now.toDateString();
+            
+            // Reset played bells at midnight
+            if (lastDateCheck !== today) {
+                playedBells.clear();
+                lastDateCheck = today;
+            }
+            
+            const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            
+            // Check each column that has audio enabled
+            const columns = [
+                { scheduleId: config.s1, audioEnabled: config.a1 },
+                { scheduleId: config.s2, audioEnabled: config.a2 },
+                { scheduleId: config.s3, audioEnabled: config.a3 }
+            ];
+            
+            for (const col of columns) {
+                if (!col.scheduleId || !col.audioEnabled) continue;
+                
+                const schedule = scheduleData[col.scheduleId];
+                if (!schedule || !schedule.periods) continue;
+                
+                for (const period of schedule.periods) {
+                    if (period.isEnabled === false) continue;
+                    
+                    for (const bell of (period.bells || [])) {
+                        if (!bell.time) continue;
+                        
+                        // Create unique bell ID
+                        const bellKey = `${col.scheduleId}-${period.name}-${bell.time}`;
+                        
+                        // Check if this bell should ring now (within the current second)
+                        if (bell.time === currentTimeStr && !playedBells.has(bellKey)) {
+                            console.log(`🔔 Playing bell: ${period.name} at ${bell.time}`);
+                            playedBells.add(bellKey);
+                            playBellSound();
+                            return; // Only play one bell at a time
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update schedule columns
+        function updateColumns() {
+            const columns = [
+                { id: 'col-1', scheduleId: config.s1, label: config.l1 },
+                { id: 'col-2', scheduleId: config.s2, label: config.l2 },
+                { id: 'col-3', scheduleId: config.s3, label: config.l3 }
+            ];
+            
+            console.log('Updating columns with config:', config);
+            console.log('Schedule data available:', Object.keys(scheduleData));
+            
+            for (const col of columns) {
+                const element = document.getElementById(col.id);
+                const labelEl = element.querySelector('.column-label');
+                const periodEl = element.querySelector('.column-period');
+                const countdownEl = element.querySelector('.column-countdown');
+                
+                // Set label
+                labelEl.textContent = col.label || '--';
+                
+                if (!col.scheduleId) {
+                    periodEl.textContent = '--';
+                    countdownEl.textContent = '';
+                    continue;
+                }
+                
+                console.log(`Column ${col.id}: scheduleId=${col.scheduleId}, data exists=${!!scheduleData[col.scheduleId]}`);
+                
+                const status = getPeriodStatus(col.scheduleId);
+                console.log(`Column ${col.id} status:`, status);
+                
+                switch (status.status) {
+                    case 'in-period':
+                        periodEl.textContent = status.periodName;
+                        countdownEl.textContent = `ends at ${formatSecondsAs12Hour(status.endSeconds)}`;
+                        break;
+                    case 'waiting':
+                        periodEl.textContent = `${status.nextPeriod}`;
+                        countdownEl.textContent = `starts in ${formatCountdown(status.countdown)}`;
+                        break;
+                    case 'error':
+                    case 'empty':
+                        periodEl.textContent = status.message;
+                        countdownEl.textContent = '';
+                        break;
+                    default:
+                        periodEl.textContent = '--';
+                        countdownEl.textContent = '';
+                }
+            }
+        }
+        
+        // Load schedule data from Firebase
+        async function loadSchedule(scheduleId) {
+            if (!scheduleId || scheduleData[scheduleId]) return;
+            
+            try {
+                // Correct path: /artifacts/{appId}/public/data/schedules/{scheduleId}
+                const doc = await db.collection('artifacts').doc(appId)
+                    .collection('public').doc('data')
+                    .collection('schedules').doc(scheduleId).get();
+                    
+                if (doc.exists) {
+                    const data = doc.data();
+                    scheduleData[scheduleId] = {
+                        name: data.name,
+                        periods: data.periods || []
+                    };
+                    console.log(`Loaded schedule: ${data.name}`);
+                } else {
+                    console.warn(`Schedule not found: ${scheduleId}`);
+                    scheduleData[scheduleId] = { name: 'Not Found', periods: [] };
+                }
+            } catch (error) {
+                console.error(`Error loading schedule ${scheduleId}:`, error);
+                scheduleData[scheduleId] = { name: 'Error', periods: [] };
+            }
+        }
+        
+        // Load all shared schedules (for setup panel)
+        async function loadAllSchedules() {
+            console.log('Loading all schedules...');
+            try {
+                // Correct path: /artifacts/{appId}/public/data/schedules
+                const snapshot = await db.collection('artifacts').doc(appId)
+                    .collection('public').doc('data')
+                    .collection('schedules').get();
+                    
+                console.log(`Firestore returned ${snapshot.size} schedules`);
+                const schedules = [];
+                snapshot.forEach(doc => {
+                    console.log(`  - ${doc.id}: ${doc.data().name}`);
+                    schedules.push({ id: doc.id, name: doc.data().name });
+                });
+                schedules.sort((a, b) => a.name.localeCompare(b.name));
+                return schedules;
+            } catch (error) {
+                console.error('Error loading schedules:', error);
+                console.error('Error code:', error.code);
+                console.error('Error message:', error.message);
+                return [];
+            }
+        }
+        
+        // Populate setup dropdowns
+        async function populateSetupDropdowns() {
+            const schedules = await loadAllSchedules();
+            
+            const selects = [
+                document.getElementById('setup-schedule-1'),
+                document.getElementById('setup-schedule-2'),
+                document.getElementById('setup-schedule-3')
+            ];
+            
+            if (schedules.length === 0) {
+                const errorHtml = '<option value="">(No schedules found - check console)</option>';
+                selects.forEach(select => {
+                    select.innerHTML = errorHtml;
+                });
+                console.warn('No schedules loaded - check Firebase auth and Firestore rules');
+                return;
+            }
+            
+            const optionsHtml = '<option value="">(None)</option>' + 
+                schedules.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            
+            selects.forEach(select => {
+                select.innerHTML = optionsHtml;
+            });
+            
+            console.log(`Populated dropdowns with ${schedules.length} schedules`);
+        }
+        
+        // Load shared sounds for the sound selector (for logged-in users)
+        async function loadSharedSounds() {
+            try {
+                const soundSelect = document.getElementById('setup-sound');
+                if (!soundSelect) return;
+                
+                // Use Firebase Storage compat API
+                const storage = firebase.storage();
+                const publicFolderRef = storage.ref('sounds/public');
+                
+                // List files in sounds/public folder
+                const result = await publicFolderRef.listAll();
+                
+                if (result.items.length === 0) {
+                    console.log('No shared sounds found in storage');
+                    return;
+                }
+                
+                // Get URLs for all sound files
+                const sounds = await Promise.all(result.items.map(async (itemRef) => {
+                    const url = await itemRef.getDownloadURL();
+                    return { name: itemRef.name, url };
+                }));
+                
+                // Add shared sounds to dropdown
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = 'Shared Sounds';
+                
+                sounds.sort((a, b) => a.name.localeCompare(b.name));
+                sounds.forEach(sound => {
+                    const option = document.createElement('option');
+                    option.value = sound.url;
+                    // Remove file extension for display
+                    option.textContent = sound.name.replace(/\.[^/.]+$/, '');
+                    optgroup.appendChild(option);
+                });
+                
+                soundSelect.appendChild(optgroup);
+                console.log(`Loaded ${sounds.length} shared sounds from storage`);
+                
+            } catch (error) {
+                console.error('Error loading shared sounds:', error);
+            }
+        }
+        
+        // Generate URL from setup form
+        function generateUrl() {
+            const s1 = document.getElementById('setup-schedule-1').value;
+            const s2 = document.getElementById('setup-schedule-2').value;
+            const s3 = document.getElementById('setup-schedule-3').value;
+            const l1 = document.getElementById('setup-label-1').value;
+            const l2 = document.getElementById('setup-label-2').value;
+            const l3 = document.getElementById('setup-label-3').value;
+            const a1 = document.getElementById('setup-audio-1').checked;
+            const a2 = document.getElementById('setup-audio-2').checked;
+            const a3 = document.getElementById('setup-audio-3').checked;
+            const soundSelect = document.getElementById('setup-sound');
+            const sound = soundSelect ? soundSelect.value : 'ellisBell.mp3';
+            
+            const params = new URLSearchParams();
+            if (s1) params.set('s1', s1);
+            if (s2) params.set('s2', s2);
+            if (s3) params.set('s3', s3);
+            if (l1) params.set('l1', l1);
+            if (l2) params.set('l2', l2);
+            if (l3) params.set('l3', l3);
+            if (a1) params.set('a1', '1');
+            if (a2) params.set('a2', '1');
+            if (a3) params.set('a3', '1');
+            if (sound && sound !== 'ellisBell.mp3') params.set('sound', sound);
+            
+            const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+            
+            document.getElementById('generated-url').textContent = url;
+            document.getElementById('generated-url').classList.add('visible');
+            document.getElementById('copy-url-btn').style.display = 'inline-block';
+            
+            return url;
+        }
+        
+        // Preview the display
+        function previewDisplay() {
+            const url = generateUrl();
+            // Save to localStorage for quick access
+            localStorage.setItem('lastClockConfig', url);
+            window.location.href = url;
+        }
+        
+        // Open in popup window - uses Document PiP API for always-on-top behavior
+        async function openPopupWindow() {
+            const url = window.location.href;
+            
+            // Try Document Picture-in-Picture API first (Chrome 116+)
+            if ('documentPictureInPicture' in window) {
+                try {
+                    const pipWindow = await documentPictureInPicture.requestWindow({
+                        width: 400,
+                        height: 300,
+                    });
+                    
+                    // Style the PiP window body
+                    pipWindow.document.body.style.margin = '0';
+                    pipWindow.document.body.style.padding = '0';
+                    pipWindow.document.body.style.overflow = 'hidden';
+                    pipWindow.document.body.style.background = '#000';
+                    
+                    // Create an iframe that loads the clock
+                    const iframe = pipWindow.document.createElement('iframe');
+                    iframe.src = url;
+                    iframe.style.width = '100%';
+                    iframe.style.height = '100%';
+                    iframe.style.border = 'none';
+                    pipWindow.document.body.appendChild(iframe);
+                    
+                    console.log('Opened clock in Picture-in-Picture mode');
+                    return;
+                } catch (error) {
+                    console.log('Document PiP not available, using regular popup:', error);
+                }
+            }
+            
+            // Fallback to regular popup
+            const width = 960;
+            const height = 540;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+            window.open(url, 'ClockDisplay', `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`);
+        }
+        
+        // ESC key returns to configuration
+        function handleKeyPress(e) {
+            if (e.key === 'Escape') {
+                // Go to config page (remove URL parameters)
+                window.location.href = window.location.pathname;
+            }
+        }
+        document.addEventListener('keydown', handleKeyPress);
+        
+        // Copy URL to clipboard
+        async function copyUrl() {
+            const url = document.getElementById('generated-url').textContent;
+            try {
+                await navigator.clipboard.writeText(url);
+                document.getElementById('copy-url-btn').textContent = 'Copied!';
+                setTimeout(() => {
+                    document.getElementById('copy-url-btn').textContent = 'Copy URL';
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy:', err);
+            }
+        }
+        
+        // Initialize
+        async function init() {
+            console.log('Clock Display initializing...');
+            
+            // Check if user is already authenticated (e.g., from main app)
+            // Only sign in anonymously if no existing auth
+            let currentUser = null;
+            try {
+                currentUser = await waitForAuth();
+                if (currentUser) {
+                    isAnonymousUser = currentUser.isAnonymous;
+                    console.log('Already authenticated as:', currentUser.uid, currentUser.isAnonymous ? '(anonymous)' : '(signed in)');
+                } else {
+                    console.log('No existing auth, signing in anonymously...');
+                    await auth.signInAnonymously();
+                    currentUser = await waitForAuth();
+                    isAnonymousUser = true;
+                    console.log('Signed in anonymously:', currentUser?.uid);
+                }
+            } catch (error) {
+                console.error('Auth error:', error);
+                // Try anonymous as fallback
+                try {
+                    await auth.signInAnonymously();
+                    isAnonymousUser = true;
+                } catch (e) {
+                    console.error('Fallback anonymous auth failed:', e);
+                }
+            }
+            
+            const hasConfig = parseUrlParams();
+            
+            if (!hasConfig) {
+                // Show setup panel
+                document.body.classList.add('setup-mode');
+                console.log('Setup mode - loading schedule list...');
+                await populateSetupDropdowns();
+                
+                // Show sound selector for logged-in (non-anonymous) users
+                if (!isAnonymousUser) {
+                    const soundSection = document.getElementById('sound-selector-section');
+                    if (soundSection) {
+                        soundSection.style.display = 'block';
+                        await loadSharedSounds();
+                    }
+                }
+                
+                // Setup event listeners
+                document.getElementById('generate-url-btn').addEventListener('click', generateUrl);
+                document.getElementById('preview-btn').addEventListener('click', previewDisplay);
+                document.getElementById('copy-url-btn').addEventListener('click', copyUrl);
+                
+                // Show "Launch Last" button if we have a saved config
+                const lastConfig = localStorage.getItem('lastClockConfig');
+                if (lastConfig) {
+                    const lastConfigBtn = document.getElementById('last-config-btn');
+                    lastConfigBtn.style.display = 'inline-block';
+                    lastConfigBtn.addEventListener('click', () => {
+                        window.location.href = lastConfig;
+                    });
+                }
+            } else {
+                // Load schedules and start display
+                const schedulesToLoad = [config.s1, config.s2, config.s3].filter(Boolean);
+                
+                await Promise.all(schedulesToLoad.map(id => loadSchedule(id)));
+                
+                // Set labels from schedule names if not provided
+                if (!config.l1 && config.s1 && scheduleData[config.s1]) {
+                    config.l1 = scheduleData[config.s1].name;
+                }
+                if (!config.l2 && config.s2 && scheduleData[config.s2]) {
+                    config.l2 = scheduleData[config.s2].name;
+                }
+                if (!config.l3 && config.s3 && scheduleData[config.s3]) {
+                    config.l3 = scheduleData[config.s3].name;
+                }
+                
+                // Initial render
+                console.log('About to call updateClock and updateColumns');
+                console.log('Config after label assignment:', JSON.stringify(config));
+                console.log('ScheduleData keys:', Object.keys(scheduleData));
+                console.log('Audio enabled:', { a1: config.a1, a2: config.a2, a3: config.a3 });
+                
+                updateClock();
+                updateColumns();
+                
+                // Update clock and check bells every second
+                setInterval(() => {
+                    updateClock();
+                    checkBellTimes();
+                    updateColumns(); // Update columns every second for smooth countdown
+                }, 1000);
+            }
+        }
+        
+        // Start
+        init();
+    </script>
+</body>
+</html>

@@ -1,4 +1,11 @@
-const APP_VERSION = "5.59.1"
+const APP_VERSION = "5.61.4"
+// V5.61.4: Clock Display v1.1.4
+// - Fixed bell icon overflow - increased panel padding
+// - Sound selector now loads from Firebase Storage (same as main app)
+// - Moved sound selector between columns and buttons with proper spacing
+// - Added default sounds (Bell, Chime, Beep, Alarm) to dropdown
+// V5.61.3: UI improvements and bug fixes
+// V5.60.0: Clock Display page initial release
 // V5.59.1: Fixed Simplified View wiping schedule
 // - Removed renderCombinedList() call from toggleSimplifiedView()
 // - CSS handles all visibility changes, no re-render needed
@@ -3953,10 +3960,12 @@ combinedBellListElement.innerHTML = renderablePeriods.map(period => {
                 <!-- Management Controls (Right Side) -->
                 <div class="flex-shrink-0 flex items-center space-x-2">
                     <!-- NEW: Add Bell to Period Button -->
+                    <!-- V5.45.2: Hidden instead of disabled for anonymous users -->
                     <button data-period-name="${safePeriodName}" 
                             class="add-bell-to-period-btn px-3 py-1 text-xs bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
                             title="Add a new bell to the ${safePeriodName} period"
-                            ${!activePersonalScheduleId ? 'disabled' : ''}>
+                            ${isUserAnonymous ? 'style="display: none;"' : ''}
+                            ${!activePersonalScheduleId && !isAdmin ? 'disabled' : ''}>
                         + Bell
                     </button>
                     
@@ -3973,10 +3982,12 @@ combinedBellListElement.innerHTML = renderablePeriods.map(period => {
                     </button>
                     
                     <!-- NEW V4.60: Delete Custom Period Button in List View -->
+                    <!-- V5.45.1: Also show for admins on shared schedules -->
                     <button data-period-name="${safePeriodName}" 
+                            data-period-origin="${isOnlyPersonal ? 'custom' : 'shared'}"
                             class="delete-list-period-btn px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700"
-                            title="Delete custom period ${safePeriodName}"
-                            style="${isOnlyPersonal && activePersonalScheduleId ? '' : 'display: none;'}">
+                            title="Delete ${isOnlyPersonal ? 'custom' : 'shared'} period ${safePeriodName}"
+                            style="${(isOnlyPersonal && activePersonalScheduleId) || (isAdmin && !isOnlyPersonal) ? '' : 'display: none;'}">
                         Delete Period
                     </button>
 
@@ -6000,6 +6011,11 @@ function setActiveSchedule(prefixedId) {
         restorePersonalScheduleBtn.disabled = false;
         showMultiAddRelativeModalBtn.disabled = false; // NEW in 4.42
         
+        // V5.45.1: Enable admin rename button for personal schedules too
+        if (document.body.classList.contains('admin-mode')) {
+            renameScheduleBtn.disabled = false;
+        }
+        
         // NEW in 4.57: Enable new period button
         newPeriodBtn.disabled = false;
         
@@ -6262,15 +6278,33 @@ async function handleCreateSchedule(e) {
 }
 
 // --- NEW V4.91: Rename Shared Schedule Functions ---
+// V5.45.1: Now handles both shared and personal schedules for admins
 function openRenameSharedScheduleModal() {
-    if (!activeBaseScheduleId || !document.body.classList.contains('admin-mode')) return;
+    if (!document.body.classList.contains('admin-mode')) return;
     
-    const schedule = allSchedules.find(s => s.id === activeBaseScheduleId);
-    if (!schedule) return;
+    // Check if we're viewing a personal schedule or shared schedule
+    const currentSelection = scheduleSelector.value;
+    const [type, scheduleId] = currentSelection.split('-');
+    
+    let schedule, currentName;
+    
+    if (type === 'personal' && activePersonalScheduleId) {
+        // Personal schedule
+        schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+        if (!schedule) return;
+        currentName = schedule.name;
+    } else if (type === 'shared' && activeBaseScheduleId) {
+        // Shared schedule
+        schedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+        if (!schedule) return;
+        currentName = schedule.name;
+    } else {
+        return;
+    }
 
     // Populate modal with current name
-    renameSharedOldName.textContent = schedule.name;
-    renameSharedNewNameInput.value = schedule.name;
+    renameSharedOldName.textContent = currentName;
+    renameSharedNewNameInput.value = currentName;
     renameSharedScheduleStatus.classList.add('hidden'); // Clear status
     
     // Show the modal
@@ -6279,10 +6313,26 @@ function openRenameSharedScheduleModal() {
 
 async function handleRenameSharedScheduleSubmit(e) {
     e.preventDefault();
-    if (!activeBaseScheduleId || !scheduleRef || !document.body.classList.contains('admin-mode')) return;
+    if (!document.body.classList.contains('admin-mode')) return;
 
-    const schedule = allSchedules.find(s => s.id === activeBaseScheduleId);
-    if (!schedule) return;
+    // Check if we're renaming a personal or shared schedule
+    const currentSelection = scheduleSelector.value;
+    const [type, scheduleId] = currentSelection.split('-');
+    
+    let schedule, docRef;
+    
+    if (type === 'personal' && activePersonalScheduleId) {
+        schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+        if (!schedule) return;
+        // Personal schedules are stored under user's collection
+        docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'personalSchedules', activePersonalScheduleId);
+    } else if (type === 'shared' && activeBaseScheduleId && scheduleRef) {
+        schedule = allSchedules.find(s => s.id === activeBaseScheduleId);
+        if (!schedule) return;
+        docRef = scheduleRef;
+    } else {
+        return;
+    }
 
     const newName = renameSharedNewNameInput.value.trim();
     
@@ -6291,8 +6341,8 @@ async function handleRenameSharedScheduleSubmit(e) {
         renameSharedScheduleStatus.classList.remove('hidden');
         
         try {
-            await updateDoc(scheduleRef, { name: newName });
-            console.log("Shared schedule renamed.");
+            await updateDoc(docRef, { name: newName });
+            console.log(`${type} schedule renamed to: ${newName}`);
             // The onSnapshot listener will handle the UI update.
             
             renameSharedScheduleModal.classList.add('hidden'); // Close modal on success
@@ -6391,7 +6441,7 @@ async function confirmDeleteBell() {
             const legacyBells = flattenPeriodsToLegacyBells(updatedPeriods);
 
             await updateDoc(scheduleRef, { periods: updatedPeriods, bells: legacyBells });
-            console.log(`Shared bell deleted: ${name} from ${currentSchedule.name}.`);
+            console.log(`Shared bell deleted: ${name} from schedule ${activeBaseScheduleId}.`);
 
         } else if (type === 'custom' && activePersonalScheduleId) {
             const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
@@ -9622,6 +9672,80 @@ async function handleSubmitEditPeriodDetails(e) {
     }
 }
 
+// --- V5.45.1: Unified Period Deletion Handler ---
+/**
+ * V5.45.1 - Unified period deletion handler for both custom and shared periods
+ * @param {string} periodName - The name of the period to delete
+ * @param {string} origin - 'custom' for personal periods, 'shared' for shared schedule periods
+ */
+async function handleDeletePeriod(periodName, origin = 'custom') {
+    const isAdmin = document.body.classList.contains('admin-mode');
+    
+    // Validate based on period type
+    if (origin === 'custom') {
+        if (!activePersonalScheduleId || !periodName) return;
+    } else if (origin === 'shared') {
+        if (!activeBaseScheduleId || !isAdmin || !periodName) return;
+    } else {
+        return;
+    }
+
+    const periodType = origin === 'custom' ? 'custom' : 'shared';
+    const confirmed = await showConfirmationModal(
+        `Are you sure you want to permanently delete the ${periodType} period "${periodName}"? All associated bells will also be deleted. This action cannot be undone.`,
+        "Confirm Period Deletion",
+        "Delete Period"
+    );
+
+    if (!confirmed) {
+        const statusEl = document.getElementById('edit-period-status-msg');
+        if (statusEl) statusEl.classList.add('hidden'); 
+        return;
+    }
+    
+    try {
+        if (origin === 'custom') {
+            // Delete from personal schedule
+            const periodIndex = personalBellsPeriods.findIndex(p => p.name === periodName);
+            if (periodIndex === -1) {
+                throw new Error(`Period "${periodName}" not found in local state.`);
+            }
+
+            const updatedPeriods = [...personalBellsPeriods];
+            updatedPeriods.splice(periodIndex, 1);
+
+            const visualKey = getVisualOverrideKey(activeBaseScheduleId, periodName);
+            if (periodVisualOverrides[visualKey]) {
+                delete periodVisualOverrides[visualKey];
+                saveVisualOverrides();
+            }
+
+            const personalScheduleRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
+            await updateDoc(personalScheduleRef, { periods: updatedPeriods });
+            
+        } else if (origin === 'shared') {
+            // Delete from shared schedule (admin only)
+            const periodIndex = localSchedulePeriods.findIndex(p => p.name === periodName);
+            if (periodIndex === -1) {
+                throw new Error(`Period "${periodName}" not found in shared schedule.`);
+            }
+
+            const updatedPeriods = [...localSchedulePeriods];
+            updatedPeriods.splice(periodIndex, 1);
+
+            await updateDoc(scheduleRef, { periods: updatedPeriods });
+        }
+
+        showUserMessage(`${periodType.charAt(0).toUpperCase() + periodType.slice(1)} period "${periodName}" deleted successfully.`);
+        
+    } catch (error) {
+        console.error("Error deleting period:", error);
+        showUserMessage(`Error deleting period: ${error.message}`);
+    } finally {
+        editPeriodModal.classList.add('hidden');
+    }
+}
+
 // --- NEW in 4.44: Visual Cue Display Logic ---
 
 /**
@@ -11638,37 +11762,8 @@ async function handleImportCurrentFileChange(e) {
             // Hide the initial status
             importStatus.classList.add('hidden');
             
-            // If it's a personal backup OR has modifications, show preview modal
-            if (analysis.isPersonalBackup || analysis.modified.sounds.items.length > 0 || analysis.modified.visuals.items.length > 0) {
-                showImportPreviewModal(analysis);
-            } else {
-                // Admin backup with no modifications - show simple confirmation
-                const confirmed = await showConfirmationModal(
-                    `This will OVERWRITE your current schedule "${currentSchedule.name}" with the data from "${data.schedule.name}" (from file: ${file.name}). This action cannot be undone.`,
-                    "Confirm Overwrite Current Schedule",
-                    "Overwrite Current"
-                );
-
-                if (!confirmed) {
-                    importStatus.textContent = "Import cancelled by user.";
-                    setTimeout(() => importStatus.classList.add('hidden'), 3000);
-                    importCurrentFileInput.value = '';
-                    return;
-                }
-
-                // Proceed with direct import
-                importStatus.textContent = `Importing and overwriting "${currentSchedule.name}"...`;
-                importStatus.classList.remove('hidden');
-                
-                const scheduleRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', activeBaseScheduleId);
-                await updateDoc(scheduleRef, { 
-                    name: data.schedule.name, 
-                    periods: data.schedule.periods 
-                });
-
-                importStatus.textContent = `Successfully overwrote "${currentSchedule.name}" with "${data.schedule.name}".`;
-                setTimeout(() => importStatus.classList.add('hidden'), 4000);
-            }
+            // V5.45.2: Always show preview modal with rename option
+            showImportPreviewModal(analysis);
 
         } catch (error) {
             console.error("Current schedule import failed:", error);
@@ -13565,12 +13660,14 @@ function init() {
         }
         
         // NEW V4.61: Handle Delete Period button click in list view (Integrated)
+        // V5.45.1: Added support for admin deleting shared periods
         const deleteBtn = target.closest('.delete-list-period-btn');
         if (deleteBtn) {
             const periodName = deleteBtn.dataset.periodName;
+            const periodOrigin = deleteBtn.dataset.periodOrigin || 'custom';
             if (periodName) {
                 // Call the deletion handler (it includes confirmation)
-                handleDeleteCustomPeriod(periodName);
+                handleDeletePeriod(periodName, periodOrigin);
                 return; // Action handled
             }
         }

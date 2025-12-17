@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Config</title>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        :root {
+            --carolina-blue: #4B9CD3;
+            --carolina-blue-light: #7BAFD4;
+            --dark-grey: #1a1a1a;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #000;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: var(--carolina-blue);
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            color: #888;
+            margin-bottom: 32px;
+        }
+        
+        /* Login Section */
+        #login-section {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        #login-section p {
+            color: #888;
+            margin-bottom: 24px;
+        }
+        
+        .btn-google {
+            background: #fff;
+            color: #333;
+            padding: 14px 28px;
+            border-radius: 6px;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .btn-google:hover {
+            background: #f0f0f0;
+        }
+        
+        .btn-google img {
+            width: 20px;
+            height: 20px;
+        }
+        
+        /* User Info */
+        .user-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--dark-grey);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+        
+        .user-info .user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .user-info img {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+        }
+        
+        .user-info .name {
+            font-weight: 600;
+        }
+        
+        .user-info .email {
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .btn-signout {
+            background: transparent;
+            border: 1px solid #444;
+            color: #888;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .btn-signout:hover {
+            border-color: #666;
+            color: #fff;
+        }
+        
+        /* Config Form */
+        #config-section {
+            display: none;
+        }
+        
+        .section {
+            background: var(--dark-grey);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #333;
+        }
+        
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: var(--carolina-blue-light);
+        }
+        
+        .field {
+            margin-bottom: 16px;
+        }
+        
+        .field:last-child {
+            margin-bottom: 0;
+        }
+        
+        label {
+            display: block;
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: #000;
+            color: #fff;
+            font-size: 16px;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--carolina-blue);
+        }
+        
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        button {
+            padding: 14px 28px;
+            border-radius: 6px;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--carolina-blue);
+            color: #fff;
+            width: 100%;
+        }
+        
+        .btn-primary:hover {
+            background: var(--carolina-blue-light);
+        }
+        
+        .btn-primary:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 6px;
+            display: none;
+        }
+        
+        .status.success {
+            display: block;
+            background: rgba(0, 200, 100, 0.2);
+            border: 1px solid rgba(0, 200, 100, 0.5);
+            color: #0c8;
+        }
+        
+        .status.error {
+            display: block;
+            background: rgba(255, 100, 100, 0.2);
+            border: 1px solid rgba(255, 100, 100, 0.5);
+            color: #f66;
+        }
+        
+        .status.loading {
+            display: block;
+            background: rgba(75, 156, 211, 0.2);
+            border: 1px solid rgba(75, 156, 211, 0.5);
+            color: var(--carolina-blue-light);
+        }
+        
+        .help {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .help a {
+            color: var(--carolina-blue);
+            text-decoration: none;
+        }
+        
+        .help a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📺 Dashboard Config</h1>
+        <p class="subtitle">Configure the Ellis tvOS Dashboard & Web Dashboard</p>
+        
+        <!-- Login Section -->
+        <div id="login-section">
+            <p>Sign in with your admin Google account to configure the dashboard.</p>
+            <button class="btn-google" onclick="signIn()">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+                Sign in with Google
+            </button>
+            <div class="status" id="login-status"></div>
+        </div>
+        
+        <!-- Config Section (hidden until signed in) -->
+        <div id="config-section">
+            <div class="user-info">
+                <div class="user">
+                    <img id="user-photo" src="" alt="">
+                    <div>
+                        <div class="name" id="user-name"></div>
+                        <div class="email" id="user-email"></div>
+                    </div>
+                </div>
+                <button class="btn-signout" onclick="signOut()">Sign Out</button>
+            </div>
+            
+            <!-- Video Section -->
+            <div class="section">
+                <h2>🎬 Video</h2>
+                <div class="field">
+                    <label>Google Drive Folder ID</label>
+                    <input type="text" id="videoFolderId" placeholder="1rhirAMiKrhkteVPk4wB7Giumi9agnP6N">
+                    <p class="help">
+                        Share a Google Drive folder (Anyone with link), then paste the ID here.<br>
+                        The ID is the last part of the folder URL: <code>drive.google.com/drive/folders/<strong>ID_HERE</strong></code><br>
+                        The newest video in this folder will play automatically on both dashboards.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Schedules Section -->
+            <div class="section">
+                <h2>🕐 Schedules</h2>
+                
+                <div class="field">
+                    <div class="row">
+                        <div>
+                            <label>Schedule 1</label>
+                            <select id="s1"><option value="">Loading...</option></select>
+                        </div>
+                        <div>
+                            <label>Label 1</label>
+                            <input type="text" id="l1" placeholder="6th">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="field">
+                    <div class="row">
+                        <div>
+                            <label>Schedule 2</label>
+                            <select id="s2"><option value="">Loading...</option></select>
+                        </div>
+                        <div>
+                            <label>Label 2</label>
+                            <input type="text" id="l2" placeholder="7th">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="field">
+                    <div class="row">
+                        <div>
+                            <label>Schedule 3</label>
+                            <select id="s3"><option value="">Loading...</option></select>
+                        </div>
+                        <div>
+                            <label>Label 3</label>
+                            <input type="text" id="l3" placeholder="8th">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Google Sheet Section -->
+            <div class="section">
+                <h2>📊 House Scores Sheet</h2>
+                <div class="field">
+                    <label>Google Sheet ID</label>
+                    <input type="text" id="sheetID" placeholder="1v7ZuPnQcG2FnDRITFo55u-c4CRT9CMhDL_-yDmzE5sA">
+                    <p class="help">The ID from your published Google Sheet URL (between /d/ and /edit)</p>
+                </div>
+            </div>
+            
+            <!-- Save Button -->
+            <button class="btn-primary" id="saveBtn" onclick="saveConfig()">Save Configuration</button>
+            
+            <div class="status" id="status"></div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
+            authDomain: "ellisbell-c185c.firebaseapp.com",
+            projectId: "ellisbell-c185c",
+            storageBucket: "ellisbell-c185c.firebasestorage.app",
+            appId: "1:441560045695:web:94e51a006663404b8f474a"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        const appId = "1:441560045695:web:94e51a006663404b8f474a";
+        const provider = new firebase.auth.GoogleAuthProvider();
+        
+        // Config document path
+        const configRef = db.collection('artifacts').doc(appId)
+            .collection('public').doc('data')
+            .collection('config').doc('dashboard');
+        
+        // Schedules collection path
+        const schedulesRef = db.collection('artifacts').doc(appId)
+            .collection('public').doc('data')
+            .collection('schedules');
+        
+        // Admins collection path
+        const adminsRef = db.collection('artifacts').doc(appId)
+            .collection('public').doc('data')
+            .collection('admins');
+        
+        function showStatus(elementId, message, type) {
+            const status = document.getElementById(elementId);
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+        
+        function hideStatus(elementId) {
+            document.getElementById(elementId).className = 'status';
+        }
+        
+        async function signIn() {
+            showStatus('login-status', 'Signing in...', 'loading');
+            try {
+                await auth.signInWithPopup(provider);
+            } catch (error) {
+                console.error('Sign in error:', error);
+                showStatus('login-status', 'Sign in failed: ' + error.message, 'error');
+            }
+        }
+        
+        async function signOut() {
+            await auth.signOut();
+        }
+        
+        async function checkIfAdmin(uid) {
+            try {
+                const doc = await adminsRef.doc(uid).get();
+                return doc.exists;
+            } catch (error) {
+                console.error('Admin check error:', error);
+                return false;
+            }
+        }
+        
+        async function loadSchedules() {
+            try {
+                const snapshot = await schedulesRef.get();
+                const schedules = [];
+                snapshot.forEach(doc => {
+                    schedules.push({ id: doc.id, name: doc.data().name });
+                });
+                schedules.sort((a, b) => a.name.localeCompare(b.name));
+                
+                const optionsHtml = '<option value="">(None)</option>' +
+                    schedules.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                
+                document.getElementById('s1').innerHTML = optionsHtml;
+                document.getElementById('s2').innerHTML = optionsHtml;
+                document.getElementById('s3').innerHTML = optionsHtml;
+                
+                console.log('Loaded', schedules.length, 'schedules');
+            } catch (error) {
+                console.error('Error loading schedules:', error);
+            }
+        }
+        
+        async function loadCurrentConfig() {
+            try {
+                const doc = await configRef.get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    document.getElementById('videoFolderId').value = data.videoFolderId || '1rhirAMiKrhkteVPk4wB7Giumi9agnP6N';
+                    document.getElementById('s1').value = data.s1 || '';
+                    document.getElementById('s2').value = data.s2 || '';
+                    document.getElementById('s3').value = data.s3 || '';
+                    document.getElementById('l1').value = data.l1 || '';
+                    document.getElementById('l2').value = data.l2 || '';
+                    document.getElementById('l3').value = data.l3 || '';
+                    document.getElementById('sheetID').value = data.sheetID || '1v7ZuPnQcG2FnDRITFo55u-c4CRT9CMhDL_-yDmzE5sA';
+                }
+            } catch (error) {
+                console.error('Error loading config:', error);
+            }
+        }
+        
+        async function saveConfig() {
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+            showStatus('status', 'Saving...', 'loading');
+            
+            const config = {
+                videoFolderId: document.getElementById('videoFolderId').value.trim() || '1rhirAMiKrhkteVPk4wB7Giumi9agnP6N',
+                s1: document.getElementById('s1').value || null,
+                s2: document.getElementById('s2').value || null,
+                s3: document.getElementById('s3').value || null,
+                l1: document.getElementById('l1').value.trim() || null,
+                l2: document.getElementById('l2').value.trim() || null,
+                l3: document.getElementById('l3').value.trim() || null,
+                sheetID: document.getElementById('sheetID').value.trim() || '1v7ZuPnQcG2FnDRITFo55u-c4CRT9CMhDL_-yDmzE5sA',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            // Remove null values
+            Object.keys(config).forEach(key => {
+                if (config[key] === null) delete config[key];
+            });
+            
+            try {
+                await configRef.set(config, { merge: true });
+                showStatus('status', '✓ Configuration saved! Both tvOS and web dashboards will update automatically.', 'success');
+            } catch (error) {
+                console.error('Save error:', error);
+                showStatus('status', 'Error saving: ' + error.message, 'error');
+            }
+            
+            btn.disabled = false;
+        }
+        
+        // Auth state listener
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                // Check if user is admin
+                const isAdmin = await checkIfAdmin(user.uid);
+                
+                if (isAdmin) {
+                    // Show config section
+                    document.getElementById('login-section').style.display = 'none';
+                    document.getElementById('config-section').style.display = 'block';
+                    
+                    // Update user info
+                    document.getElementById('user-photo').src = user.photoURL || '';
+                    document.getElementById('user-name').textContent = user.displayName || 'Admin';
+                    document.getElementById('user-email').textContent = user.email;
+                    
+                    // Load data
+                    await loadSchedules();
+                    await loadCurrentConfig();
+                } else {
+                    // Not an admin
+                    showStatus('login-status', 'You are not authorized to configure the dashboard. Please contact an administrator.', 'error');
+                    await auth.signOut();
+                }
+            } else {
+                // Show login section
+                document.getElementById('login-section').style.display = 'block';
+                document.getElementById('config-section').style.display = 'none';
+                hideStatus('login-status');
+            }
+        });
+    </script>
+</body>
+</html>
