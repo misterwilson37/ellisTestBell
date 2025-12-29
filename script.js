@@ -1,10 +1,9 @@
-const APP_VERSION = "5.61.4"
-// V5.61.4: Clock Display v1.1.4
-// - Fixed bell icon overflow - increased panel padding
-// - Sound selector now loads from Firebase Storage (same as main app)
-// - Moved sound selector between columns and buttons with proper spacing
-// - Added default sounds (Bell, Chime, Beep, Alarm) to dropdown
-// V5.61.3: UI improvements and bug fixes
+const APP_VERSION = "5.46.2"
+const CLOCK_VERSION = "1.1.7"
+const DASHBOARD_VERSION = "1.2.3"
+// V5.46.2: Dashboard v1.2.2 - added Launch TV View button
+// - Added CLOCK_VERSION and DASHBOARD_VERSION constants (dynamically displayed in footer)
+// V5.46.0: Clock Display v1.1.7 + Dashboard link
 // V5.60.0: Clock Display page initial release
 // V5.59.1: Fixed Simplified View wiping schedule
 // - Removed renderCombinedList() call from toggleSimplifiedView()
@@ -12500,6 +12499,17 @@ function init() {
     if (cssVersionElement) {
         const cssVersion = getComputedStyle(document.documentElement).getPropertyValue('--css-version').trim().replace(/"/g, '');
         cssVersionElement.textContent = `v${cssVersion || '?.?.?'}`;
+    }
+    
+    // V5.46.2: Clock and Dashboard version displays
+    const clockVersionElement = document.getElementById('clock-version-display');
+    if (clockVersionElement) {
+        clockVersionElement.textContent = `v${CLOCK_VERSION}`;
+    }
+    
+    const dashboardVersionElement = document.getElementById('dashboard-version-display');
+    if (dashboardVersionElement) {
+        dashboardVersionElement.textContent = `v${DASHBOARD_VERSION}`;
     }
     
     // Optional: Also update the Browser Tab Title automatically
