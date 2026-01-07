@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bell Schedule Clock</title>
-    <!-- Clock Display v1.1.7 -->
+    <!-- Clock Display v1.2.1 -->
+    <!-- v1.2.0: Added personal schedule support for teachers with multiple personal schedules -->
+    <!-- v1.2.0: Added relative bell time calculation (personal schedules use relative bells) -->
+    <!-- v1.2.0: Handles linked schedules (personal schedules based on shared schedules) -->
     
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -16,7 +19,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&family=Questrial&display=swap" rel="stylesheet">
     
     <style>
-        /* Clock Display v1.1.7 - School Colors: Black, White, Grey, Carolina Blue */
+        /* Clock Display v1.2.0 - School Colors: Black, White, Grey, Carolina Blue */
         :root {
             --carolina-blue: #4B9CD3;
             --carolina-blue-light: #7BAFD4;
@@ -55,6 +58,8 @@
             padding: 24px 32px;
             max-width: 650px;
             width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             border: 1px solid #333;
         }
@@ -71,6 +76,76 @@
             font-size: 1.5rem;
             margin-bottom: 20px;
             color: var(--carolina-blue);
+        }
+        
+        /* Auth section styles */
+        .auth-section {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: rgba(75, 156, 211, 0.1);
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .auth-section.signed-in {
+            background: rgba(52, 168, 83, 0.1);
+            border-color: #34a853;
+        }
+        
+        .auth-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .auth-status-text {
+            font-size: 14px;
+            color: #a0a0a0;
+        }
+        
+        .auth-status.signed-in .auth-status-text {
+            color: #34a853;
+        }
+        
+        .google-sign-in-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #fff;
+            color: #333;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .google-sign-in-btn:hover {
+            background: #f0f0f0;
+        }
+        
+        .google-sign-in-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .sign-out-btn {
+            padding: 8px 16px;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .sign-out-btn:hover {
+            background: #444;
         }
         
         .setup-row {
@@ -312,6 +387,23 @@
             <a href="dashboard.html" style="color: #a0a0a0; text-decoration: none; font-size: 0.85em;">📺 School Dashboard</a>
         </h2>
         
+        <!-- Auth Section for Personal Schedules -->
+        <div id="auth-section" class="auth-section">
+            <div id="auth-status" class="auth-status">
+                <span class="auth-status-text" id="auth-status-text">Sign in to access your personal schedules</span>
+                <button id="google-sign-in-btn" class="google-sign-in-btn">
+                    <svg viewBox="0 0 48 48">
+                        <path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l8.28 6.42C12.92 13.9 18.06 9.5 24 9.5z"></path>
+                        <path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.42-4.55H24v8.51h12.8c-.57 2.73-2.2 5.08-4.79 6.69l7.38 5.71C44.97 36.3 46.98 30.8 46.98 24.55z"></path>
+                        <path fill="#FBBC05" d="M10.84 28.71C10.22 26.9 9.83 24.99 9.83 23c0-1.99.39-3.9 1.01-5.71L2.56 10.8C.9 14.28 0 18.48 0 23c0 4.52.9 8.72 2.56 12.2l8.28-6.49z"></path>
+                        <path fill="#EA4335" d="M24 48c5.4 0 10.32-1.62 14.34-4.38l-7.38-5.71C28.71 40.5 26.47 42.1 24 42.1c-5.94 0-11.08-4.4-12.96-10.28L2.56 38.2C6.51 46.04 14.62 48 24 48z"></path>
+                    </svg>
+                    Sign in with Google
+                </button>
+                <button id="sign-out-btn" class="sign-out-btn" style="display: none;">Sign Out</button>
+            </div>
+        </div>
+        
         <div class="setup-row">
             <label>Column 1:</label>
             <select id="setup-schedule-1">
@@ -364,10 +456,13 @@
         <div class="setup-note">
             <strong>Tip:</strong> Once generated, bookmark the URL or use it in your signage system. 
             The display will automatically load with your configured schedules.
+            <br><br>
+            <strong>Personal Schedules:</strong> Sign in with Google to access your personal schedules.
+            The generated URL will include your user ID, allowing the clock to load your personal schedules.
         </div>
         
         <div class="version-info" style="margin-top: 16px; font-size: 11px; color: #666; text-align: center;">
-            Clock v1.1.7 | Dashboard v1.2.3 | Ellis Web Bell v5.46.2
+            Clock v1.2.0 | Dashboard v1.2.3 | Ellis Web Bell v5.46.2
             <br>
             <a href="index.html" style="color: var(--carolina-blue); text-decoration: none;">← Back to Bell Schedule</a>
         </div>
@@ -402,7 +497,7 @@
     </div>
     
     <script>
-        // Clock Display v1.1.7
+        // Clock Display v1.2.0 - Added personal schedule support
         
         // Firebase config (must match main app)
         const firebaseConfig = {
@@ -422,9 +517,13 @@
         const auth = firebase.auth();
         
         // State
-        let scheduleData = {}; // { scheduleId: { name, periods: [...] } }
+        let scheduleData = {}; // { scheduleId: { name, periods: [...], isPersonal: bool } }
+        let currentUserId = null; // Signed-in user's ID
+        let allPersonalSchedules = []; // List of user's personal schedules
         let config = {
-            s1: null, s2: null, s3: null,  // Schedule IDs
+            s1: null, s2: null, s3: null,  // Shared schedule IDs
+            p1: null, p2: null, p3: null,  // Personal schedule IDs (NEW)
+            uid: null,                      // User ID for personal schedules (NEW)
             l1: '', l2: '', l3: '',         // Labels
             a1: false, a2: false, a3: false, // Audio enabled
             sound: 'ellisBell.mp3'          // Sound file for all bells
@@ -448,9 +547,16 @@
         // Parse URL parameters
         function parseUrlParams() {
             const params = new URLSearchParams(window.location.search);
+            // Shared schedules
             config.s1 = params.get('s1') || null;
             config.s2 = params.get('s2') || null;
             config.s3 = params.get('s3') || null;
+            // Personal schedules (NEW)
+            config.p1 = params.get('p1') || null;
+            config.p2 = params.get('p2') || null;
+            config.p3 = params.get('p3') || null;
+            config.uid = params.get('uid') || null; // User ID for personal schedules
+            // Labels and audio
             config.l1 = params.get('l1') || '';
             config.l2 = params.get('l2') || '';
             config.l3 = params.get('l3') || '';
@@ -459,7 +565,8 @@
             config.a3 = params.get('a3') === '1';
             config.sound = params.get('sound') || 'ellisBell.mp3';
             
-            return config.s1 || config.s2 || config.s3;
+            // Has config if ANY schedule (shared or personal) is specified
+            return config.s1 || config.s2 || config.s3 || config.p1 || config.p2 || config.p3;
         }
         
         // Format time as 12-hour with seconds
@@ -502,6 +609,133 @@
         function timeToSeconds(timeStr) {
             const [h, m, s] = timeStr.split(':').map(Number);
             return h * 3600 + m * 60 + (s || 0);
+        }
+        
+        // Convert seconds since midnight to HH:MM:SS string
+        function secondsToTime(totalSeconds) {
+            // Handle negative or overflow
+            while (totalSeconds < 0) totalSeconds += 86400;
+            totalSeconds = totalSeconds % 86400;
+            
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+        
+        // Calculate relative bell time recursively
+        function calculateRelativeBellTime(bell, bellMap, allPeriods, visited = new Set()) {
+            // 1. If the bell already has a static time (and isn't relative), return it
+            if (bell.time && !bell.relative) {
+                return bell.time;
+            }
+            
+            // 2. Handle relative bell (by parentBellId)
+            if (bell.relative && bell.relative.parentBellId) {
+                if (visited.has(bell.bellId)) {
+                    console.error(`Circular dependency for bell "${bell.name}"`);
+                    return null;
+                }
+                visited.add(bell.bellId);
+                
+                const parentBell = bellMap.get(bell.relative.parentBellId);
+                if (!parentBell) {
+                    console.warn(`Parent bell not found for "${bell.name}"`);
+                    return null;
+                }
+                
+                const parentTime = calculateRelativeBellTime(parentBell, bellMap, allPeriods, new Set(visited));
+                if (!parentTime || typeof parentTime === 'object') return null;
+                
+                const parentSeconds = timeToSeconds(parentTime);
+                const myTimeSeconds = parentSeconds + bell.relative.offsetSeconds;
+                return secondsToTime(myTimeSeconds);
+            }
+            
+            // 3. Handle relative bell (by parentPeriodName + parentAnchorType)
+            if (bell.relative && bell.relative.parentPeriodName) {
+                if (visited.has(bell.bellId)) {
+                    console.error(`Circular dependency for bell "${bell.name}"`);
+                    return null;
+                }
+                visited.add(bell.bellId);
+                
+                const { parentPeriodName, parentAnchorType, offsetSeconds } = bell.relative;
+                const parentPeriod = allPeriods.find(p => p.name === parentPeriodName);
+                
+                if (!parentPeriod || !parentPeriod.bells) {
+                    console.warn(`Parent period "${parentPeriodName}" not found for "${bell.name}"`);
+                    return null;
+                }
+                
+                // Find anchor bell - look for anchorRole first, then fall back to name
+                let anchorBell = null;
+                const targetRole = parentAnchorType === 'period_start' ? 'start' : 'end';
+                
+                // Try anchorRole first
+                anchorBell = parentPeriod.bells.find(b => b.anchorRole === targetRole && !b.relative);
+                
+                // Fall back to name match
+                if (!anchorBell) {
+                    const targetName = parentAnchorType === 'period_start' ? 'Period Start' : 'Period End';
+                    anchorBell = parentPeriod.bells.find(b => b.name === targetName && !b.relative);
+                }
+                
+                // Fall back to first/last static bell
+                if (!anchorBell) {
+                    const staticBells = parentPeriod.bells.filter(b => b.time && !b.relative);
+                    if (staticBells.length > 0) {
+                        staticBells.sort((a, b) => timeToSeconds(a.time) - timeToSeconds(b.time));
+                        anchorBell = parentAnchorType === 'period_start' ? staticBells[0] : staticBells[staticBells.length - 1];
+                    }
+                }
+                
+                if (!anchorBell) {
+                    console.warn(`No anchor bell found in "${parentPeriodName}" for "${bell.name}"`);
+                    return null;
+                }
+                
+                const anchorTime = calculateRelativeBellTime(anchorBell, bellMap, allPeriods, new Set(visited));
+                if (!anchorTime || typeof anchorTime === 'object') return null;
+                
+                const anchorSeconds = timeToSeconds(anchorTime);
+                const myTimeSeconds = anchorSeconds + offsetSeconds;
+                return secondsToTime(myTimeSeconds);
+            }
+            
+            // 4. Invalid bell
+            console.warn(`Invalid bell: "${bell.name}" has no time or relative data`);
+            return null;
+        }
+        
+        // Resolve all bell times in a schedule's periods (handles relative bells)
+        function resolveScheduleBellTimes(periods) {
+            if (!periods || periods.length === 0) return periods;
+            
+            // Build a map of all bells by bellId
+            const bellMap = new Map();
+            periods.forEach(period => {
+                (period.bells || []).forEach(bell => {
+                    if (bell.bellId) {
+                        bellMap.set(bell.bellId, bell);
+                    }
+                });
+            });
+            
+            // Calculate times for all bells
+            const resolvedPeriods = periods.map(period => {
+                const resolvedBells = (period.bells || []).map(bell => {
+                    const calculatedTime = calculateRelativeBellTime(bell, bellMap, periods, new Set());
+                    if (calculatedTime && typeof calculatedTime === 'string') {
+                        return { ...bell, time: calculatedTime };
+                    }
+                    return { ...bell, time: null }; // Failed to calculate
+                }).filter(bell => bell.time !== null);
+                
+                return { ...period, bells: resolvedBells };
+            });
+            
+            return resolvedPeriods;
         }
         
         // Get current period status for a schedule
@@ -628,17 +862,26 @@
             
             const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
             
+            // Helper to get schedule key for column
+            const getScheduleKey = (colNum) => {
+                const pKey = config[`p${colNum}`];
+                const sKey = config[`s${colNum}`];
+                if (pKey) return `personal-${pKey}`;
+                if (sKey) return sKey;
+                return null;
+            };
+            
             // Check each column that has audio enabled
             const columns = [
-                { scheduleId: config.s1, audioEnabled: config.a1 },
-                { scheduleId: config.s2, audioEnabled: config.a2 },
-                { scheduleId: config.s3, audioEnabled: config.a3 }
+                { scheduleKey: getScheduleKey(1), audioEnabled: config.a1 },
+                { scheduleKey: getScheduleKey(2), audioEnabled: config.a2 },
+                { scheduleKey: getScheduleKey(3), audioEnabled: config.a3 }
             ];
             
             for (const col of columns) {
-                if (!col.scheduleId || !col.audioEnabled) continue;
+                if (!col.scheduleKey || !col.audioEnabled) continue;
                 
-                const schedule = scheduleData[col.scheduleId];
+                const schedule = scheduleData[col.scheduleKey];
                 if (!schedule || !schedule.periods) continue;
                 
                 for (const period of schedule.periods) {
@@ -648,7 +891,7 @@
                         if (!bell.time) continue;
                         
                         // Create unique bell ID
-                        const bellKey = `${col.scheduleId}-${period.name}-${bell.time}`;
+                        const bellKey = `${col.scheduleKey}-${period.name}-${bell.time}`;
                         
                         // Check if this bell should ring now (within the current second)
                         if (bell.time === currentTimeStr && !playedBells.has(bellKey)) {
@@ -664,10 +907,20 @@
         
         // Update schedule columns
         function updateColumns() {
+            // Determine which schedule key to use for each column
+            // Priority: personal schedule (p1/p2/p3) > shared schedule (s1/s2/s3)
+            const getScheduleKey = (colNum) => {
+                const pKey = config[`p${colNum}`];
+                const sKey = config[`s${colNum}`];
+                if (pKey) return `personal-${pKey}`;
+                if (sKey) return sKey;
+                return null;
+            };
+            
             const columns = [
-                { id: 'col-1', scheduleId: config.s1, label: config.l1 },
-                { id: 'col-2', scheduleId: config.s2, label: config.l2 },
-                { id: 'col-3', scheduleId: config.s3, label: config.l3 }
+                { id: 'col-1', scheduleKey: getScheduleKey(1), label: config.l1 },
+                { id: 'col-2', scheduleKey: getScheduleKey(2), label: config.l2 },
+                { id: 'col-3', scheduleKey: getScheduleKey(3), label: config.l3 }
             ];
             
             console.log('Updating columns with config:', config);
@@ -682,15 +935,15 @@
                 // Set label
                 labelEl.textContent = col.label || '--';
                 
-                if (!col.scheduleId) {
+                if (!col.scheduleKey) {
                     periodEl.textContent = '--';
                     countdownEl.textContent = '';
                     continue;
                 }
                 
-                console.log(`Column ${col.id}: scheduleId=${col.scheduleId}, data exists=${!!scheduleData[col.scheduleId]}`);
+                console.log(`Column ${col.id}: scheduleKey=${col.scheduleKey}, data exists=${!!scheduleData[col.scheduleKey]}`);
                 
-                const status = getPeriodStatus(col.scheduleId);
+                const status = getPeriodStatus(col.scheduleKey);
                 console.log(`Column ${col.id} status:`, status);
                 
                 switch (status.status) {
@@ -714,7 +967,7 @@
             }
         }
         
-        // Load schedule data from Firebase
+        // Load schedule data from Firebase (shared schedules)
         async function loadSchedule(scheduleId) {
             if (!scheduleId || scheduleData[scheduleId]) return;
             
@@ -728,47 +981,165 @@
                     const data = doc.data();
                     scheduleData[scheduleId] = {
                         name: data.name,
-                        periods: data.periods || []
+                        periods: data.periods || [],
+                        isPersonal: false
                     };
-                    console.log(`Loaded schedule: ${data.name}`);
+                    console.log(`Loaded shared schedule: ${data.name}`);
                 } else {
                     console.warn(`Schedule not found: ${scheduleId}`);
-                    scheduleData[scheduleId] = { name: 'Not Found', periods: [] };
+                    scheduleData[scheduleId] = { name: 'Not Found', periods: [], isPersonal: false };
                 }
             } catch (error) {
                 console.error(`Error loading schedule ${scheduleId}:`, error);
-                scheduleData[scheduleId] = { name: 'Error', periods: [] };
+                scheduleData[scheduleId] = { name: 'Error', periods: [], isPersonal: false };
+            }
+        }
+        
+        // NEW: Load personal schedule data from Firebase
+        async function loadPersonalSchedule(scheduleId, userId) {
+            const key = `personal-${scheduleId}`;
+            if (!scheduleId || !userId || scheduleData[key]) return;
+            
+            try {
+                // Path: /artifacts/{appId}/users/{userId}/personal_schedules/{scheduleId}
+                const doc = await db.collection('artifacts').doc(appId)
+                    .collection('users').doc(userId)
+                    .collection('personal_schedules').doc(scheduleId).get();
+                    
+                if (doc.exists) {
+                    const data = doc.data();
+                    let periods = data.periods || [];
+                    
+                    // Check if this schedule is linked to a base (shared) schedule
+                    const baseScheduleId = data.baseScheduleId;
+                    const isStandalone = !baseScheduleId || data.isStandalone;
+                    
+                    if (!isStandalone && baseScheduleId) {
+                        // Load the base schedule and merge periods
+                        console.log(`Personal schedule "${data.name}" is linked to base: ${baseScheduleId}`);
+                        
+                        // Load base schedule if not already loaded
+                        await loadSchedule(baseScheduleId);
+                        const baseSchedule = scheduleData[baseScheduleId];
+                        
+                        if (baseSchedule && baseSchedule.periods) {
+                            // Merge: base periods + personal periods
+                            const mergedPeriodsMap = new Map();
+                            
+                            // Add base periods first
+                            baseSchedule.periods.forEach(period => {
+                                mergedPeriodsMap.set(period.name, {
+                                    ...period,
+                                    bells: (period.bells || []).map(b => ({ ...b }))
+                                });
+                            });
+                            
+                            // Merge personal periods
+                            periods.forEach(period => {
+                                if (mergedPeriodsMap.has(period.name)) {
+                                    // Period exists in base - merge bells
+                                    const basePeriod = mergedPeriodsMap.get(period.name);
+                                    basePeriod.bells = [...basePeriod.bells, ...(period.bells || [])];
+                                } else {
+                                    // New personal-only period
+                                    mergedPeriodsMap.set(period.name, {
+                                        ...period,
+                                        bells: (period.bells || []).map(b => ({ ...b }))
+                                    });
+                                }
+                            });
+                            
+                            periods = Array.from(mergedPeriodsMap.values());
+                            console.log(`Merged ${baseSchedule.periods.length} base + personal periods`);
+                        }
+                    }
+                    
+                    // Resolve relative bell times
+                    periods = resolveScheduleBellTimes(periods);
+                    console.log(`Resolved bell times for personal schedule: ${data.name}`);
+                    
+                    // Log period bell counts for debugging
+                    periods.forEach(p => {
+                        console.log(`  Period "${p.name}": ${p.bells.length} bells after resolution`);
+                    });
+                    
+                    scheduleData[key] = {
+                        name: data.name,
+                        periods: periods,
+                        isPersonal: true,
+                        userId: userId
+                    };
+                    console.log(`Loaded personal schedule: ${data.name}`);
+                } else {
+                    console.warn(`Personal schedule not found: ${scheduleId} for user ${userId}`);
+                    scheduleData[key] = { name: 'Not Found', periods: [], isPersonal: true };
+                }
+            } catch (error) {
+                console.error(`Error loading personal schedule ${scheduleId}:`, error);
+                scheduleData[key] = { name: 'Error', periods: [], isPersonal: true };
             }
         }
         
         // Load all shared schedules (for setup panel)
         async function loadAllSchedules() {
-            console.log('Loading all schedules...');
+            console.log('Loading all shared schedules...');
             try {
                 // Correct path: /artifacts/{appId}/public/data/schedules
                 const snapshot = await db.collection('artifacts').doc(appId)
                     .collection('public').doc('data')
                     .collection('schedules').get();
                     
-                console.log(`Firestore returned ${snapshot.size} schedules`);
+                console.log(`Firestore returned ${snapshot.size} shared schedules`);
                 const schedules = [];
                 snapshot.forEach(doc => {
                     console.log(`  - ${doc.id}: ${doc.data().name}`);
-                    schedules.push({ id: doc.id, name: doc.data().name });
+                    schedules.push({ id: doc.id, name: doc.data().name, isPersonal: false });
                 });
                 schedules.sort((a, b) => a.name.localeCompare(b.name));
                 return schedules;
             } catch (error) {
-                console.error('Error loading schedules:', error);
+                console.error('Error loading shared schedules:', error);
                 console.error('Error code:', error.code);
                 console.error('Error message:', error.message);
                 return [];
             }
         }
         
-        // Populate setup dropdowns
+        // NEW: Load all personal schedules for current user
+        async function loadAllPersonalSchedules(userId) {
+            if (!userId) return [];
+            
+            console.log('Loading personal schedules for user:', userId);
+            try {
+                const snapshot = await db.collection('artifacts').doc(appId)
+                    .collection('users').doc(userId)
+                    .collection('personal_schedules').get();
+                    
+                console.log(`Firestore returned ${snapshot.size} personal schedules`);
+                const schedules = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    console.log(`  - ${doc.id}: ${data.name}`);
+                    schedules.push({ 
+                        id: doc.id, 
+                        name: data.name, 
+                        isPersonal: true,
+                        userId: userId
+                    });
+                });
+                schedules.sort((a, b) => a.name.localeCompare(b.name));
+                allPersonalSchedules = schedules;
+                return schedules;
+            } catch (error) {
+                console.error('Error loading personal schedules:', error);
+                return [];
+            }
+        }
+        
+        // Populate setup dropdowns with both shared and personal schedules
         async function populateSetupDropdowns() {
-            const schedules = await loadAllSchedules();
+            const sharedSchedules = await loadAllSchedules();
+            const personalSchedules = currentUserId ? await loadAllPersonalSchedules(currentUserId) : [];
             
             const selects = [
                 document.getElementById('setup-schedule-1'),
@@ -776,7 +1147,7 @@
                 document.getElementById('setup-schedule-3')
             ];
             
-            if (schedules.length === 0) {
+            if (sharedSchedules.length === 0 && personalSchedules.length === 0) {
                 const errorHtml = '<option value="">(No schedules found - check console)</option>';
                 selects.forEach(select => {
                     select.innerHTML = errorHtml;
@@ -785,14 +1156,32 @@
                 return;
             }
             
-            const optionsHtml = '<option value="">(None)</option>' + 
-                schedules.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            // Build options HTML
+            let optionsHtml = '<option value="">(None)</option>';
+            
+            // Add shared schedules
+            if (sharedSchedules.length > 0) {
+                optionsHtml += '<optgroup label="🔔 Bell Schedules">';
+                optionsHtml += sharedSchedules.map(s => 
+                    `<option value="shared:${s.id}">${s.name}</option>`
+                ).join('');
+                optionsHtml += '</optgroup>';
+            }
+            
+            // Add personal schedules (if signed in)
+            if (personalSchedules.length > 0) {
+                optionsHtml += '<optgroup label="👤 My Personal Schedules">';
+                optionsHtml += personalSchedules.map(s => 
+                    `<option value="personal:${s.id}">${s.name}</option>`
+                ).join('');
+                optionsHtml += '</optgroup>';
+            }
             
             selects.forEach(select => {
                 select.innerHTML = optionsHtml;
             });
             
-            console.log(`Populated dropdowns with ${schedules.length} schedules`);
+            console.log(`Populated dropdowns with ${sharedSchedules.length} shared + ${personalSchedules.length} personal schedules`);
         }
         
         // Load shared sounds for the sound selector (for logged-in users)
@@ -842,9 +1231,9 @@
         
         // Generate URL from setup form
         function generateUrl() {
-            const s1 = document.getElementById('setup-schedule-1').value;
-            const s2 = document.getElementById('setup-schedule-2').value;
-            const s3 = document.getElementById('setup-schedule-3').value;
+            const val1 = document.getElementById('setup-schedule-1').value;
+            const val2 = document.getElementById('setup-schedule-2').value;
+            const val3 = document.getElementById('setup-schedule-3').value;
             const l1 = document.getElementById('setup-label-1').value;
             const l2 = document.getElementById('setup-label-2').value;
             const l3 = document.getElementById('setup-label-3').value;
@@ -854,16 +1243,46 @@
             const soundSelect = document.getElementById('setup-sound');
             const sound = soundSelect ? soundSelect.value : 'ellisBell.mp3';
             
+            // Parse schedule values (format: "shared:id" or "personal:id")
+            const parseScheduleValue = (val) => {
+                if (!val) return { type: null, id: null };
+                const [type, id] = val.split(':');
+                return { type, id };
+            };
+            
+            const sched1 = parseScheduleValue(val1);
+            const sched2 = parseScheduleValue(val2);
+            const sched3 = parseScheduleValue(val3);
+            
             const params = new URLSearchParams();
-            if (s1) params.set('s1', s1);
-            if (s2) params.set('s2', s2);
-            if (s3) params.set('s3', s3);
+            
+            // Add shared schedules
+            if (sched1.type === 'shared' && sched1.id) params.set('s1', sched1.id);
+            if (sched2.type === 'shared' && sched2.id) params.set('s2', sched2.id);
+            if (sched3.type === 'shared' && sched3.id) params.set('s3', sched3.id);
+            
+            // Add personal schedules
+            if (sched1.type === 'personal' && sched1.id) params.set('p1', sched1.id);
+            if (sched2.type === 'personal' && sched2.id) params.set('p2', sched2.id);
+            if (sched3.type === 'personal' && sched3.id) params.set('p3', sched3.id);
+            
+            // Add user ID if any personal schedules are used
+            const hasPersonal = sched1.type === 'personal' || sched2.type === 'personal' || sched3.type === 'personal';
+            if (hasPersonal && currentUserId) {
+                params.set('uid', currentUserId);
+            }
+            
+            // Add labels
             if (l1) params.set('l1', l1);
             if (l2) params.set('l2', l2);
             if (l3) params.set('l3', l3);
+            
+            // Add audio settings
             if (a1) params.set('a1', '1');
             if (a2) params.set('a2', '1');
             if (a3) params.set('a3', '1');
+            
+            // Add sound
             if (sound && sound !== 'ellisBell.mp3') params.set('sound', sound);
             
             const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
@@ -947,17 +1366,88 @@
             }
         }
         
+        // Handle Google Sign-In
+        async function handleGoogleSignIn() {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await auth.signInWithPopup(provider);
+                console.log('Signed in as:', result.user.email);
+                currentUserId = result.user.uid;
+                isAnonymousUser = false;
+                updateAuthUI(result.user);
+                
+                // Reload dropdowns with personal schedules
+                await populateSetupDropdowns();
+                
+                // Show sound selector
+                const soundSection = document.getElementById('sound-selector-section');
+                if (soundSection) {
+                    soundSection.style.display = 'block';
+                    await loadSharedSounds();
+                }
+            } catch (error) {
+                console.error('Google sign-in error:', error);
+                if (error.code !== 'auth/popup-closed-by-user') {
+                    alert('Sign-in failed: ' + error.message);
+                }
+            }
+        }
+        
+        // Handle Sign Out
+        async function handleSignOut() {
+            try {
+                await auth.signOut();
+                // Sign in anonymously after sign out
+                await auth.signInAnonymously();
+                currentUserId = null;
+                isAnonymousUser = true;
+                allPersonalSchedules = [];
+                updateAuthUI(null);
+                
+                // Reload dropdowns without personal schedules
+                await populateSetupDropdowns();
+                
+                // Hide sound selector
+                const soundSection = document.getElementById('sound-selector-section');
+                if (soundSection) soundSection.style.display = 'none';
+            } catch (error) {
+                console.error('Sign-out error:', error);
+            }
+        }
+        
+        // Update auth UI based on sign-in state
+        function updateAuthUI(user) {
+            const authSection = document.getElementById('auth-section');
+            const authStatusText = document.getElementById('auth-status-text');
+            const googleSignInBtn = document.getElementById('google-sign-in-btn');
+            const signOutBtn = document.getElementById('sign-out-btn');
+            
+            if (user && !user.isAnonymous) {
+                authSection.classList.add('signed-in');
+                authStatusText.textContent = `✓ Signed in as ${user.email}`;
+                googleSignInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+            } else {
+                authSection.classList.remove('signed-in');
+                authStatusText.textContent = 'Sign in to access your personal schedules';
+                googleSignInBtn.style.display = 'flex';
+                signOutBtn.style.display = 'none';
+            }
+        }
+        
         // Initialize
         async function init() {
-            console.log('Clock Display initializing...');
+            console.log('Clock Display v1.2.0 initializing...');
             
             // Check if user is already authenticated (e.g., from main app)
-            // Only sign in anonymously if no existing auth
             let currentUser = null;
             try {
                 currentUser = await waitForAuth();
                 if (currentUser) {
                     isAnonymousUser = currentUser.isAnonymous;
+                    if (!isAnonymousUser) {
+                        currentUserId = currentUser.uid;
+                    }
                     console.log('Already authenticated as:', currentUser.uid, currentUser.isAnonymous ? '(anonymous)' : '(signed in)');
                 } else {
                     console.log('No existing auth, signing in anonymously...');
@@ -983,6 +1473,10 @@
                 // Show setup panel
                 document.body.classList.add('setup-mode');
                 console.log('Setup mode - loading schedule list...');
+                
+                // Update auth UI
+                updateAuthUI(currentUser && !currentUser.isAnonymous ? currentUser : null);
+                
                 await populateSetupDropdowns();
                 
                 // Show sound selector for logged-in (non-anonymous) users
@@ -998,6 +1492,8 @@
                 document.getElementById('generate-url-btn').addEventListener('click', generateUrl);
                 document.getElementById('preview-btn').addEventListener('click', previewDisplay);
                 document.getElementById('copy-url-btn').addEventListener('click', copyUrl);
+                document.getElementById('google-sign-in-btn').addEventListener('click', handleGoogleSignIn);
+                document.getElementById('sign-out-btn').addEventListener('click', handleSignOut);
                 
                 // Show "Launch Last" button if we have a saved config
                 const lastConfig = localStorage.getItem('lastClockConfig');
@@ -1010,19 +1506,41 @@
                 }
             } else {
                 // Load schedules and start display
-                const schedulesToLoad = [config.s1, config.s2, config.s3].filter(Boolean);
+                // Determine user ID for personal schedules (from URL or current user)
+                const userIdForPersonal = config.uid || currentUserId;
                 
-                await Promise.all(schedulesToLoad.map(id => loadSchedule(id)));
+                // Load shared schedules
+                const sharedSchedulesToLoad = [config.s1, config.s2, config.s3].filter(Boolean);
+                await Promise.all(sharedSchedulesToLoad.map(id => loadSchedule(id)));
+                
+                // Load personal schedules
+                if (userIdForPersonal) {
+                    const personalSchedulesToLoad = [config.p1, config.p2, config.p3].filter(Boolean);
+                    await Promise.all(personalSchedulesToLoad.map(id => loadPersonalSchedule(id, userIdForPersonal)));
+                }
+                
+                // Helper to get schedule key for column
+                const getScheduleKey = (colNum) => {
+                    const pKey = config[`p${colNum}`];
+                    const sKey = config[`s${colNum}`];
+                    if (pKey) return `personal-${pKey}`;
+                    if (sKey) return sKey;
+                    return null;
+                };
                 
                 // Set labels from schedule names if not provided
-                if (!config.l1 && config.s1 && scheduleData[config.s1]) {
-                    config.l1 = scheduleData[config.s1].name;
+                const key1 = getScheduleKey(1);
+                const key2 = getScheduleKey(2);
+                const key3 = getScheduleKey(3);
+                
+                if (!config.l1 && key1 && scheduleData[key1]) {
+                    config.l1 = scheduleData[key1].name;
                 }
-                if (!config.l2 && config.s2 && scheduleData[config.s2]) {
-                    config.l2 = scheduleData[config.s2].name;
+                if (!config.l2 && key2 && scheduleData[key2]) {
+                    config.l2 = scheduleData[key2].name;
                 }
-                if (!config.l3 && config.s3 && scheduleData[config.s3]) {
-                    config.l3 = scheduleData[config.s3].name;
+                if (!config.l3 && key3 && scheduleData[key3]) {
+                    config.l3 = scheduleData[key3].name;
                 }
                 
                 // Initial render
