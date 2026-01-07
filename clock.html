@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bell Schedule Clock</title>
-    <!-- Clock Display v1.2.1 -->
+    <!-- Clock Display v1.3.0 -->
+    <!-- v1.3.0: Support up to 9 schedules with automatic grid layout -->
     <!-- v1.2.0: Added personal schedule support for teachers with multiple personal schedules -->
     <!-- v1.2.0: Added relative bell time calculation (personal schedules use relative bells) -->
     <!-- v1.2.0: Handles linked schedules (personal schedules based on shared schedules) -->
@@ -19,7 +20,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&family=Questrial&display=swap" rel="stylesheet">
     
     <style>
-        /* Clock Display v1.2.0 - School Colors: Black, White, Grey, Carolina Blue */
+        /* Clock Display v1.3.0 - School Colors: Black, White, Grey, Carolina Blue */
         :root {
             --carolina-blue: #4B9CD3;
             --carolina-blue-light: #7BAFD4;
@@ -148,6 +149,74 @@
             background: #444;
         }
         
+        /* Schedule count selector */
+        .schedule-count-section {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: rgba(75, 156, 211, 0.05);
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .schedule-count-section label {
+            display: block;
+            font-size: 14px;
+            color: #a0a0a0;
+            margin-bottom: 12px;
+        }
+        
+        .schedule-count-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        
+        .count-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #444;
+            background: #222;
+            color: #888;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .count-btn:hover {
+            border-color: var(--carolina-blue);
+            color: #fff;
+        }
+        
+        .count-btn.active {
+            background: var(--carolina-blue);
+            border-color: var(--carolina-blue);
+            color: #fff;
+        }
+        
+        .grid-preview {
+            display: grid;
+            gap: 4px;
+            max-width: 120px;
+        }
+        
+        .grid-preview-cell {
+            background: var(--carolina-blue);
+            opacity: 0.6;
+            border-radius: 3px;
+            height: 20px;
+        }
+        
+        /* Schedule rows container */
+        #schedule-rows-container {
+            max-height: 320px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+            padding-right: 8px;
+        }
+        
         .setup-row {
             display: grid;
             grid-template-columns: 80px 1fr 120px 60px;
@@ -257,7 +326,7 @@
         /* Clock display styles */
         #clock-display {
             width: 100%;
-            max-width: 960px;
+            max-width: 1200px; /* Increased from 960px for larger grids */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -312,6 +381,18 @@
             width: 100%;
             line-height: 1.1;
             margin-bottom: 20px;
+            transition: font-size 0.3s;
+        }
+        
+        /* Smaller clock for larger grids */
+        #main-clock.compact {
+            font-size: clamp(3rem, 12vw, 7rem);
+            margin-bottom: 15px;
+        }
+        
+        #main-clock.very-compact {
+            font-size: clamp(2.5rem, 10vw, 5rem);
+            margin-bottom: 10px;
         }
         
         #schedule-columns {
@@ -319,7 +400,16 @@
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             width: 100%;
+            transition: all 0.3s;
         }
+        
+        /* Dynamic grid layouts */
+        #schedule-columns.grid-1 { grid-template-columns: 1fr; max-width: 400px; }
+        #schedule-columns.grid-2 { grid-template-columns: repeat(2, 1fr); }
+        #schedule-columns.grid-3 { grid-template-columns: repeat(3, 1fr); }
+        #schedule-columns.grid-2x2 { grid-template-columns: repeat(2, 1fr); }
+        #schedule-columns.grid-3x2 { grid-template-columns: repeat(3, 1fr); }
+        #schedule-columns.grid-3x3 { grid-template-columns: repeat(3, 1fr); gap: 12px; }
         
         .schedule-column {
             text-align: center;
@@ -327,6 +417,11 @@
             border-radius: 8px;
             background: var(--dark-grey);
             border: 1px solid #333;
+            display: none; /* Hidden by default */
+        }
+        
+        .schedule-column.active {
+            display: block;
         }
         
         .column-label {
@@ -353,6 +448,30 @@
             min-height: 1.3em;
         }
         
+        /* Compact styles for larger grids (7-9 schedules) */
+        #schedule-columns.grid-3x3 .schedule-column {
+            padding: 10px 8px;
+        }
+        
+        #schedule-columns.grid-3x3 .column-label {
+            font-size: clamp(0.75rem, 2vw, 1rem);
+            margin-bottom: 4px;
+        }
+        
+        #schedule-columns.grid-3x3 .column-period {
+            font-size: clamp(1rem, 3.5vw, 1.8rem);
+        }
+        
+        #schedule-columns.grid-3x3 .column-countdown {
+            font-size: clamp(0.7rem, 2vw, 1rem);
+        }
+        
+        /* Medium compact for 4-6 schedules */
+        #schedule-columns.grid-2x2 .column-period,
+        #schedule-columns.grid-3x2 .column-period {
+            font-size: clamp(1.2rem, 4vw, 2rem);
+        }
+        
         /* Loading state */
         #loading-message {
             font-size: 1.5rem;
@@ -372,8 +491,16 @@
                 gap: 10px;
             }
             
+            #schedule-columns.grid-3x3 {
+                gap: 6px;
+            }
+            
             .schedule-column {
                 padding: 12px 8px;
+            }
+            
+            #schedule-columns.grid-3x3 .schedule-column {
+                padding: 8px 6px;
             }
         }
     </style>
@@ -404,31 +531,26 @@
             </div>
         </div>
         
-        <div class="setup-row">
-            <label>Column 1:</label>
-            <select id="setup-schedule-1">
-                <option value="">Loading schedules...</option>
-            </select>
-            <input type="text" id="setup-label-1" placeholder="Label (e.g., 6th)">
-            <label class="audio-toggle"><input type="checkbox" id="setup-audio-1"> 🔔</label>
+        <!-- Schedule Count Selector -->
+        <div class="schedule-count-section">
+            <label>Number of schedules to display:</label>
+            <div class="schedule-count-buttons">
+                <button type="button" class="count-btn" data-count="1">1</button>
+                <button type="button" class="count-btn" data-count="2">2</button>
+                <button type="button" class="count-btn active" data-count="3">3</button>
+                <button type="button" class="count-btn" data-count="4">4</button>
+                <button type="button" class="count-btn" data-count="5">5</button>
+                <button type="button" class="count-btn" data-count="6">6</button>
+                <button type="button" class="count-btn" data-count="7">7</button>
+                <button type="button" class="count-btn" data-count="8">8</button>
+                <button type="button" class="count-btn" data-count="9">9</button>
+            </div>
+            <div class="grid-preview" id="grid-preview"></div>
         </div>
         
-        <div class="setup-row">
-            <label>Column 2:</label>
-            <select id="setup-schedule-2">
-                <option value="">Loading schedules...</option>
-            </select>
-            <input type="text" id="setup-label-2" placeholder="Label (e.g., 7th)">
-            <label class="audio-toggle"><input type="checkbox" id="setup-audio-2"> 🔔</label>
-        </div>
-        
-        <div class="setup-row">
-            <label>Column 3:</label>
-            <select id="setup-schedule-3">
-                <option value="">Loading schedules...</option>
-            </select>
-            <input type="text" id="setup-label-3" placeholder="Label (e.g., 8th)">
-            <label class="audio-toggle"><input type="checkbox" id="setup-audio-3"> 🔔</label>
+        <!-- Dynamic Schedule Rows Container -->
+        <div id="schedule-rows-container">
+            <!-- Rows will be generated dynamically -->
         </div>
         
         <!-- Sound selector (shown for logged-in users) - between columns and buttons -->
@@ -457,12 +579,13 @@
             <strong>Tip:</strong> Once generated, bookmark the URL or use it in your signage system. 
             The display will automatically load with your configured schedules.
             <br><br>
+            <strong>Multi-Schedule:</strong> Select 1-9 schedules to display simultaneously. The grid adjusts automatically.
+            <br><br>
             <strong>Personal Schedules:</strong> Sign in with Google to access your personal schedules.
-            The generated URL will include your user ID, allowing the clock to load your personal schedules.
         </div>
         
         <div class="version-info" style="margin-top: 16px; font-size: 11px; color: #666; text-align: center;">
-            Clock v1.2.0 | Dashboard v1.2.3 | Ellis Web Bell v5.46.2
+            Clock v1.3.0 | Dashboard v1.2.3 | Ellis Web Bell v5.46.2
             <br>
             <a href="index.html" style="color: var(--carolina-blue); text-decoration: none;">← Back to Bell Schedule</a>
         </div>
@@ -493,11 +616,41 @@
                 <div class="column-period">Loading...</div>
                 <div class="column-countdown"></div>
             </div>
+            <div class="schedule-column" id="col-4">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
+            <div class="schedule-column" id="col-5">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
+            <div class="schedule-column" id="col-6">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
+            <div class="schedule-column" id="col-7">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
+            <div class="schedule-column" id="col-8">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
+            <div class="schedule-column" id="col-9">
+                <div class="column-label">--</div>
+                <div class="column-period">Loading...</div>
+                <div class="column-countdown"></div>
+            </div>
         </div>
     </div>
     
     <script>
-        // Clock Display v1.2.0 - Added personal schedule support
+        // Clock Display v1.3.0 - Support up to 9 schedules with automatic grid layout
         
         // Firebase config (must match main app)
         const firebaseConfig = {
@@ -521,16 +674,21 @@
         let currentUserId = null; // Signed-in user's ID
         let allPersonalSchedules = []; // List of user's personal schedules
         let config = {
-            s1: null, s2: null, s3: null,  // Shared schedule IDs
-            p1: null, p2: null, p3: null,  // Personal schedule IDs (NEW)
-            uid: null,                      // User ID for personal schedules (NEW)
-            l1: '', l2: '', l3: '',         // Labels
-            a1: false, a2: false, a3: false, // Audio enabled
-            sound: 'ellisBell.mp3'          // Sound file for all bells
+            // Shared schedule IDs (s1-s9)
+            s1: null, s2: null, s3: null, s4: null, s5: null, s6: null, s7: null, s8: null, s9: null,
+            // Personal schedule IDs (p1-p9)
+            p1: null, p2: null, p3: null, p4: null, p5: null, p6: null, p7: null, p8: null, p9: null,
+            uid: null,
+            // Labels (l1-l9)
+            l1: '', l2: '', l3: '', l4: '', l5: '', l6: '', l7: '', l8: '', l9: '',
+            // Audio enabled (a1-a9)
+            a1: false, a2: false, a3: false, a4: false, a5: false, a6: false, a7: false, a8: false, a9: false,
+            sound: 'ellisBell.mp3'
         };
         let playedBells = new Set(); // Track bells that have played today
         let lastDateCheck = null; // To reset playedBells at midnight
         let isAnonymousUser = true; // Track if user is anonymous
+        let activeScheduleCount = 3; // Number of schedules being configured in setup
         
         // Sound URL is determined by config.sound (set from URL parameter or default)
         
@@ -547,26 +705,52 @@
         // Parse URL parameters
         function parseUrlParams() {
             const params = new URLSearchParams(window.location.search);
-            // Shared schedules
-            config.s1 = params.get('s1') || null;
-            config.s2 = params.get('s2') || null;
-            config.s3 = params.get('s3') || null;
-            // Personal schedules (NEW)
-            config.p1 = params.get('p1') || null;
-            config.p2 = params.get('p2') || null;
-            config.p3 = params.get('p3') || null;
-            config.uid = params.get('uid') || null; // User ID for personal schedules
-            // Labels and audio
-            config.l1 = params.get('l1') || '';
-            config.l2 = params.get('l2') || '';
-            config.l3 = params.get('l3') || '';
-            config.a1 = params.get('a1') === '1';
-            config.a2 = params.get('a2') === '1';
-            config.a3 = params.get('a3') === '1';
+            
+            // Parse all 9 slots
+            for (let i = 1; i <= 9; i++) {
+                config[`s${i}`] = params.get(`s${i}`) || null;
+                config[`p${i}`] = params.get(`p${i}`) || null;
+                config[`l${i}`] = params.get(`l${i}`) || '';
+                config[`a${i}`] = params.get(`a${i}`) === '1';
+            }
+            
+            config.uid = params.get('uid') || null;
             config.sound = params.get('sound') || 'ellisBell.mp3';
             
             // Has config if ANY schedule (shared or personal) is specified
-            return config.s1 || config.s2 || config.s3 || config.p1 || config.p2 || config.p3;
+            for (let i = 1; i <= 9; i++) {
+                if (config[`s${i}`] || config[`p${i}`]) return true;
+            }
+            return false;
+        }
+        
+        // Count how many schedules are configured
+        function countActiveSchedules() {
+            let count = 0;
+            for (let i = 1; i <= 9; i++) {
+                if (config[`s${i}`] || config[`p${i}`]) count++;
+            }
+            return count;
+        }
+        
+        // Get the schedule key for a column number (1-9)
+        function getScheduleKey(colNum) {
+            const pKey = config[`p${colNum}`];
+            const sKey = config[`s${colNum}`];
+            if (pKey) return `personal-${pKey}`;
+            if (sKey) return sKey;
+            return null;
+        }
+        
+        // Calculate optimal grid layout based on schedule count
+        function getGridLayout(count) {
+            if (count <= 0) return { cols: 1, rows: 1 };
+            if (count === 1) return { cols: 1, rows: 1 };
+            if (count === 2) return { cols: 2, rows: 1 };
+            if (count === 3) return { cols: 3, rows: 1 };
+            if (count === 4) return { cols: 2, rows: 2 };
+            if (count <= 6) return { cols: 3, rows: 2 };
+            return { cols: 3, rows: 3 }; // 7-9
         }
         
         // Format time as 12-hour with seconds
@@ -862,26 +1046,14 @@
             
             const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
             
-            // Helper to get schedule key for column
-            const getScheduleKey = (colNum) => {
-                const pKey = config[`p${colNum}`];
-                const sKey = config[`s${colNum}`];
-                if (pKey) return `personal-${pKey}`;
-                if (sKey) return sKey;
-                return null;
-            };
-            
-            // Check each column that has audio enabled
-            const columns = [
-                { scheduleKey: getScheduleKey(1), audioEnabled: config.a1 },
-                { scheduleKey: getScheduleKey(2), audioEnabled: config.a2 },
-                { scheduleKey: getScheduleKey(3), audioEnabled: config.a3 }
-            ];
-            
-            for (const col of columns) {
-                if (!col.scheduleKey || !col.audioEnabled) continue;
+            // Check all 9 columns that have audio enabled
+            for (let i = 1; i <= 9; i++) {
+                const scheduleKey = getScheduleKey(i);
+                const audioEnabled = config[`a${i}`];
                 
-                const schedule = scheduleData[col.scheduleKey];
+                if (!scheduleKey || !audioEnabled) continue;
+                
+                const schedule = scheduleData[scheduleKey];
                 if (!schedule || !schedule.periods) continue;
                 
                 for (const period of schedule.periods) {
@@ -891,7 +1063,7 @@
                         if (!bell.time) continue;
                         
                         // Create unique bell ID
-                        const bellKey = `${col.scheduleKey}-${period.name}-${bell.time}`;
+                        const bellKey = `${scheduleKey}-${period.name}-${bell.time}`;
                         
                         // Check if this bell should ring now (within the current second)
                         if (bell.time === currentTimeStr && !playedBells.has(bellKey)) {
@@ -905,46 +1077,88 @@
             }
         }
         
+        // Apply grid layout to the display
+        function applyGridLayout(activeCount) {
+            const columnsEl = document.getElementById('schedule-columns');
+            const clockEl = document.getElementById('main-clock');
+            const layout = getGridLayout(activeCount);
+            
+            // Remove all grid classes
+            columnsEl.classList.remove('grid-1', 'grid-2', 'grid-3', 'grid-2x2', 'grid-3x2', 'grid-3x3');
+            clockEl.classList.remove('compact', 'very-compact');
+            
+            // Apply appropriate grid class
+            if (activeCount === 1) {
+                columnsEl.classList.add('grid-1');
+            } else if (activeCount === 2) {
+                columnsEl.classList.add('grid-2');
+            } else if (activeCount === 3) {
+                columnsEl.classList.add('grid-3');
+            } else if (activeCount === 4) {
+                columnsEl.classList.add('grid-2x2');
+                clockEl.classList.add('compact');
+            } else if (activeCount <= 6) {
+                columnsEl.classList.add('grid-3x2');
+                clockEl.classList.add('compact');
+            } else {
+                columnsEl.classList.add('grid-3x3');
+                clockEl.classList.add('very-compact');
+            }
+            
+            // Show/hide columns
+            for (let i = 1; i <= 9; i++) {
+                const colEl = document.getElementById(`col-${i}`);
+                if (colEl) {
+                    if (i <= activeCount) {
+                        colEl.classList.add('active');
+                    } else {
+                        colEl.classList.remove('active');
+                    }
+                }
+            }
+        }
+        
         // Update schedule columns
         function updateColumns() {
-            // Determine which schedule key to use for each column
-            // Priority: personal schedule (p1/p2/p3) > shared schedule (s1/s2/s3)
-            const getScheduleKey = (colNum) => {
-                const pKey = config[`p${colNum}`];
-                const sKey = config[`s${colNum}`];
-                if (pKey) return `personal-${pKey}`;
-                if (sKey) return sKey;
-                return null;
-            };
+            // Count active schedules
+            let activeCount = 0;
+            for (let i = 1; i <= 9; i++) {
+                if (getScheduleKey(i)) activeCount = i; // Track highest column with a schedule
+            }
+            if (activeCount === 0) activeCount = 3; // Default to 3 if none configured
             
-            const columns = [
-                { id: 'col-1', scheduleKey: getScheduleKey(1), label: config.l1 },
-                { id: 'col-2', scheduleKey: getScheduleKey(2), label: config.l2 },
-                { id: 'col-3', scheduleKey: getScheduleKey(3), label: config.l3 }
-            ];
+            // Apply grid layout
+            applyGridLayout(activeCount);
             
             console.log('Updating columns with config:', config);
             console.log('Schedule data available:', Object.keys(scheduleData));
+            console.log('Active column count:', activeCount);
             
-            for (const col of columns) {
-                const element = document.getElementById(col.id);
+            // Update each column
+            for (let i = 1; i <= 9; i++) {
+                const element = document.getElementById(`col-${i}`);
+                if (!element) continue;
+                
                 const labelEl = element.querySelector('.column-label');
                 const periodEl = element.querySelector('.column-period');
                 const countdownEl = element.querySelector('.column-countdown');
                 
-                // Set label
-                labelEl.textContent = col.label || '--';
+                const scheduleKey = getScheduleKey(i);
+                const label = config[`l${i}`];
                 
-                if (!col.scheduleKey) {
+                // Set label
+                labelEl.textContent = label || '--';
+                
+                if (!scheduleKey) {
                     periodEl.textContent = '--';
                     countdownEl.textContent = '';
                     continue;
                 }
                 
-                console.log(`Column ${col.id}: scheduleKey=${col.scheduleKey}, data exists=${!!scheduleData[col.scheduleKey]}`);
+                console.log(`Column col-${i}: scheduleKey=${scheduleKey}, data exists=${!!scheduleData[scheduleKey]}`);
                 
-                const status = getPeriodStatus(col.scheduleKey);
-                console.log(`Column ${col.id} status:`, status);
+                const status = getPeriodStatus(scheduleKey);
+                console.log(`Column col-${i} status:`, status);
                 
                 switch (status.status) {
                     case 'in-period':
@@ -1141,19 +1355,8 @@
             const sharedSchedules = await loadAllSchedules();
             const personalSchedules = currentUserId ? await loadAllPersonalSchedules(currentUserId) : [];
             
-            const selects = [
-                document.getElementById('setup-schedule-1'),
-                document.getElementById('setup-schedule-2'),
-                document.getElementById('setup-schedule-3')
-            ];
-            
             if (sharedSchedules.length === 0 && personalSchedules.length === 0) {
-                const errorHtml = '<option value="">(No schedules found - check console)</option>';
-                selects.forEach(select => {
-                    select.innerHTML = errorHtml;
-                });
                 console.warn('No schedules loaded - check Firebase auth and Firestore rules');
-                return;
             }
             
             // Build options HTML
@@ -1177,11 +1380,70 @@
                 optionsHtml += '</optgroup>';
             }
             
-            selects.forEach(select => {
-                select.innerHTML = optionsHtml;
-            });
+            // Store for later use
+            window.scheduleOptionsHtml = optionsHtml;
+            
+            // Render initial rows
+            renderSetupRows();
             
             console.log(`Populated dropdowns with ${sharedSchedules.length} shared + ${personalSchedules.length} personal schedules`);
+        }
+        
+        // Render setup rows based on activeScheduleCount
+        function renderSetupRows() {
+            const container = document.getElementById('schedule-rows-container');
+            const optionsHtml = window.scheduleOptionsHtml || '<option value="">(None)</option>';
+            
+            let html = '';
+            for (let i = 1; i <= activeScheduleCount; i++) {
+                html += `
+                    <div class="setup-row">
+                        <label>Schedule ${i}:</label>
+                        <select id="setup-schedule-${i}">
+                            ${optionsHtml}
+                        </select>
+                        <input type="text" id="setup-label-${i}" placeholder="Label">
+                        <label class="audio-toggle"><input type="checkbox" id="setup-audio-${i}"> 🔔</label>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+        
+        // Update grid preview
+        function updateGridPreview() {
+            const preview = document.getElementById('grid-preview');
+            const layout = getGridLayout(activeScheduleCount);
+            
+            preview.style.gridTemplateColumns = `repeat(${layout.cols}, 1fr)`;
+            
+            let cellsHtml = '';
+            for (let i = 0; i < activeScheduleCount; i++) {
+                cellsHtml += '<div class="grid-preview-cell"></div>';
+            }
+            preview.innerHTML = cellsHtml;
+        }
+        
+        // Handle schedule count button clicks
+        function setupScheduleCountButtons() {
+            const buttons = document.querySelectorAll('.count-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const count = parseInt(btn.dataset.count);
+                    activeScheduleCount = count;
+                    
+                    // Update active state
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // Re-render rows and preview
+                    renderSetupRows();
+                    updateGridPreview();
+                });
+            });
+            
+            // Initial preview
+            updateGridPreview();
         }
         
         // Load shared sounds for the sound selector (for logged-in users)
@@ -1231,17 +1493,8 @@
         
         // Generate URL from setup form
         function generateUrl() {
-            const val1 = document.getElementById('setup-schedule-1').value;
-            const val2 = document.getElementById('setup-schedule-2').value;
-            const val3 = document.getElementById('setup-schedule-3').value;
-            const l1 = document.getElementById('setup-label-1').value;
-            const l2 = document.getElementById('setup-label-2').value;
-            const l3 = document.getElementById('setup-label-3').value;
-            const a1 = document.getElementById('setup-audio-1').checked;
-            const a2 = document.getElementById('setup-audio-2').checked;
-            const a3 = document.getElementById('setup-audio-3').checked;
-            const soundSelect = document.getElementById('setup-sound');
-            const sound = soundSelect ? soundSelect.value : 'ellisBell.mp3';
+            const params = new URLSearchParams();
+            let hasPersonal = false;
             
             // Parse schedule values (format: "shared:id" or "personal:id")
             const parseScheduleValue = (val) => {
@@ -1250,39 +1503,44 @@
                 return { type, id };
             };
             
-            const sched1 = parseScheduleValue(val1);
-            const sched2 = parseScheduleValue(val2);
-            const sched3 = parseScheduleValue(val3);
-            
-            const params = new URLSearchParams();
-            
-            // Add shared schedules
-            if (sched1.type === 'shared' && sched1.id) params.set('s1', sched1.id);
-            if (sched2.type === 'shared' && sched2.id) params.set('s2', sched2.id);
-            if (sched3.type === 'shared' && sched3.id) params.set('s3', sched3.id);
-            
-            // Add personal schedules
-            if (sched1.type === 'personal' && sched1.id) params.set('p1', sched1.id);
-            if (sched2.type === 'personal' && sched2.id) params.set('p2', sched2.id);
-            if (sched3.type === 'personal' && sched3.id) params.set('p3', sched3.id);
+            // Process all active schedule slots
+            for (let i = 1; i <= activeScheduleCount; i++) {
+                const scheduleSelect = document.getElementById(`setup-schedule-${i}`);
+                const labelInput = document.getElementById(`setup-label-${i}`);
+                const audioCheckbox = document.getElementById(`setup-audio-${i}`);
+                
+                if (!scheduleSelect) continue;
+                
+                const sched = parseScheduleValue(scheduleSelect.value);
+                const label = labelInput ? labelInput.value : '';
+                const audio = audioCheckbox ? audioCheckbox.checked : false;
+                
+                // Add shared schedule
+                if (sched.type === 'shared' && sched.id) {
+                    params.set(`s${i}`, sched.id);
+                }
+                
+                // Add personal schedule
+                if (sched.type === 'personal' && sched.id) {
+                    params.set(`p${i}`, sched.id);
+                    hasPersonal = true;
+                }
+                
+                // Add label
+                if (label) params.set(`l${i}`, label);
+                
+                // Add audio
+                if (audio) params.set(`a${i}`, '1');
+            }
             
             // Add user ID if any personal schedules are used
-            const hasPersonal = sched1.type === 'personal' || sched2.type === 'personal' || sched3.type === 'personal';
             if (hasPersonal && currentUserId) {
                 params.set('uid', currentUserId);
             }
             
-            // Add labels
-            if (l1) params.set('l1', l1);
-            if (l2) params.set('l2', l2);
-            if (l3) params.set('l3', l3);
-            
-            // Add audio settings
-            if (a1) params.set('a1', '1');
-            if (a2) params.set('a2', '1');
-            if (a3) params.set('a3', '1');
-            
             // Add sound
+            const soundSelect = document.getElementById('setup-sound');
+            const sound = soundSelect ? soundSelect.value : 'ellisBell.mp3';
             if (sound && sound !== 'ellisBell.mp3') params.set('sound', sound);
             
             const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
@@ -1437,7 +1695,7 @@
         
         // Initialize
         async function init() {
-            console.log('Clock Display v1.2.0 initializing...');
+            console.log('Clock Display v1.3.0 initializing...');
             
             // Check if user is already authenticated (e.g., from main app)
             let currentUser = null;
@@ -1495,6 +1753,9 @@
                 document.getElementById('google-sign-in-btn').addEventListener('click', handleGoogleSignIn);
                 document.getElementById('sign-out-btn').addEventListener('click', handleSignOut);
                 
+                // Setup schedule count buttons
+                setupScheduleCountButtons();
+                
                 // Show "Launch Last" button if we have a saved config
                 const lastConfig = localStorage.getItem('lastClockConfig');
                 if (lastConfig) {
@@ -1509,45 +1770,34 @@
                 // Determine user ID for personal schedules (from URL or current user)
                 const userIdForPersonal = config.uid || currentUserId;
                 
-                // Load shared schedules
-                const sharedSchedulesToLoad = [config.s1, config.s2, config.s3].filter(Boolean);
+                // Collect all shared schedules to load (s1-s9)
+                const sharedSchedulesToLoad = [];
+                for (let i = 1; i <= 9; i++) {
+                    if (config[`s${i}`]) sharedSchedulesToLoad.push(config[`s${i}`]);
+                }
                 await Promise.all(sharedSchedulesToLoad.map(id => loadSchedule(id)));
                 
-                // Load personal schedules
+                // Collect all personal schedules to load (p1-p9)
                 if (userIdForPersonal) {
-                    const personalSchedulesToLoad = [config.p1, config.p2, config.p3].filter(Boolean);
+                    const personalSchedulesToLoad = [];
+                    for (let i = 1; i <= 9; i++) {
+                        if (config[`p${i}`]) personalSchedulesToLoad.push(config[`p${i}`]);
+                    }
                     await Promise.all(personalSchedulesToLoad.map(id => loadPersonalSchedule(id, userIdForPersonal)));
                 }
                 
-                // Helper to get schedule key for column
-                const getScheduleKey = (colNum) => {
-                    const pKey = config[`p${colNum}`];
-                    const sKey = config[`s${colNum}`];
-                    if (pKey) return `personal-${pKey}`;
-                    if (sKey) return sKey;
-                    return null;
-                };
-                
-                // Set labels from schedule names if not provided
-                const key1 = getScheduleKey(1);
-                const key2 = getScheduleKey(2);
-                const key3 = getScheduleKey(3);
-                
-                if (!config.l1 && key1 && scheduleData[key1]) {
-                    config.l1 = scheduleData[key1].name;
-                }
-                if (!config.l2 && key2 && scheduleData[key2]) {
-                    config.l2 = scheduleData[key2].name;
-                }
-                if (!config.l3 && key3 && scheduleData[key3]) {
-                    config.l3 = scheduleData[key3].name;
+                // Set labels from schedule names if not provided (for all 9 slots)
+                for (let i = 1; i <= 9; i++) {
+                    const key = getScheduleKey(i);
+                    if (!config[`l${i}`] && key && scheduleData[key]) {
+                        config[`l${i}`] = scheduleData[key].name;
+                    }
                 }
                 
                 // Initial render
                 console.log('About to call updateClock and updateColumns');
                 console.log('Config after label assignment:', JSON.stringify(config));
                 console.log('ScheduleData keys:', Object.keys(scheduleData));
-                console.log('Audio enabled:', { a1: config.a1, a2: config.a2, a3: config.a3 });
                 
                 updateClock();
                 updateColumns();
