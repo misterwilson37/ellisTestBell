@@ -127,14 +127,14 @@
             font-weight: bold;
             text-align: center;
             font-family: 'Century Gothic', 'Avant Garde', Arial, Helvetica, sans-serif;
-            color: #4ade80;
+            color: #7BAFD4;
             margin: 2vmin 0;
             line-height: 1.1;
         }
         .countdown-unit {
             font-size: 5vmin;
             font-weight: normal;
-            color: #86efac;
+            color: #A8D1E7;
         }
         .next-bell {
             text-align: center;
@@ -219,7 +219,7 @@
             background: #d1d5db;
         }
         .btn-enable {
-            background: #22c55e;
+            background: #7BAFD4;
             color: #fff;
             font-size: 5vmin;
             padding: 5vmin;
@@ -227,7 +227,7 @@
         }
         .btn-enable:hover,
         .btn-enable:active {
-            background: #16a34a;
+            background: #5A9BC8;
         }
         .status {
             text-align: center;
@@ -239,7 +239,7 @@
             color: #ef4444;
         }
         .success {
-            color: #22c55e;
+            color: #7BAFD4;
         }
         .hidden {
             display: none;
@@ -459,6 +459,330 @@
         .homescreen-hint.hidden {
             display: none;
         }
+        
+        /* Public schedules dropdown */
+        .schedule-divider {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 3vmin;
+            margin: 3vmin 0;
+        }
+        select {
+            width: 100%;
+            padding: 4vmin;
+            font-size: 4vmin;
+            border: 2px solid #e5e7eb;
+            border-radius: 2vmin;
+            background: #fff;
+            color: #1f2937;
+            outline: none;
+            font-family: 'Century Gothic', 'Avant Garde', Arial, Helvetica, sans-serif;
+            -webkit-appearance: none;
+            appearance: none;
+            -webkit-transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+            cursor: pointer;
+            /* Arrow indicator */
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236b7280'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 3vmin center;
+            background-size: 6vmin;
+            padding-right: 10vmin;
+        }
+        select:focus {
+            border-color: #3b82f6;
+            -webkit-box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        body.dark-mode select {
+            background-color: #374151;
+            border-color: #4b5563;
+            color: #f3f4f6;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239ca3af'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
+        }
+        body.dark-mode select:focus {
+            border-color: #60a5fa;
+        }
+        
+        /* ===========================================
+           VISUAL CUE STYLES (Safari 9 Compatible)
+           =========================================== */
+        
+        /* Visual cue toggle button */
+        .btn-visual-toggle {
+            background: #10b981;
+            color: #fff;
+        }
+        .btn-visual-toggle:hover,
+        .btn-visual-toggle:active {
+            background: #059669;
+        }
+        .btn-visual-toggle.visual-off {
+            background: #6b7280;
+        }
+        .btn-visual-toggle.visual-off:hover,
+        .btn-visual-toggle.visual-off:active {
+            background: #4b5563;
+        }
+        
+        /* Clock card layout when visual cues enabled */
+        .clock-card-inner {
+            display: block;
+        }
+        
+        /* Flex layout for visual mode */
+        body.visual-mode .clock-card-inner {
+            display: -webkit-box;
+            display: -webkit-flex;
+            display: flex;
+            -webkit-box-orient: horizontal;
+            -webkit-flex-direction: row;
+            flex-direction: row;
+            -webkit-box-align: center;
+            -webkit-align-items: center;
+            align-items: center;
+        }
+        
+        /* Visual cue container - hidden by default */
+        .visual-cue-container {
+            display: none;
+            width: 38vmin;
+            height: 38vmin;
+            min-width: 38vmin;
+            min-height: 38vmin;
+            background: #374151;
+            border-radius: 2vmin;
+            margin-right: 4vmin;
+            -webkit-flex-shrink: 0;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        
+        body.visual-mode .visual-cue-container {
+            display: -webkit-box;
+            display: -webkit-flex;
+            display: flex;
+            -webkit-box-pack: center;
+            -webkit-justify-content: center;
+            justify-content: center;
+            -webkit-box-align: center;
+            -webkit-align-items: center;
+            align-items: center;
+        }
+        
+        /* Content area when visual enabled */
+        .clock-content {
+            -webkit-box-flex: 1;
+            -webkit-flex: 1;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        /* Left-align text when visual mode is on */
+        body.visual-mode .clock,
+        body.visual-mode .countdown,
+        body.visual-mode .next-bell,
+        body.visual-mode .schedule-name {
+            text-align: left;
+        }
+        
+        /* Larger text when visual mode is on (landscape) */
+        body.visual-mode .clock {
+            font-size: 17vmin;
+        }
+        body.visual-mode .countdown {
+            font-size: 14vmin;
+        }
+        body.visual-mode .next-bell {
+            font-size: 6vmin;
+        }
+        
+        /* Visual cue image/svg styling */
+        .visual-cue-img {
+            max-width: 95%;
+            max-height: 95%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+        .visual-cue-svg {
+            width: 80%;
+            height: 80%;
+            color: #9ca3af;
+        }
+        
+        /* Custom text visual */
+        .visual-cue-text-box {
+            width: 100%;
+            height: 100%;
+            display: -webkit-box;
+            display: -webkit-flex;
+            display: flex;
+            -webkit-box-pack: center;
+            -webkit-justify-content: center;
+            justify-content: center;
+            -webkit-box-align: center;
+            -webkit-align-items: center;
+            align-items: center;
+        }
+        .visual-cue-text {
+            font-size: 14vmin;
+            font-weight: bold;
+            font-family: 'Century Gothic', 'Avant Garde', Arial, Helvetica, sans-serif;
+            line-height: 1;
+            text-align: center;
+        }
+        
+        /* Kiosk mode with visual cues */
+        body.kiosk-mode.visual-mode .visual-cue-container {
+            width: 45vmin;
+            height: 45vmin;
+            min-width: 45vmin;
+            min-height: 45vmin;
+            margin-right: 5vmin;
+        }
+        body.kiosk-mode.visual-mode .visual-cue-text {
+            font-size: 20vmin;
+        }
+        body.kiosk-mode.visual-mode .clock {
+            font-size: 18vmin;
+        }
+        body.kiosk-mode.visual-mode .countdown {
+            font-size: 15vmin;
+        }
+        body.kiosk-mode.visual-mode .next-bell {
+            font-size: 6vmin;
+        }
+        
+        /* Dark mode visual cue */
+        body.dark-mode .visual-cue-container {
+            background: #1f2937;
+        }
+        body.dark-mode .visual-cue-svg {
+            color: #6b7280;
+        }
+        
+        /* Landscape mode - larger sizes */
+        @media (orientation: landscape) {
+            body.visual-mode .visual-cue-container {
+                width: 50vmin;
+                height: 50vmin;
+                min-width: 50vmin;
+                min-height: 50vmin;
+            }
+            
+            body.visual-mode .clock {
+                font-size: 22vmin;
+            }
+            body.visual-mode .countdown {
+                font-size: 18vmin;
+            }
+            body.visual-mode .next-bell {
+                font-size: 7vmin;
+            }
+            
+            /* Center schedule name and kiosk hint across full width */
+            body.visual-mode .clock-card {
+                position: relative;
+            }
+            body.visual-mode .schedule-name {
+                position: absolute;
+                top: 1vmin;
+                left: 0;
+                right: 0;
+                text-align: center;
+            }
+            body.visual-mode .kiosk-exit-hint {
+                position: absolute;
+                bottom: 1vmin;
+                left: 0;
+                right: 0;
+                text-align: center;
+            }
+            body.visual-mode .clock-card-inner {
+                padding-top: 5vmin;
+                padding-bottom: 4vmin;
+            }
+            
+            /* Kiosk + landscape */
+            body.kiosk-mode.visual-mode .visual-cue-container {
+                width: 55vmin;
+                height: 55vmin;
+                min-width: 55vmin;
+                min-height: 55vmin;
+            }
+            body.kiosk-mode.visual-mode .clock {
+                font-size: 22vmin;
+            }
+            body.kiosk-mode.visual-mode .countdown {
+                font-size: 18vmin;
+            }
+            body.kiosk-mode.visual-mode .next-bell {
+                font-size: 7vmin;
+            }
+            
+            body.visual-mode .visual-cue-text {
+                font-size: 18vmin;
+            }
+            body.kiosk-mode.visual-mode .visual-cue-text {
+                font-size: 22vmin;
+            }
+        }
+        
+        /* Portrait mode - stack vertically */
+        @media (orientation: portrait) {
+            body.visual-mode .clock-card-inner {
+                -webkit-box-orient: vertical;
+                -webkit-flex-direction: column;
+                flex-direction: column;
+            }
+            
+            body.visual-mode .visual-cue-container {
+                width: 40vmin;
+                height: 40vmin;
+                min-width: 40vmin;
+                min-height: 40vmin;
+                margin-right: 0;
+                margin-bottom: 3vmin;
+            }
+            
+            /* Center text in portrait */
+            body.visual-mode .clock,
+            body.visual-mode .countdown,
+            body.visual-mode .next-bell,
+            body.visual-mode .schedule-name {
+                text-align: center;
+            }
+            
+            /* Larger clock text in portrait */
+            body.visual-mode .clock {
+                font-size: 14vmin;
+            }
+            body.visual-mode .countdown {
+                font-size: 12vmin;
+            }
+            body.visual-mode .next-bell {
+                font-size: 5vmin;
+            }
+            
+            /* Kiosk + portrait */
+            body.kiosk-mode.visual-mode .visual-cue-container {
+                width: 35vmin;
+                height: 35vmin;
+                min-width: 35vmin;
+                min-height: 35vmin;
+                margin-bottom: 2vmin;
+            }
+            body.kiosk-mode.visual-mode .clock {
+                font-size: 18vmin;
+            }
+            body.kiosk-mode.visual-mode .countdown {
+                font-size: 14vmin;
+            }
+            body.kiosk-mode.visual-mode .next-bell {
+                font-size: 6vmin;
+            }
+        }
     </style>
 </head>
 <body>
@@ -470,6 +794,13 @@
         
         <!-- Code Entry Screen -->
         <div id="code-screen" class="card">
+            <label for="public-schedule-select">Select a Public Schedule:</label>
+            <select id="public-schedule-select">
+                <option value="">Loading schedules...</option>
+            </select>
+            
+            <div class="schedule-divider">— or —</div>
+            
             <label for="share-code">Enter Share Code:</label>
             <input type="text" id="share-code" maxlength="6" placeholder="ABC123" autocomplete="off" autocorrect="off" autocapitalize="characters">
             <button type="button" id="load-btn" class="btn-primary">Load Schedule</button>
@@ -490,14 +821,24 @@
         <!-- Main Clock Screen -->
         <div id="clock-screen" class="hidden">
             <div class="clock-card">
-                <div class="schedule-name" id="schedule-name">Loading...</div>
-                <div class="clock" id="current-time">--:--:--</div>
-                <div class="countdown" id="countdown">--:--</div>
-                <div class="next-bell" id="next-bell">Loading schedule...</div>
-                
-                <!-- Kiosk exit hint - only visible in kiosk mode -->
-                <div class="kiosk-exit-hint">
-                    <span class="kiosk-exit-link" id="kiosk-exit-link">Triple-tap here or top-right corner to exit kiosk mode</span>
+                <div class="clock-card-inner">
+                    <!-- Visual cue container (hidden by default) -->
+                    <div class="visual-cue-container" id="visual-cue-container">
+                        <!-- Image/SVG will be injected by JS -->
+                    </div>
+                    
+                    <!-- Clock content -->
+                    <div class="clock-content">
+                        <div class="schedule-name" id="schedule-name">Loading...</div>
+                        <div class="clock" id="current-time">--:--:--</div>
+                        <div class="countdown" id="countdown">--:--</div>
+                        <div class="next-bell" id="next-bell">Loading schedule...</div>
+                        
+                        <!-- Kiosk exit hint - only visible in kiosk mode -->
+                        <div class="kiosk-exit-hint">
+                            <span class="kiosk-exit-link" id="kiosk-exit-link">Triple-tap here or top-right corner to exit kiosk mode</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -511,14 +852,15 @@
                 <button type="button" id="dark-mode-btn" class="btn-dark-toggle">Dark</button>
                 <button type="button" id="fullscreen-btn" class="btn-fullscreen">Full</button>
             </div>
-            <div class="button-row">
-                <button type="button" id="kiosk-btn" class="btn-secondary">Kiosk Mode</button>
-                <button type="button" id="change-schedule-btn" class="btn-secondary">Change Schedule</button>
+            <div class="button-row button-row-3">
+                <button type="button" id="visual-toggle-btn" class="btn-visual-toggle visual-off">Visual</button>
+                <button type="button" id="kiosk-btn" class="btn-secondary">Kiosk</button>
+                <button type="button" id="change-schedule-btn" class="btn-secondary">Change</button>
             </div>
             <div id="last-refresh" class="last-refresh"></div>
         </div>
         
-        <div class="version">Ellis Bell Legacy v1.4.4 (iOS 9+)</div>
+        <div class="version">Ellis Bell Legacy v1.6.4 (iOS 9+)</div>
     </div>
     
     <!-- Invisible tap zone to exit kiosk mode (top-right corner) -->
@@ -657,6 +999,8 @@
         var wakeLock = null;
         var kioskTapCount = 0;
         var kioskTapTimer = null;
+        var visualModeEnabled = false;
+        var currentVisualHtml = '';
         
         // ===========================================
         // === DOM ELEMENTS ===
@@ -665,6 +1009,7 @@
         var codeScreen = document.getElementById('code-screen');
         var audioScreen = document.getElementById('audio-screen');
         var clockScreen = document.getElementById('clock-screen');
+        var publicScheduleSelect = document.getElementById('public-schedule-select');
         var shareCodeInput = document.getElementById('share-code');
         var loadBtn = document.getElementById('load-btn');
         var codeStatus = document.getElementById('code-status');
@@ -684,6 +1029,8 @@
         var kioskExitZone = document.getElementById('kiosk-exit-zone');
         var kioskExitLink = document.getElementById('kiosk-exit-link');
         var homescreenHint = document.getElementById('homescreen-hint');
+        var visualCueContainer = document.getElementById('visual-cue-container');
+        var visualToggleBtn = document.getElementById('visual-toggle-btn');
         
         // ===========================================
         // === UTILITIES ===
@@ -844,6 +1191,176 @@
         }
         
         // ===========================================
+        // === VISUAL CUE FUNCTIONS ===
+        // ===========================================
+        
+        // Render visual cue HTML based on the value from the database
+        function getVisualHtml(visualCue) {
+            if (!visualCue) {
+                return getDefaultBellSvg();
+            }
+            
+            // HTTP URL - show as image (PNG, JPG, GIF, SVG)
+            if (visualCue.indexOf('http') === 0) {
+                return '<img src="' + visualCue + '" alt="Visual" class="visual-cue-img">';
+            }
+            
+            // [CUSTOM_TEXT] format: [CUSTOM_TEXT] text|bgColor|fgColor
+            if (visualCue.indexOf('[CUSTOM_TEXT]') === 0) {
+                var textPart = visualCue.replace('[CUSTOM_TEXT] ', '').replace('[CUSTOM_TEXT]', '');
+                var parts = textPart.split('|');
+                var text = parts[0] || '?';
+                var bgColor = parts[1] || '#4338CA';
+                var fgColor = parts[2] || '#FFFFFF';
+                
+                return '<div class="visual-cue-text-box" style="background-color:' + bgColor + ';">' +
+                    '<span class="visual-cue-text" style="color:' + fgColor + ';">' + text + '</span>' +
+                    '</div>';
+            }
+            
+            // [DEFAULT] format - built-in SVGs
+            if (visualCue.indexOf('[DEFAULT]') === 0) {
+                var key = visualCue.replace('[DEFAULT] ', '').replace('[DEFAULT]', '').toLowerCase();
+                
+                if (key.indexOf('lunch') !== -1) {
+                    // Fork and knife
+                    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="visual-cue-svg">' +
+                        '<path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5V12.97c2.09-.13 3.75-1.85 3.75-3.97V2h-2v7zm5-3v8h2.5v10h2.5V2h-5z"/>' +
+                        '</svg>';
+                }
+                
+                if (key.indexOf('passing') !== -1) {
+                    // Walking person
+                    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="visual-cue-svg">' +
+                        '<circle cx="12" cy="4" r="2"/>' +
+                        '<path d="M15.89 8.11C15.5 7.72 14.83 7 13.53 7h-2.54C8.24 6.99 6 9.26 6 12c0 .79.19 1.54.52 2.21L4.69 18l1.33 1 2.27-3.03c.46.11.94.18 1.46.19L8.3 20h2.5l1.42-4.26c2.1-.24 3.87-1.56 4.72-3.39l1.47-3.47-2.52 1.23z"/>' +
+                        '</svg>';
+                }
+                
+                // Default for unknown [DEFAULT] keys
+                return getDefaultBellSvg();
+            }
+            
+            // Handle [BG:color] prefix (strip it and process the rest)
+            if (visualCue.indexOf('[BG:') === 0) {
+                var closeBracket = visualCue.indexOf(']');
+                if (closeBracket !== -1) {
+                    var bgColor = visualCue.substring(4, closeBracket);
+                    var rest = visualCue.substring(closeBracket + 1).trim();
+                    var innerHtml = rest ? getVisualHtml(rest) : getDefaultBellSvg();
+                    return '<div style="background-color:' + bgColor + '; width:100%; height:100%; display:flex; align-items:center; justify-content:center;">' + 
+                        innerHtml + '</div>';
+                }
+            }
+            
+            // Unknown format - show default
+            return getDefaultBellSvg();
+        }
+        
+        // Default bell SVG
+        function getDefaultBellSvg() {
+            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="visual-cue-svg">' +
+                '<path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>' +
+                '</svg>';
+        }
+        
+        // Update visual cue display
+        function updateVisualCue(html) {
+            if (!visualModeEnabled || !visualCueContainer) return;
+            
+            // Only update if content changed
+            if (html === currentVisualHtml) return;
+            currentVisualHtml = html;
+            
+            visualCueContainer.innerHTML = html;
+        }
+        
+        // Determine which visual to show based on current time and bells
+        function determineCurrentVisual(nowSeconds) {
+            // Find previous bell (most recent one that already passed)
+            var previousBell = null;
+            for (var i = bells.length - 1; i >= 0; i--) {
+                var bellSeconds = timeToSeconds(bells[i].time);
+                if (bellSeconds <= nowSeconds) {
+                    previousBell = bells[i];
+                    break;
+                }
+            }
+            
+            // Find next bell
+            var nextBell = null;
+            for (var j = 0; j < bells.length; j++) {
+                var bellSeconds2 = timeToSeconds(bells[j].time);
+                if (bellSeconds2 > nowSeconds) {
+                    nextBell = bells[j];
+                    break;
+                }
+            }
+            
+            // Priority 1: "after" visual from previous bell
+            if (previousBell && previousBell.visualMode === 'after' && previousBell.visualCue) {
+                return getVisualHtml(previousBell.visualCue);
+            }
+            
+            // Priority 2: "before" visual from next bell
+            if (nextBell && nextBell.visualMode === 'before' && nextBell.visualCue) {
+                return getVisualHtml(nextBell.visualCue);
+            }
+            
+            // Priority 3: "both" visual mode - check previous then next
+            if (previousBell && previousBell.visualMode === 'both' && previousBell.visualCue) {
+                return getVisualHtml(previousBell.visualCue);
+            }
+            if (nextBell && nextBell.visualMode === 'both' && nextBell.visualCue) {
+                return getVisualHtml(nextBell.visualCue);
+            }
+            
+            // Default: show bell icon
+            return getDefaultBellSvg();
+        }
+        
+        // Toggle visual mode on/off
+        function toggleVisualMode() {
+            visualModeEnabled = !visualModeEnabled;
+            
+            if (visualModeEnabled) {
+                addClass(document.body, 'visual-mode');
+                removeClass(visualToggleBtn, 'visual-off');
+                visualToggleBtn.textContent = 'Visual ✓';
+                
+                // Update visual immediately
+                if (bells.length > 0) {
+                    var nowSeconds = timeToSeconds(getCurrentTimeHHMMSS());
+                    var html = determineCurrentVisual(nowSeconds);
+                    updateVisualCue(html);
+                }
+            } else {
+                removeClass(document.body, 'visual-mode');
+                addClass(visualToggleBtn, 'visual-off');
+                visualToggleBtn.textContent = 'Visual';
+                currentVisualHtml = '';
+            }
+            
+            // Save preference
+            try {
+                localStorage.setItem('ellisBellLegacy_visualMode', visualModeEnabled ? '1' : '0');
+            } catch (e) {}
+        }
+        
+        // Load visual mode preference
+        function loadVisualModePreference() {
+            try {
+                var saved = localStorage.getItem('ellisBellLegacy_visualMode');
+                if (saved === '1') {
+                    visualModeEnabled = true;
+                    addClass(document.body, 'visual-mode');
+                    removeClass(visualToggleBtn, 'visual-off');
+                    visualToggleBtn.textContent = 'Visual ✓';
+                }
+            } catch (e) {}
+        }
+        
+        // ===========================================
         // === API CALLS ===
         // ===========================================
         
@@ -870,6 +1387,136 @@
                 callback(new Error('Network error'));
             };
             xhr.send();
+        }
+        
+        // ===========================================
+        // === PUBLIC SCHEDULES ===
+        // ===========================================
+        
+        var publicSchedules = [];
+        
+        function fetchPublicSchedules() {
+            var listPath = '/artifacts/' + APP_ID + '/public/data/schedules';
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', FIRESTORE_BASE + listPath, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            var documents = data.documents || [];
+                            publicSchedules = [];
+                            
+                            for (var i = 0; i < documents.length; i++) {
+                                var doc = documents[i];
+                                var fields = parseFields(doc.fields || {});
+                                var nameParts = doc.name.split('/');
+                                var scheduleId = nameParts[nameParts.length - 1];
+                                
+                                publicSchedules.push({
+                                    id: scheduleId,
+                                    name: fields.name || fields.scheduleName || scheduleId,
+                                    data: fields
+                                });
+                            }
+                            
+                            // Sort alphabetically
+                            publicSchedules.sort(function(a, b) {
+                                return a.name.localeCompare(b.name);
+                            });
+                            
+                            populatePublicScheduleDropdown();
+                        } catch (e) {
+                            console.error('Error parsing public schedules:', e);
+                            publicScheduleSelect.innerHTML = '<option value="">Error loading schedules</option>';
+                        }
+                    } else {
+                        console.error('Error fetching public schedules:', xhr.status);
+                        publicScheduleSelect.innerHTML = '<option value="">Error loading schedules</option>';
+                    }
+                }
+            };
+            xhr.onerror = function() {
+                publicScheduleSelect.innerHTML = '<option value="">Network error</option>';
+            };
+            xhr.send();
+        }
+        
+        function populatePublicScheduleDropdown() {
+            var html = '<option value="">-- Select a schedule --</option>';
+            
+            for (var i = 0; i < publicSchedules.length; i++) {
+                var schedule = publicSchedules[i];
+                html += '<option value="' + schedule.id + '">' + schedule.name + '</option>';
+            }
+            
+            if (publicSchedules.length === 0) {
+                html = '<option value="">No public schedules available</option>';
+            }
+            
+            publicScheduleSelect.innerHTML = html;
+        }
+        
+        function loadPublicSchedule(scheduleId) {
+            if (!scheduleId) return;
+            
+            // Find the schedule in our cached list
+            var selectedSchedule = null;
+            for (var i = 0; i < publicSchedules.length; i++) {
+                if (publicSchedules[i].id === scheduleId) {
+                    selectedSchedule = publicSchedules[i];
+                    break;
+                }
+            }
+            
+            if (!selectedSchedule) {
+                showStatus('Schedule not found', 'error');
+                return;
+            }
+            
+            showStatus('Loading ' + selectedSchedule.name + '...', '');
+            scheduleName = selectedSchedule.name;
+            
+            // Extract bells from the public schedule
+            bells = extractBellsFromSchedule(selectedSchedule.data);
+            
+            console.log('Public schedule bells:', bells);
+            
+            if (bells.length === 0) {
+                showStatus('No bells found in schedule', 'error');
+                return;
+            }
+            
+            // Sort and deduplicate
+            bells.sort(function(a, b) {
+                return a.time.localeCompare(b.time);
+            });
+            
+            var uniqueBells = [];
+            var seenTimes = {};
+            for (var j = 0; j < bells.length; j++) {
+                if (!seenTimes[bells[j].time]) {
+                    seenTimes[bells[j].time] = true;
+                    uniqueBells.push(bells[j]);
+                }
+            }
+            bells = uniqueBells;
+            
+            // Save to localStorage (use schedule ID as "code")
+            try {
+                localStorage.setItem('ellisBellLegacy_code', 'PUBLIC_' + scheduleId);
+                localStorage.setItem('ellisBellLegacy_bells', JSON.stringify(bells));
+                localStorage.setItem('ellisBellLegacy_name', scheduleName);
+                localStorage.setItem('ellisBellLegacy_timestamp', Date.now().toString());
+                localStorage.setItem('ellisBellLegacy_publicScheduleId', scheduleId);
+            } catch (e) {}
+            
+            showStatus('Loaded ' + bells.length + ' bells!', 'success');
+            
+            setTimeout(function() {
+                addClass(codeScreen, 'hidden');
+                removeClass(audioScreen, 'hidden');
+            }, 500);
         }
         
         // ===========================================
@@ -1186,10 +1833,14 @@
                         time: time,
                         name: bell.name || 'Bell',
                         sound: bell.sound || DEFAULT_SOUND,
-                        periodName: bell._periodName || ''
+                        periodName: bell._periodName || '',
+                        visualCue: bell.visualCue || '',
+                        visualMode: bell.visualMode || 'none'
                     });
                     
-                    console.log('Added bell:', bell.name, 'at', time, bell.relative ? '(relative)' : '(static)');
+                    console.log('Added bell:', bell.name, 'at', time, 
+                        bell.relative ? '(relative)' : '(static)',
+                        bell.visualCue ? 'visual:' + bell.visualMode : '');
                 } else {
                     console.log('Could not calculate time for bell:', bell.name);
                 }
@@ -1309,6 +1960,12 @@
             var nowSeconds = timeToSeconds(now);
             
             currentTimeEl.textContent = formatTime12Hour(now);
+            
+            // Update visual cue
+            if (visualModeEnabled) {
+                var visualHtml = determineCurrentVisual(nowSeconds);
+                updateVisualCue(visualHtml);
+            }
             
             // Find next bell - use >= so we still catch the bell at the exact second it rings
             var nextBell = null;
@@ -1578,6 +2235,13 @@
             }
         };
         
+        publicScheduleSelect.onchange = function() {
+            var selectedId = publicScheduleSelect.value;
+            if (selectedId) {
+                loadPublicSchedule(selectedId);
+            }
+        };
+        
         enableAudioBtn.onclick = function() {
             enableAudio();
         };
@@ -1590,6 +2254,7 @@
             removeClass(codeScreen, 'hidden');
             addClass(codeStatus, 'hidden');
             shareCodeInput.value = '';
+            publicScheduleSelect.selectedIndex = 0;
             shareCodeInput.focus();
             
             releaseWakeLock();
@@ -1599,6 +2264,7 @@
                 localStorage.removeItem('ellisBellLegacy_bells');
                 localStorage.removeItem('ellisBellLegacy_name');
                 localStorage.removeItem('ellisBellLegacy_timestamp');
+                localStorage.removeItem('ellisBellLegacy_publicScheduleId');
             } catch (e) {}
         };
         
@@ -1611,7 +2277,50 @@
             if (savedCode) {
                 refreshScheduleBtn.textContent = 'Refreshing...';
                 refreshScheduleBtn.disabled = true;
-                loadScheduleFromCode(savedCode);
+                
+                // Check if it's a public schedule
+                if (savedCode.indexOf('PUBLIC_') === 0) {
+                    var publicId = savedCode.replace('PUBLIC_', '');
+                    // Refetch public schedules and reload
+                    var listPath = '/artifacts/' + APP_ID + '/public/data/schedules';
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('GET', FIRESTORE_BASE + listPath, true);
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 4) {
+                            refreshScheduleBtn.textContent = 'Refresh';
+                            refreshScheduleBtn.disabled = false;
+                            
+                            if (xhr.status === 200) {
+                                try {
+                                    var data = JSON.parse(xhr.responseText);
+                                    var documents = data.documents || [];
+                                    publicSchedules = [];
+                                    
+                                    for (var i = 0; i < documents.length; i++) {
+                                        var doc = documents[i];
+                                        var fields = parseFields(doc.fields || {});
+                                        var nameParts = doc.name.split('/');
+                                        var schedId = nameParts[nameParts.length - 1];
+                                        
+                                        publicSchedules.push({
+                                            id: schedId,
+                                            name: fields.name || fields.scheduleName || schedId,
+                                            data: fields
+                                        });
+                                    }
+                                    
+                                    populatePublicScheduleDropdown();
+                                    loadPublicSchedule(publicId);
+                                } catch (e) {
+                                    console.error('Error refreshing public schedule:', e);
+                                }
+                            }
+                        }
+                    };
+                    xhr.send();
+                } else {
+                    loadScheduleFromCode(savedCode);
+                }
             } else {
                 changeScheduleBtn.click();
             }
@@ -1636,6 +2345,11 @@
         // Kiosk exit link (visible text in kiosk mode)
         kioskExitLink.onclick = function() {
             handleKioskExitTap();
+        };
+        
+        // Visual mode toggle
+        visualToggleBtn.onclick = function() {
+            toggleVisualMode();
         };
         
         // Fullscreen change events
@@ -1664,6 +2378,10 @@
         function init() {
             // Load preferences
             loadDarkModePreference();
+            loadVisualModePreference();
+            
+            // Fetch public schedules for dropdown
+            fetchPublicSchedules();
             
             // Show homescreen hint after a delay
             setTimeout(showHomescreenHint, 2000);
@@ -1686,7 +2404,19 @@
                     
                     if (isStale && savedCode) {
                         console.log('Cache is stale, refreshing schedule...');
-                        loadScheduleFromCode(savedCode);
+                        // Check if it was a public schedule
+                        if (savedCode.indexOf('PUBLIC_') === 0) {
+                            var publicId = savedCode.replace('PUBLIC_', '');
+                            // We need to wait for public schedules to load first
+                            // For now, just use cached bells
+                            bells = JSON.parse(savedBells);
+                            scheduleName = savedName;
+                            addClass(codeScreen, 'hidden');
+                            removeClass(audioScreen, 'hidden');
+                            loadKioskModePreference();
+                        } else {
+                            loadScheduleFromCode(savedCode);
+                        }
                         return;
                     }
                     
