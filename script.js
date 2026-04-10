@@ -1,9 +1,58 @@
-const APP_VERSION = "5.46.2"
-const CLOCK_VERSION = "1.1.7"
+const APP_VERSION = "5.65.3"
+const CLOCK_VERSION = "1.3.0"
 const DASHBOARD_VERSION = "1.2.3"
-// V5.46.2: Dashboard v1.2.2 - added Launch TV View button
+// V5.65.3: Remove broadcast popup messages
+// - Removed "Broadcast sent" and "synced from another device" modals (too intrusive)
+// - Console logging remains for debugging if needed
+// V5.65.2: Broadcast Fix - Use correct user variable
+// - Fixed: Changed currentUser (undefined) to userId (correct variable)
+// - Added detailed console logging for debugging
+// - Added user-visible messages when broadcast sends/receives
+// - Increased stale broadcast threshold from 5s to 10s
+// V5.65.1: Broadcast Toggle Fix
+// - Fixed broadcast toggle button not responding to clicks (DOM timing issue)
+// - Removed disabled attribute from HTML, button now works for all users
+// V5.65.0: Quick Bell Broadcast Feature
+// - Added broadcast toggle button next to sound dropdown (syncs quick bells across all logged-in devices)
+// - Added "Always broadcast" checkbox to custom quick bells
+// - Broadcast-enabled custom bells show a signal icon in the corner
+// - Cancel syncs across devices when broadcast is enabled
+// - Uses Firestore real-time listener for instant sync
+// V5.64.3: PiP Kiosk Mode Fixes
+// - Fixed visual cue icon not loading in kiosk mode
+// - Fixed countdown centering issue when window is small (now stays left-aligned)
+// V5.64.0: Enhanced PiP Kiosk Mode + Text Wrapping Fix
+// - Enhanced PiP kiosk mode with responsive scaling (icon fills height, countdown scales with viewport)
+// - Kiosk mode now has dark background, properly hides quick bells and action buttons
+// - Fixed text wrapping issue in full pop-out where "are" would drop to second line
+// - Fixed warning settings modal scrolling on smaller screens
+// V5.63.3: Share code feature fixes
+// - Fixed: populateScheduleSelector() -> renderScheduleSelector() (function didn't exist)
+// - Fixed: Unfollow now switches to another schedule if viewing the unfollowed one
+// V5.63.2: Fixed custom quick bell visual and sound upload
+// - Visual upload: Set currentVisualSelectTarget when opening upload from custom bell manager
+// - Visual upload: Added custom bell manager dropdowns to updateVisualDropdowns()
+// - Visual upload: Upload completion now properly updates hidden inputs for custom bells
+// - Sound upload: Added handler for [UPLOAD] selection in custom bell sound dropdown
+// - Sound upload: Added custom bell sound selects to addNewAudioOption() and updateSoundDropdowns()
+// V5.63.1: Bug fixes
+// - Users can generate 6-character share codes for their personal schedules
+// - Colleagues can enter share codes to "follow" schedules (read-only access)
+// - Following schedules appear in schedule selector under "📥 Following" group
+// - Followers can duplicate shared schedules to their own account
+// - Share codes can be revoked by the owner
+// - Updated Firestore rules: personal schedules readable by all authenticated users
+// - Updated Storage rules: user sounds/visuals readable by all authenticated users
+// V5.62.0: Memory Management System
+// - Added automatic memory purge during safe windows (when no bells approaching)
+// - Audio players now auto-dispose after playback
+// - Tracks and cleans up Tone.Player instances to prevent accumulation
+// - Clears unused audio buffer cache periodically
+// - Added PRODUCTION_MODE flag to reduce console logging
+// - Safe memory window = 60s before next bell (no cleanup during critical times)
+// V5.61.2: Dashboard v1.2.2 - added Launch TV View button
 // - Added CLOCK_VERSION and DASHBOARD_VERSION constants (dynamically displayed in footer)
-// V5.46.0: Clock Display v1.1.7 + Dashboard link
+// V5.61.0: Clock Display v1.1.7 + Dashboard link
 // V5.60.0: Clock Display page initial release
 // V5.59.1: Fixed Simplified View wiping schedule
 // - Removed renderCombinedList() call from toggleSimplifiedView()
@@ -642,6 +691,35 @@ const sharedAudioFilesList = document.getElementById('shared-audio-files-list');
 
 const signOutBtn = document.getElementById('signout-btn');
 
+// V5.63.0: Share Code Feature DOM Elements
+const shareScheduleModal = document.getElementById('share-schedule-modal');
+const shareScheduleName = document.getElementById('share-schedule-name');
+const shareCodeGenerate = document.getElementById('share-code-generate');
+const shareCodeDisplay = document.getElementById('share-code-display');
+const shareCodeValue = document.getElementById('share-code-value');
+const generateShareCodeBtn = document.getElementById('generate-share-code-btn');
+const copyShareCodeBtn = document.getElementById('copy-share-code-btn');
+const revokeShareCodeBtn = document.getElementById('revoke-share-code-btn');
+const shareScheduleStatus = document.getElementById('share-schedule-status');
+const shareScheduleCloseBtn = document.getElementById('share-schedule-close');
+const shareScheduleBtn = document.getElementById('share-schedule-btn');
+
+const enterShareCodeModal = document.getElementById('enter-share-code-modal');
+const enterShareCodeForm = document.getElementById('enter-share-code-form');
+const enterShareCodeInput = document.getElementById('enter-share-code-input');
+const shareCodePreview = document.getElementById('share-code-preview');
+const shareCodePreviewName = document.getElementById('share-code-preview-name');
+const shareCodePreviewOwner = document.getElementById('share-code-preview-owner');
+const enterShareCodeStatus = document.getElementById('enter-share-code-status');
+const enterShareCodeSubmit = document.getElementById('enter-share-code-submit');
+const enterShareCodeCancel = document.getElementById('enter-share-code-cancel');
+
+const manageFollowingModal = document.getElementById('manage-following-modal');
+const followingList = document.getElementById('following-list');
+const addShareCodeBtn = document.getElementById('add-share-code-btn');
+const manageFollowingCloseBtn = document.getElementById('manage-following-close');
+const manageFollowingBtn = document.getElementById('manage-following-btn');
+
 // DELETED: v3.24 - Removed hardcoded admin list
 // const ADMIN_EMAIL_LIST = [ ... ];
 
@@ -662,6 +740,11 @@ let schedulesCollectionRef; // For *all* shared schedules collection
 let sharedSchedulesListenerUnsubscribe = null; // v3.24 - For shared schedules
 let allSchedules = []; // Array of *all* shared schedules
 let allPersonalSchedules = []; // Array of *user's* personal schedules
+
+// V5.63.0: Share Code Feature State
+let followingSchedules = []; // Schedules the user is following
+let followingSchedulesData = {}; // Loaded schedule data for followed schedules
+let currentShareCodeLookup = null; // Temp storage for share code lookup result
 
 let activeBaseScheduleId = null; // MODIFIED: Renamed from activeScheduleId
 let activePersonalScheduleId = null; // NEW: ID of active personal schedule
@@ -720,6 +803,12 @@ let queueVisual = '[DEFAULT_Q]';
 let queueActive = false;
 let queueTimerEndTime = null; // When current queue timer expires
 
+// V5.65.0: Quick Bell Broadcast State
+let broadcastEnabled = false; // Whether to broadcast quick bells to other devices
+let broadcastListenerUnsubscribe = null; // Firestore listener for incoming broadcasts
+let instanceId = crypto.randomUUID(); // Unique ID for this browser tab to prevent self-triggering
+let lastProcessedBroadcastTimestamp = 0; // Prevent duplicate processing
+
 let mutedBellIds = new Set(); 
 let skippedBellOccurrences = new Set(); // V5.47.9: Temporarily skipped bells (format: "bellId:YYYY-MM-DD")
 let bellSoundOverrides = {}; // NEW: Store local sound overrides
@@ -748,6 +837,148 @@ let oscillatorAlertInterval = null; // NEW in 4.38: For pre-bell wake-up
 let isOscillatorAlert = false; // NEW in 4.38: Flag for pre-bell wake-up
 
 let periodCollapsePreference = {}; // NEW in 4.49: Store collapse state { periodName: bool }
+
+// ============================================
+// V5.61.0: MEMORY MANAGEMENT SYSTEM
+// Prevents memory leaks during long runtime
+// ============================================
+
+// Track active Tone.Player instances for cleanup
+let activeAudioPlayers = [];
+const MAX_CACHED_PLAYERS = 5; // Keep only recent players
+
+// Track last memory purge time
+let lastMemoryPurgeTime = 0;
+const MEMORY_PURGE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const SAFE_WINDOW_THRESHOLD = 60 * 1000; // 60 seconds from next bell
+
+// Production mode flag - reduces console logging
+const PRODUCTION_MODE = true; // Set to false for debugging
+
+// Memory-safe console wrapper
+const safeLog = {
+    log: (...args) => { if (!PRODUCTION_MODE) console.log(...args); },
+    warn: (...args) => { console.warn(...args); }, // Always show warnings
+    error: (...args) => { console.error(...args); }, // Always show errors
+    important: (...args) => { console.log('[BELL]', ...args); } // Important logs always show
+};
+
+/**
+ * Check if we're in a safe window for memory operations
+ * Safe = more than SAFE_WINDOW_THRESHOLD ms until next bell
+ */
+function isInSafeMemoryWindow() {
+    const now = new Date();
+    const currentTimeHHMMSS = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    
+    const allBells = [...localSchedule, ...personalBells];
+    const nextBell = allBells
+        .filter(b => b.time > currentTimeHHMMSS)
+        .sort((a, b) => a.time.localeCompare(b.time))[0];
+    
+    if (!nextBell) return true; // No more bells today = safe
+    
+    const [h, m, s] = nextBell.time.split(':').map(Number);
+    const nextBellDate = new Date();
+    nextBellDate.setHours(h, m, s, 0);
+    
+    const msUntilBell = nextBellDate.getTime() - now.getTime();
+    return msUntilBell > SAFE_WINDOW_THRESHOLD;
+}
+
+/**
+ * Clean up old audio players to prevent memory buildup
+ */
+function cleanupAudioPlayers() {
+    if (activeAudioPlayers.length > MAX_CACHED_PLAYERS) {
+        const toRemove = activeAudioPlayers.splice(0, activeAudioPlayers.length - MAX_CACHED_PLAYERS);
+        toRemove.forEach(player => {
+            try {
+                if (player && typeof player.dispose === 'function') {
+                    player.stop();
+                    player.dispose();
+                }
+            } catch (e) {
+                // Ignore disposal errors
+            }
+        });
+        safeLog.log(`[Memory] Cleaned up ${toRemove.length} audio players`);
+    }
+}
+
+/**
+ * Purge non-essential cached data during safe windows
+ */
+function purgeMemoryIfSafe() {
+    const now = Date.now();
+    
+    // Don't purge too frequently
+    if (now - lastMemoryPurgeTime < MEMORY_PURGE_INTERVAL) return;
+    
+    // Don't purge if a bell is approaching
+    if (!isInSafeMemoryWindow()) {
+        safeLog.log('[Memory] Skipping purge - bell approaching');
+        return;
+    }
+    
+    safeLog.important('[Memory] Starting safe memory purge...');
+    lastMemoryPurgeTime = now;
+    
+    // 1. Clean up old audio players
+    cleanupAudioPlayers();
+    
+    // 2. Clear old audio buffer cache (keep only frequently used)
+    const essentialSounds = ['Bell', 'Chime', 'Beep', 'Alarm', 'ellisBell.mp3'];
+    const cacheKeys = Object.keys(synths);
+    let clearedCount = 0;
+    
+    cacheKeys.forEach(key => {
+        // Keep built-in synths and ellisBell
+        if (essentialSounds.includes(key)) return;
+        
+        // Keep buffers that are actively used in schedule
+        const soundInUse = [...localSchedule, ...personalBells].some(bell => 
+            bell.sound === key || bell.sound?.includes(key) || 
+            key.includes(bell.sound)
+        );
+        
+        if (!soundInUse && key.startsWith('buffer-')) {
+            delete synths[key];
+            clearedCount++;
+        }
+    });
+    
+    if (clearedCount > 0) {
+        safeLog.log(`[Memory] Cleared ${clearedCount} unused audio buffers`);
+    }
+    
+    // 3. Hint to browser for garbage collection (if available)
+    if (typeof window.gc === 'function') {
+        window.gc();
+    }
+    
+    safeLog.important('[Memory] Purge complete');
+}
+
+/**
+ * Track a new audio player for later cleanup
+ */
+function trackAudioPlayer(player) {
+    activeAudioPlayers.push(player);
+    // Immediate cleanup if we're way over limit
+    if (activeAudioPlayers.length > MAX_CACHED_PLAYERS * 2) {
+        cleanupAudioPlayers();
+    }
+}
+
+// Run memory check periodically (but only during safe windows)
+setInterval(() => {
+    purgeMemoryIfSafe();
+}, MEMORY_PURGE_INTERVAL);
+
+// ============================================
+// END V5.61.0: MEMORY MANAGEMENT SYSTEM
+// ============================================
 let currentVisualPeriodName = null; // NEW in 4.50: Tracks the period currently displayed by the visual cue.
 let currentVisualKey = null; // NEW: Tracks the actual visual being displayed (e.g., "after:bellId", "before:bellId", "period:name")
 
@@ -1671,7 +1902,14 @@ async function playBell(soundName) {
         if (synths[bufferCacheKey] instanceof AudioBuffer) {
             // console.log("Playing from AudioBuffer cache:", bufferCacheKey);
             const player = new Tone.Player(synths[bufferCacheKey]).toDestination();
+            trackAudioPlayer(player); // V5.61.0: Track for cleanup
             player.start(now);
+            // V5.61.0: Auto-dispose after playback
+            player.onstop = () => {
+                try { player.dispose(); } catch(e) {}
+                const idx = activeAudioPlayers.indexOf(player);
+                if (idx > -1) activeAudioPlayers.splice(idx, 1);
+            };
             return; // Played from cache
         }
 
@@ -1681,7 +1919,14 @@ async function playBell(soundName) {
             const buffer = await synths[bufferCacheKey];
             if (buffer) {
                 const player = new Tone.Player(buffer).toDestination();
+                trackAudioPlayer(player); // V5.61.0: Track for cleanup
                 player.start(now);
+                // V5.61.0: Auto-dispose after playback
+                player.onstop = () => {
+                    try { player.dispose(); } catch(e) {}
+                    const idx = activeAudioPlayers.indexOf(player);
+                    if (idx > -1) activeAudioPlayers.splice(idx, 1);
+                };
             } else {
                 // Promise resolved to null (it failed)
                 console.warn(`In-flight promise for ${bufferCacheKey} failed. Reverting to default.`);
@@ -1719,7 +1964,14 @@ async function playBell(soundName) {
         if (newBuffer) {
             synths[bufferCacheKey] = newBuffer; // Overwrite promise with resolved buffer
             const player = new Tone.Player(newBuffer).toDestination();
+            trackAudioPlayer(player); // V5.61.0: Track for cleanup
             player.start(now);
+            // V5.61.0: Auto-dispose after playback
+            player.onstop = () => {
+                try { player.dispose(); } catch(e) {}
+                const idx = activeAudioPlayers.indexOf(player);
+                if (idx > -1) activeAudioPlayers.splice(idx, 1);
+            };
         } else {
             // Fetching failed, play default as fallback
             console.warn("Falling back to default bell.");
@@ -2290,6 +2542,80 @@ async function togglePictureInPicture() {
             body.pip-kiosk-mode #pip-next-bell {
                 display: none !important;
             }
+            /* V5.64.0: Prevent text wrapping on clock line */
+            #pip-clock {
+                white-space: nowrap;
+            }
+            
+            /* V5.64.0: Enhanced kiosk mode - responsive scaling */
+            body.pip-kiosk-mode {
+                background: #1f2937 !important;
+                padding: 8px !important;
+            }
+            body.pip-kiosk-mode .pip-layout {
+                display: flex !important;
+                grid-template-columns: none !important;
+                gap: 12px !important;
+                height: calc(100vh - 16px) !important;
+                align-items: center !important;
+            }
+            body.pip-kiosk-mode #pip-visual {
+                width: auto !important;
+                height: 100% !important;
+                min-height: 0 !important;
+                max-height: 100% !important;
+                aspect-ratio: 1 !important;
+                flex-shrink: 0 !important;
+                border-radius: 8px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            body.pip-kiosk-mode #pip-visual img {
+                width: 85% !important;
+                height: 85% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                object-fit: contain !important;
+            }
+            body.pip-kiosk-mode #pip-visual svg {
+                width: 85% !important;
+                height: 85% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+            }
+            body.pip-kiosk-mode .p-2 {
+                padding: 0 !important;
+                flex: 1 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+                align-items: flex-start !important;
+                min-width: 0 !important;
+                height: 100% !important;
+            }
+            body.pip-kiosk-mode #pip-countdown {
+                font-size: 50vh !important;
+                line-height: 0.85 !important;
+                color: white !important;
+                white-space: nowrap !important;
+                text-align: left !important;
+            }
+            body.pip-kiosk-mode #pip-bell-name {
+                font-size: 14vh !important;
+                line-height: 1.2 !important;
+                color: #9ca3af !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                text-align: left !important;
+            }
+            body.pip-kiosk-mode #pip-quick-bells {
+                display: none !important;
+            }
+            body.pip-kiosk-mode .pip-action-buttons {
+                display: none !important;
+            }
         `;
         pipDoc.head.appendChild(pipStyle);
         
@@ -2582,6 +2908,7 @@ function updatePipActionButtons(pipDoc) {
         }
     }
 }
+
 // ============================================
 // END V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
 // ============================================
@@ -2996,7 +3323,7 @@ function updateClock() {
         
         // Only update the DOM if the visual has actually changed
         if (newVisualKey !== currentVisualKey) {
-            console.log(`Visual: ${visualSource}`);
+            safeLog.log(`Visual: ${visualSource}`); // V5.61.0: Use safe logging
             visualCueContainer.innerHTML = visualHtml;
             currentVisualKey = newVisualKey;
         }
@@ -3013,7 +3340,7 @@ function updateClock() {
 }
 
 // --- NEW: Quick Bell Function (MODIFIED V5.00) ---
-function startQuickBell(hours = 0, minutes = 0, seconds = 0, sound, name = "Quick Bell") {
+function startQuickBell(hours = 0, minutes = 0, seconds = 0, sound, name = "Quick Bell", shouldBroadcast = false) {
     const now = new Date();
     // V5.44.8: Include hours in calculation
     const totalMillis = (hours * 3600000) + (minutes * 60000) + (seconds * 1000);
@@ -3025,10 +3352,175 @@ function startQuickBell(hours = 0, minutes = 0, seconds = 0, sound, name = "Quic
     
     // NEW V5.00: Store quick bell name for countdown display
     quickBellEndTime.bellName = name; 
+    
+    // V5.65.0: Store whether this bell was broadcast (for cancel sync)
+    quickBellEndTime.wasBroadcast = shouldBroadcast || broadcastEnabled;
 
     console.log(`Quick bell set for ${hours}h ${minutes}m ${seconds}s from now. Sound: ${quickBellSound}`);
+    
+    // V5.65.0: Broadcast to other devices if enabled
+    if ((shouldBroadcast || broadcastEnabled) && userId && !isUserAnonymous) {
+        broadcastQuickBell('start', hours, minutes, seconds, quickBellSound, name, totalMillis);
+    }
+    
     updateClock(); // Update display immediately
 }
+
+// ============================================================
+// V5.65.0: Quick Bell Broadcast Functions
+// Sync quick bells across all logged-in devices for the same user
+// ============================================================
+
+/**
+ * Send a quick bell broadcast to Firestore
+ */
+async function broadcastQuickBell(action, hours, minutes, seconds, sound, name, durationMs) {
+    if (!userId || isUserAnonymous) {
+        console.log('[Broadcast] Cannot send - no user or anonymous');
+        return;
+    }
+    
+    const broadcastPath = `artifacts/${appId}/users/${userId}/quick_bell_broadcast/current`;
+    console.log('[Broadcast] Sending to path:', broadcastPath);
+    
+    try {
+        const broadcastRef = doc(db, 'artifacts', appId, 'users', userId, 'quick_bell_broadcast', 'current');
+        const broadcastData = {
+            action: action, // 'start' or 'cancel'
+            hours: hours || 0,
+            minutes: minutes || 0,
+            seconds: seconds || 0,
+            sound: sound || 'ellisBell.mp3',
+            name: name || 'Quick Bell',
+            durationMs: durationMs || 0,
+            timestamp: Date.now(),
+            originInstance: instanceId
+        };
+        console.log('[Broadcast] Data:', broadcastData);
+        
+        await setDoc(broadcastRef, broadcastData);
+        console.log(`[Broadcast] Successfully sent ${action} broadcast for "${name}"`);
+    } catch (error) {
+        console.error('[Broadcast] Error sending broadcast:', error);
+    }
+}
+
+/**
+ * Set up listener for incoming quick bell broadcasts
+ * NOTE: This listener should be active regardless of whether broadcastEnabled is true
+ * The toggle only affects SENDING, not RECEIVING
+ */
+function setupBroadcastListener() {
+    if (!userId || isUserAnonymous) {
+        console.log('[Broadcast] Cannot set up listener - no user or anonymous');
+        return;
+    }
+    
+    // Clean up existing listener
+    if (broadcastListenerUnsubscribe) {
+        broadcastListenerUnsubscribe();
+        broadcastListenerUnsubscribe = null;
+    }
+    
+    const broadcastRef = doc(db, 'artifacts', appId, 'users', userId, 'quick_bell_broadcast', 'current');
+    console.log('[Broadcast] Setting up listener at path:', `artifacts/${appId}/users/${userId}/quick_bell_broadcast/current`);
+    
+    broadcastListenerUnsubscribe = onSnapshot(broadcastRef, (docSnap) => {
+        console.log('[Broadcast] Received snapshot, exists:', docSnap.exists());
+        if (!docSnap.exists()) return;
+        
+        const data = docSnap.data();
+        console.log('[Broadcast] Snapshot data:', data);
+        
+        // Ignore broadcasts from this instance
+        if (data.originInstance === instanceId) {
+            console.log('[Broadcast] Ignoring own broadcast (origin:', data.originInstance, ', this:', instanceId, ')');
+            return;
+        }
+        
+        // Ignore old broadcasts (more than 10 seconds old - increased from 5)
+        const age = Date.now() - data.timestamp;
+        if (age > 10000) {
+            console.log(`[Broadcast] Ignoring stale broadcast (${age}ms old)`);
+            return;
+        }
+        
+        // Prevent duplicate processing
+        if (data.timestamp <= lastProcessedBroadcastTimestamp) {
+            console.log('[Broadcast] Ignoring already-processed broadcast');
+            return;
+        }
+        lastProcessedBroadcastTimestamp = data.timestamp;
+        
+        console.log(`[Broadcast] Processing ${data.action} broadcast for "${data.name}"`);
+        
+        if (data.action === 'start') {
+            // Start the quick bell locally (without re-broadcasting)
+            const now = new Date();
+            quickBellEndTime = new Date(now.getTime() + data.durationMs);
+            quickBellEndTime.bellName = data.name;
+            quickBellEndTime.wasBroadcast = true; // Mark as broadcast-received
+            quickBellSound = data.sound;
+            document.getElementById('cancel-quick-bell-btn').classList.remove('hidden');
+            updateClock();
+        } else if (data.action === 'cancel') {
+            // Cancel the quick bell locally
+            quickBellEndTime = null;
+            document.getElementById('cancel-quick-bell-btn').classList.add('hidden');
+            updateClock();
+        }
+    }, (error) => {
+        console.error('[Broadcast] Listener error:', error);
+    });
+    
+    console.log('[Broadcast] Listener set up successfully for user:', userId);
+}
+
+/**
+ * Clean up broadcast listener
+ */
+function cleanupBroadcastListener() {
+    if (broadcastListenerUnsubscribe) {
+        broadcastListenerUnsubscribe();
+        broadcastListenerUnsubscribe = null;
+    }
+}
+
+/**
+ * Toggle broadcast mode on/off
+ */
+function toggleBroadcastMode() {
+    broadcastEnabled = !broadcastEnabled;
+    updateBroadcastToggleUI();
+    
+    if (broadcastEnabled) {
+        showUserMessage('📡 Broadcast ON - Quick bells will sync to all your devices');
+    } else {
+        showUserMessage('📡 Broadcast OFF - Quick bells only on this device');
+    }
+}
+
+/**
+ * Update the broadcast toggle button UI
+ */
+function updateBroadcastToggleUI() {
+    const btn = document.getElementById('quick-bell-broadcast-toggle');
+    if (!btn) return;
+    
+    if (broadcastEnabled) {
+        btn.classList.remove('bg-gray-200', 'text-gray-500');
+        btn.classList.add('bg-sky-500', 'text-white');
+        btn.title = 'Broadcast to all devices (ON)';
+    } else {
+        btn.classList.remove('bg-sky-500', 'text-white');
+        btn.classList.add('bg-gray-200', 'text-gray-500');
+        btn.title = 'Broadcast to all devices (off)';
+    }
+}
+
+// ============================================================
+// END V5.65.0: Quick Bell Broadcast Functions
+// ============================================================
 
 // ============================================================
 // NEW V5.55.0: Quick Bell Queue Functions
@@ -3563,6 +4055,19 @@ function renderCustomQuickBells() {
                             aria-label="Preview" ${disabledAttr}>&#9654;</button>
                 </div>
                 
+                <!-- V5.65.0: ROW 2.5: Broadcast Toggle -->
+                <div class="flex items-center gap-2 ${disabledClass}">
+                    <input type="checkbox" data-bell-id="${id}" data-field="alwaysBroadcast" name="alwaysBroadcast-${id}"
+                            class="custom-bell-broadcast-toggle custom-bell-editable-input h-4 w-4 text-sky-600 rounded focus:ring-sky-500"
+                            ${bell && bell.alwaysBroadcast ? 'checked' : ''} ${disabledAttr}>
+                    <label class="text-sm text-gray-600 flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z"></path>
+                        </svg>
+                        Always broadcast to all devices
+                    </label>
+                </div>
+                
                 <!-- ROW 3: Visual Cue Dropdown (full width) -->
                 <div>
                     <label class="block text-xs font-medium text-gray-500 mb-1">Visual Cue</label>
@@ -3668,6 +4173,15 @@ function renderCustomQuickBells() {
             }
 
             // V5.44.8: Add hours data attribute
+            // V5.65.0: Add broadcast data attribute and indicator
+            const broadcastIndicator = bell.alwaysBroadcast ? `
+                <span class="absolute top-0 right-0 w-3 h-3 text-white" title="Broadcasts to all devices">
+                    <svg class="w-full h-full drop-shadow" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z"></path>
+                    </svg>
+                </span>
+            ` : '';
+            
             return `
             <button data-custom-id="${bell.id}"
                     data-hours="${hours}"
@@ -3675,9 +4189,11 @@ function renderCustomQuickBells() {
                     data-seconds="${seconds}"
                     data-sound="${bell.sound}"
                     data-name="${bell.name}"
+                    data-broadcast="${bell.alwaysBroadcast ? 'true' : 'false'}"
                     class="custom-quick-launch-btn font-bold py-2 px-4 rounded-lg text-sm transition-all duration-150 shadow-md hover:shadow-lg transform active:scale-95 h-11 w-11 relative overflow-hidden group flex items-center justify-center"
                     style="background-color: ${bell.iconBgColor}; color: ${bell.iconFgColor};">
                     ${visualContent}
+                    ${broadcastIndicator}
                     <span class="absolute inset-0 bg-black bg-opacity-75 text-white text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             ${formattedTime}
                     </span>
@@ -3760,6 +4276,8 @@ function syncCustomBellFormToArray() {
         const iconTextInput = row.querySelector(`input[data-field="iconText"][data-bell-id="${bellId}"]`);
         const iconBgColorInput = row.querySelector(`input[data-field="iconBgColor"][data-bell-id="${bellId}"]`);
         const iconFgColorInput = row.querySelector(`input[data-field="iconFgColor"][data-bell-id="${bellId}"]`);
+        // V5.65.0: Broadcast toggle
+        const broadcastToggle = row.querySelector(`input[data-field="alwaysBroadcast"][data-bell-id="${bellId}"]`);
         
         bell.isActive = toggle.checked;
         if (nameInput) bell.name = nameInput.value;
@@ -3771,6 +4289,8 @@ function syncCustomBellFormToArray() {
         if (iconTextInput) bell.iconText = iconTextInput.value;
         if (iconBgColorInput) bell.iconBgColor = iconBgColorInput.value;
         if (iconFgColorInput) bell.iconFgColor = iconFgColorInput.value;
+        // V5.65.0: Sync broadcast setting
+        if (broadcastToggle) bell.alwaysBroadcast = broadcastToggle.checked;
     });
 }
 
@@ -4203,9 +4723,10 @@ combinedBellListElement.innerHTML = renderablePeriods.map(period => {
 function renderScheduleSelector() {
     // MODIFIED: v3.03 - Renders with optgroups
     // MODIFIED: V5.44 - Added standalone schedules optgroup
+    // MODIFIED: V5.63 - Added following schedules optgroup
     const lastSelectedId = localStorage.getItem('activeScheduleId') || (allSchedules.length > 0 ? `shared-${allSchedules[0].id}` : '');
     
-    if (allSchedules.length === 0 && allPersonalSchedules.length === 0) {
+    if (allSchedules.length === 0 && allPersonalSchedules.length === 0 && followingSchedules.length === 0) {
             scheduleSelector.innerHTML = '<option value="">No schedules found. Create one!</option>';
             setActiveSchedule(""); 
             return;
@@ -4232,6 +4753,13 @@ function renderScheduleSelector() {
             ${schedule.name}
         </option>`
     ).join('');
+    
+    // V5.63.0: Following schedules
+    let followingOptions = followingSchedules.map(f => 
+        `<option value="following-${f.ownerId}-${f.scheduleId}" ${`following-${f.ownerId}-${f.scheduleId}` === lastSelectedId ? 'selected' : ''}>
+            ${f.scheduleName} (${f.ownerName || 'Unknown'})
+        </option>`
+    ).join('');
 
     scheduleSelector.innerHTML = `
         <optgroup label="My Personal Schedules" id="personal-schedules-optgroup">
@@ -4240,6 +4768,11 @@ function renderScheduleSelector() {
         <optgroup label="My Custom Standalone Schedules" id="standalone-schedules-optgroup">
             ${standaloneOptions || '<option value="" disabled>No standalone schedules created.</option>'}
         </optgroup>
+        ${followingSchedules.length > 0 ? `
+        <optgroup label="📥 Following" id="following-schedules-optgroup">
+            ${followingOptions}
+        </optgroup>
+        ` : ''}
         <optgroup label="Shared Schedules" id="shared-schedules-optgroup">
             ${sharedOptions}
         </optgroup>
@@ -5467,23 +6000,41 @@ async function initFirebase() {
                     listenForPersonalSchedules(user.uid);
                     // NEW V5.00: Start Custom Quick Bell listener
                     listenForCustomQuickBells(user.uid);
+                    // V5.65.0: Set up broadcast listener for quick bell sync
+                    setupBroadcastListener();
                     // V5.53: Load cloud preferences and set up listener
                     await loadUserPreferencesFromCloud();
                     setupUserPreferencesListener();
+                    // V5.63.0: Load following schedules
+                    await loadFollowingSchedules();
+                    updateFollowingButton();
                     // NEW V5.00: Enable custom quick bell button
                     showCustomQuickBellManagerBtn.disabled = false;
                     showCustomQuickBellManagerBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     // V5.44: Enable standalone schedule button
                     createStandaloneScheduleBtn.disabled = false;
                     createStandaloneScheduleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    // V5.65.0: Enable broadcast toggle
+                    const broadcastBtn = document.getElementById('quick-bell-broadcast-toggle');
+                    if (broadcastBtn) {
+                        broadcastBtn.disabled = false;
+                        broadcastBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
                 } else {
                     allPersonalSchedules = []; // Clear personal schedules
+                    followingSchedules = []; // V5.63.0: Clear following schedules
                     // NEW V5.00: Disable custom quick bell button
                     showCustomQuickBellManagerBtn.disabled = true;
                     showCustomQuickBellManagerBtn.classList.add('opacity-50', 'cursor-not-allowed');
                     // V5.44: Disable standalone schedule button
                     createStandaloneScheduleBtn.disabled = true;
                     createStandaloneScheduleBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    // V5.65.0: Disable broadcast toggle for anonymous users
+                    const broadcastBtnAnon = document.getElementById('quick-bell-broadcast-toggle');
+                    if (broadcastBtnAnon) {
+                        broadcastBtnAnon.disabled = true;
+                        broadcastBtnAnon.classList.add('opacity-50', 'cursor-not-allowed');
+                    }
                 }
                 schedulesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'schedules');
                 // MODIFIED: v3.24 - Changed to real-time listener
@@ -5552,6 +6103,10 @@ async function initFirebase() {
                     customQuickBellsListenerUnsubscribe();
                     customQuickBellsListenerUnsubscribe = null;
                 }
+                // V5.65.0: Clean up broadcast listener
+                cleanupBroadcastListener();
+                broadcastEnabled = false;
+                updateBroadcastToggleUI();
                 // V5.53: Unsubscribe from user preferences
                 if (userPreferencesListenerUnsubscribe) {
                     userPreferencesListenerUnsubscribe();
@@ -5870,6 +6425,11 @@ function setActiveSchedule(prefixedId) {
     createPersonalScheduleBtn.textContent = 'Copy as Personal Schedule';
     deletePersonalScheduleBtn.disabled = true;
     deletePersonalScheduleBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    // V5.63.0: Disable share button
+    if (shareScheduleBtn) {
+        shareScheduleBtn.disabled = true;
+        shareScheduleBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
     
     if (document.body.classList.contains('admin-mode')) {
         addSharedBellForm.querySelector('button[type="submit"]').disabled = true;
@@ -6001,6 +6561,12 @@ function setActiveSchedule(prefixedId) {
         
         deletePersonalScheduleBtn.disabled = false;
         deletePersonalScheduleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        
+        // V5.63.0: Enable share button for personal schedules
+        if (shareScheduleBtn) {
+            shareScheduleBtn.disabled = false;
+            shareScheduleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
         
         // v3.05: Enable "Duplicate" button and manager buttons
         createPersonalScheduleBtn.disabled = false;
@@ -6249,6 +6815,89 @@ function setActiveSchedule(prefixedId) {
                 recalculateAndRenderAll();
             });
         }
+    } else if (type === 'following') {
+        // V5.63.0: Handle following (shared by another user) schedules
+        // Format: following-ownerId-scheduleId
+        const parts = prefixedId.split('-');
+        const followOwnerId = parts[1];
+        const followScheduleId = parts.slice(2).join('-'); // In case schedule ID has dashes
+        
+        console.log("Setting active FOLLOWING schedule:", followScheduleId, "from user:", followOwnerId);
+        
+        // Find the following entry
+        const followEntry = followingSchedules.find(f => f.ownerId === followOwnerId && f.scheduleId === followScheduleId);
+        if (!followEntry) {
+            console.error("Could not find following schedule entry.");
+            return;
+        }
+        
+        // Set as viewing another user's schedule (read-only)
+        activeBaseScheduleId = null;
+        activePersonalScheduleId = null; // Not our schedule
+        
+        scheduleTitle.textContent = `${followEntry.scheduleName} (Following)`;
+        
+        // V5.63.0: Hide standalone badge for following schedules
+        if (standaloneScheduleBadge) {
+            standaloneScheduleBadge.classList.add('hidden');
+        }
+        
+        // Keep all edit buttons disabled (read-only view)
+        // But allow duplicate action
+        createPersonalScheduleBtn.disabled = true; // Will enable duplicate via different path
+        
+        // Load the schedule from the other user's account
+        const followScheduleRef = doc(db, 'artifacts', appId, 'users', followOwnerId, 'personal_schedules', followScheduleId);
+        
+        // Clear any existing listeners
+        if (activeScheduleListenerUnsubscribe) {
+            activeScheduleListenerUnsubscribe();
+            activeScheduleListenerUnsubscribe = null;
+        }
+        if (activePersonalScheduleListenerUnsubscribe) {
+            activePersonalScheduleListenerUnsubscribe();
+            activePersonalScheduleListenerUnsubscribe = null;
+        }
+        
+        activeScheduleListenerUnsubscribe = onSnapshot(followScheduleRef, async (docSnap) => {
+            if (docSnap.exists()) {
+                const scheduleData = docSnap.data();
+                
+                // Check if this is a standalone or linked schedule
+                const isStandalone = !scheduleData.baseScheduleId || scheduleData.isStandalone;
+                
+                if (isStandalone) {
+                    // Standalone: use periods directly
+                    localSchedulePeriods = scheduleData.periods || [];
+                    personalBellsPeriods = [];
+                } else {
+                    // Linked: need to load the base schedule too
+                    const baseRef = doc(db, 'artifacts', appId, 'public', 'data', 'schedules', scheduleData.baseScheduleId);
+                    const baseSnap = await getDoc(baseRef);
+                    if (baseSnap.exists()) {
+                        const baseData = baseSnap.data();
+                        localSchedulePeriods = baseData.periods || [];
+                    } else {
+                        localSchedulePeriods = [];
+                    }
+                    personalBellsPeriods = scheduleData.periods || [];
+                }
+                
+                // Load bell overrides for display
+                personalBellOverrides = scheduleData.bellOverrides || {};
+                personalPassingPeriodVisual = scheduleData.passingPeriodVisual || null;
+                
+                console.log("Loaded following schedule:", followEntry.scheduleName);
+                
+                recalculateAndRenderAll();
+            } else {
+                console.warn("Following schedule no longer exists.");
+                localSchedulePeriods = [];
+                personalBellsPeriods = [];
+                scheduleTitle.textContent = "Schedule Not Found";
+                recalculateAndRenderAll();
+            }
+        });
     }
 }
 
@@ -6324,7 +6973,7 @@ async function handleRenameSharedScheduleSubmit(e) {
         schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
         if (!schedule) return;
         // Personal schedules are stored under user's collection
-        docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'personalSchedules', activePersonalScheduleId);
+        docRef = doc(db, 'artifacts', appId, 'users', userId, 'personal_schedules', activePersonalScheduleId);
     } else if (type === 'shared' && activeBaseScheduleId && scheduleRef) {
         schedule = allSchedules.find(s => s.id === activeBaseScheduleId);
         if (!schedule) return;
@@ -8192,6 +8841,458 @@ async function confirmRestorePersonalSchedule() {
     }
 }
 
+// ============================================
+// V5.63.0: SHARE CODE FEATURE
+// ============================================
+
+/**
+ * Generate a random 6-character share code
+ */
+function generateShareCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars (0,O,1,I)
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+/**
+ * Open the share schedule modal
+ */
+async function openShareScheduleModal() {
+    if (!activePersonalScheduleId) {
+        showUserMessage('Please select a personal schedule first', 'error');
+        return;
+    }
+    
+    const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+    if (!schedule) return;
+    
+    shareScheduleName.textContent = schedule.name;
+    shareScheduleStatus.classList.add('hidden');
+    
+    // Check if this schedule already has a share code
+    try {
+        const shareCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'share_codes');
+        const snapshot = await getDocs(shareCodesRef);
+        
+        let existingCode = null;
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            if (data.ownerId === userId && data.scheduleId === activePersonalScheduleId) {
+                existingCode = docSnap.id;
+            }
+        });
+        
+        if (existingCode) {
+            // Show existing code
+            shareCodeGenerate.classList.add('hidden');
+            shareCodeDisplay.classList.remove('hidden');
+            shareCodeValue.value = existingCode;
+        } else {
+            // Show generate button
+            shareCodeGenerate.classList.remove('hidden');
+            shareCodeDisplay.classList.add('hidden');
+        }
+        
+        shareScheduleModal.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error checking share code:', error);
+        showUserMessage('Error checking share status', 'error');
+    }
+}
+
+/**
+ * Generate a new share code for the current schedule
+ */
+async function createShareCode() {
+    if (!activePersonalScheduleId || !userId) return;
+    
+    const schedule = allPersonalSchedules.find(s => s.id === activePersonalScheduleId);
+    if (!schedule) return;
+    
+    try {
+        shareScheduleStatus.textContent = 'Generating...';
+        shareScheduleStatus.classList.remove('hidden');
+        
+        // Generate unique code (check for collisions)
+        let code = generateShareCode();
+        let attempts = 0;
+        while (attempts < 10) {
+            const codeDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'share_codes', code));
+            if (!codeDoc.exists()) break;
+            code = generateShareCode();
+            attempts++;
+        }
+        
+        // Create the share code document
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'share_codes', code), {
+            ownerId: userId,
+            scheduleId: activePersonalScheduleId,
+            scheduleName: schedule.name,
+            ownerName: auth.currentUser?.displayName || 'Anonymous',
+            createdAt: new Date().toISOString()
+        });
+        
+        // Update UI
+        shareCodeValue.value = code;
+        shareCodeGenerate.classList.add('hidden');
+        shareCodeDisplay.classList.remove('hidden');
+        shareScheduleStatus.textContent = 'Share code created!';
+        
+        showUserMessage(`Share code created: ${code}`, 'success');
+        
+    } catch (error) {
+        console.error('Error creating share code:', error);
+        shareScheduleStatus.textContent = 'Error creating share code';
+        shareScheduleStatus.classList.remove('hidden');
+    }
+}
+
+/**
+ * Copy share code to clipboard
+ */
+async function copyShareCodeToClipboard() {
+    const code = shareCodeValue.value;
+    try {
+        await navigator.clipboard.writeText(code);
+        showUserMessage('Share code copied!', 'success');
+    } catch (error) {
+        // Fallback
+        shareCodeValue.select();
+        document.execCommand('copy');
+        showUserMessage('Share code copied!', 'success');
+    }
+}
+
+/**
+ * Revoke (delete) a share code
+ */
+async function revokeShareCode() {
+    const code = shareCodeValue.value;
+    if (!code) return;
+    
+    if (!confirm('Revoke this share code? Anyone following your schedule will lose access.')) {
+        return;
+    }
+    
+    try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'share_codes', code));
+        
+        shareCodeGenerate.classList.remove('hidden');
+        shareCodeDisplay.classList.add('hidden');
+        shareCodeValue.value = '';
+        
+        showUserMessage('Share code revoked', 'success');
+    } catch (error) {
+        console.error('Error revoking share code:', error);
+        showUserMessage('Error revoking share code', 'error');
+    }
+}
+
+/**
+ * Look up a share code as user types
+ */
+async function lookupShareCode(code) {
+    code = code.toUpperCase().trim();
+    
+    if (code.length !== 6) {
+        shareCodePreview.classList.add('hidden');
+        enterShareCodeSubmit.disabled = true;
+        currentShareCodeLookup = null;
+        return;
+    }
+    
+    try {
+        enterShareCodeStatus.textContent = 'Looking up...';
+        enterShareCodeStatus.classList.remove('hidden');
+        
+        const codeDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'share_codes', code));
+        
+        if (!codeDoc.exists()) {
+            enterShareCodeStatus.textContent = 'Share code not found';
+            enterShareCodeStatus.className = 'text-red-600 text-sm mt-4';
+            shareCodePreview.classList.add('hidden');
+            enterShareCodeSubmit.disabled = true;
+            currentShareCodeLookup = null;
+            return;
+        }
+        
+        const data = codeDoc.data();
+        
+        // Check if already following
+        const alreadyFollowing = followingSchedules.some(f => 
+            f.ownerId === data.ownerId && f.scheduleId === data.scheduleId
+        );
+        
+        if (alreadyFollowing) {
+            enterShareCodeStatus.textContent = "You're already following this schedule";
+            enterShareCodeStatus.className = 'text-yellow-600 text-sm mt-4';
+            shareCodePreview.classList.add('hidden');
+            enterShareCodeSubmit.disabled = true;
+            currentShareCodeLookup = null;
+            return;
+        }
+        
+        // Check if it's own schedule
+        if (data.ownerId === userId) {
+            enterShareCodeStatus.textContent = 'This is your own schedule!';
+            enterShareCodeStatus.className = 'text-yellow-600 text-sm mt-4';
+            shareCodePreview.classList.add('hidden');
+            enterShareCodeSubmit.disabled = true;
+            currentShareCodeLookup = null;
+            return;
+        }
+        
+        // Show preview
+        shareCodePreviewName.textContent = data.scheduleName;
+        shareCodePreviewOwner.textContent = `Shared by: ${data.ownerName || 'Unknown'}`;
+        shareCodePreview.classList.remove('hidden');
+        enterShareCodeStatus.classList.add('hidden');
+        enterShareCodeSubmit.disabled = false;
+        
+        currentShareCodeLookup = {
+            code: code,
+            ...data
+        };
+        
+    } catch (error) {
+        console.error('Error looking up share code:', error);
+        enterShareCodeStatus.textContent = 'Error looking up code';
+        enterShareCodeStatus.className = 'text-red-600 text-sm mt-4';
+        enterShareCodeSubmit.disabled = true;
+    }
+}
+
+/**
+ * Follow a schedule from a share code
+ */
+async function followSchedule() {
+    if (!currentShareCodeLookup || !userId) return;
+    
+    try {
+        enterShareCodeStatus.textContent = 'Following...';
+        enterShareCodeStatus.className = 'text-blue-600 text-sm mt-4';
+        enterShareCodeStatus.classList.remove('hidden');
+        
+        // Add to following collection
+        const followingRef = collection(db, 'artifacts', appId, 'users', userId, 'following');
+        await addDoc(followingRef, {
+            shareCode: currentShareCodeLookup.code,
+            ownerId: currentShareCodeLookup.ownerId,
+            scheduleId: currentShareCodeLookup.scheduleId,
+            scheduleName: currentShareCodeLookup.scheduleName,
+            ownerName: currentShareCodeLookup.ownerName,
+            addedAt: new Date().toISOString()
+        });
+        
+        showUserMessage(`Now following: ${currentShareCodeLookup.scheduleName}`, 'success');
+        
+        // Close modal and refresh
+        enterShareCodeModal.classList.add('hidden');
+        enterShareCodeForm.reset();
+        shareCodePreview.classList.add('hidden');
+        currentShareCodeLookup = null;
+        
+        // Reload following list
+        await loadFollowingSchedules();
+        updateFollowingButton();
+        renderScheduleSelector();
+        
+    } catch (error) {
+        console.error('Error following schedule:', error);
+        enterShareCodeStatus.textContent = 'Error following schedule';
+        enterShareCodeStatus.className = 'text-red-600 text-sm mt-4';
+    }
+}
+
+/**
+ * Unfollow a schedule
+ */
+async function unfollowSchedule(followDocId, scheduleName) {
+    if (!confirm(`Stop following "${scheduleName}"?`)) return;
+    
+    try {
+        // Check if we're currently viewing this schedule
+        const currentSelection = scheduleSelector.value;
+        const isViewingUnfollowed = currentSelection.startsWith('following-') && 
+            followingSchedules.find(f => f.docId === followDocId && 
+                currentSelection === `following-${f.ownerId}-${f.scheduleId}`);
+        
+        await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'following', followDocId));
+        
+        showUserMessage(`Unfollowed: ${scheduleName}`, 'success');
+        
+        // Reload
+        await loadFollowingSchedules();
+        updateFollowingButton();
+        renderScheduleSelector();
+        renderFollowingList();
+        
+        // If we were viewing the unfollowed schedule, switch to first available
+        if (isViewingUnfollowed) {
+            const firstOption = scheduleSelector.querySelector('option:not([disabled])');
+            if (firstOption && firstOption.value) {
+                setActiveSchedule(firstOption.value);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error unfollowing:', error);
+        showUserMessage('Error unfollowing schedule', 'error');
+    }
+}
+
+/**
+ * Load all schedules the user is following
+ */
+async function loadFollowingSchedules() {
+    if (!userId) {
+        followingSchedules = [];
+        return;
+    }
+    
+    try {
+        const followingRef = collection(db, 'artifacts', appId, 'users', userId, 'following');
+        const snapshot = await getDocs(followingRef);
+        
+        followingSchedules = [];
+        snapshot.forEach(docSnap => {
+            followingSchedules.push({
+                docId: docSnap.id,
+                ...docSnap.data()
+            });
+        });
+        
+        console.log(`Loaded ${followingSchedules.length} following schedules`);
+        
+    } catch (error) {
+        console.error('Error loading following schedules:', error);
+        followingSchedules = [];
+    }
+}
+
+/**
+ * Update the "Manage Followed Schedules" button text with count
+ */
+function updateFollowingButton() {
+    if (manageFollowingBtn) {
+        const count = followingSchedules.length;
+        manageFollowingBtn.textContent = count > 0 
+            ? `👥 Manage Followed Schedules (${count})`
+            : `👥 Manage Followed Schedules`;
+    }
+}
+
+/**
+ * Render the following list in the manage modal
+ */
+function renderFollowingList() {
+    if (!followingList) return;
+    
+    if (followingSchedules.length === 0) {
+        followingList.innerHTML = '<p class="text-gray-500 text-center py-4">You\'re not following any schedules yet.</p>';
+        return;
+    }
+    
+    followingList.innerHTML = followingSchedules.map(f => `
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+                <p class="font-semibold text-gray-800">${f.scheduleName}</p>
+                <p class="text-sm text-gray-500">by ${f.ownerName || 'Unknown'}</p>
+            </div>
+            <div class="flex gap-2">
+                <button type="button" onclick="duplicateFollowedSchedule('${f.ownerId}', '${f.scheduleId}', '${f.scheduleName.replace(/'/g, "\\'")}')" 
+                        class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200" title="Duplicate as your own">
+                    📋 Copy
+                </button>
+                <button type="button" onclick="unfollowSchedule('${f.docId}', '${f.scheduleName.replace(/'/g, "\\'")}')" 
+                        class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200" title="Unfollow">
+                    ✕
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * Duplicate a followed schedule as your own personal schedule
+ */
+async function duplicateFollowedSchedule(ownerId, scheduleId, scheduleName) {
+    if (!userId) return;
+    
+    const newName = prompt('Name for your copy:', `${scheduleName} (Copy)`);
+    if (!newName) return;
+    
+    try {
+        showUserMessage('Duplicating schedule...', 'info');
+        
+        // Load the source schedule
+        const sourceRef = doc(db, 'artifacts', appId, 'users', ownerId, 'personal_schedules', scheduleId);
+        const sourceSnap = await getDoc(sourceRef);
+        
+        if (!sourceSnap.exists()) {
+            showUserMessage('Source schedule not found', 'error');
+            return;
+        }
+        
+        const sourceData = sourceSnap.data();
+        
+        // Create new schedule with copied data
+        const newScheduleRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'personal_schedules'));
+        
+        await setDoc(newScheduleRef, {
+            name: newName,
+            baseScheduleId: sourceData.baseScheduleId || null,
+            isStandalone: sourceData.isStandalone || false,
+            periods: sourceData.periods || [],
+            bellOverrides: {}, // Start fresh - don't copy overrides
+            passingPeriodVisual: sourceData.passingPeriodVisual || null,
+            createdAt: new Date().toISOString(),
+            copiedFrom: {
+                ownerId: ownerId,
+                scheduleId: scheduleId,
+                scheduleName: scheduleName
+            }
+        });
+        
+        showUserMessage(`Created: ${newName}`, 'success');
+        
+        // Close modal if open
+        manageFollowingModal?.classList.add('hidden');
+        
+    } catch (error) {
+        console.error('Error duplicating schedule:', error);
+        showUserMessage('Error duplicating schedule', 'error');
+    }
+}
+
+/**
+ * Open the manage following modal
+ */
+function openManageFollowingModal() {
+    renderFollowingList();
+    manageFollowingModal.classList.remove('hidden');
+}
+
+/**
+ * Open the enter share code modal
+ */
+function openEnterShareCodeModal() {
+    enterShareCodeForm.reset();
+    shareCodePreview.classList.add('hidden');
+    enterShareCodeStatus.classList.add('hidden');
+    enterShareCodeSubmit.disabled = true;
+    currentShareCodeLookup = null;
+    enterShareCodeModal.classList.remove('hidden');
+    enterShareCodeInput.focus();
+}
+
+// ============================================
+// END V5.63.0: SHARE CODE FEATURE
+// ============================================
+
 // --- End v3.05 Functions ---
 
 // ... existing code ...
@@ -9178,6 +10279,15 @@ async function handleVisualUpload() {
             }
             console.log('Updated quick bell visual cue for slot', currentCustomBellIconSlot);
         }
+        
+        // V5.63.2: If this is a custom bell manager dropdown, update hidden inputs
+        if (currentVisualSelectTarget.classList.contains('custom-bell-visual-select') && currentCustomBellIconSlot) {
+            const hiddenVisualCue = document.querySelector(`input[data-bell-id="${currentCustomBellIconSlot}"][data-field="visualCue"]`);
+            if (hiddenVisualCue) {
+                hiddenVisualCue.value = downloadURL;
+            }
+            console.log('Updated custom bell visual cue for slot', currentCustomBellIconSlot);
+        }
                 
         currentVisualSelectTarget = null; // Clear state (only once!)
         uploadVisualModal.classList.add('hidden'); // Close modal
@@ -9849,6 +10959,7 @@ function updateVisualDropdowns() {
     // Added 5.31.1: Dropdowns to add images to individual bells
     // MODIFIED V5.42.0: Added passing period visual select
     // MODIFIED V5.58.3: Added period modal visual select
+    // MODIFIED V5.63.2: Added custom bell manager visual selects
     const selects = [ 
         editPeriodImageSelect, 
         newPeriodImageSelect, 
@@ -9859,7 +10970,9 @@ function updateVisualDropdowns() {
         document.getElementById('multi-bell-visual'),
         document.getElementById('multi-relative-bell-visual'),
         document.getElementById('passing-period-visual-select'), // NEW V5.42.0
-        document.getElementById('multi-period-visual') // V5.58.3: Period modal visual
+        document.getElementById('multi-period-visual'), // V5.58.3: Period modal visual
+        // V5.63.2: Include all custom bell visual selects from the manager
+        ...document.querySelectorAll('.custom-bell-visual-select')
     ];
     
     // 1. Create options for default SVGs (dynamically)
@@ -12147,10 +13260,12 @@ function renderAudioFileManager() {
     * NEW V4.76: Helper to add a new option to all audio dropdowns
     */
 function addNewAudioOption(url, name, nickname = '') { // MODIFIED V4.97
+    // V5.63.2: Include custom bell sound selects
     const selects = [
         sharedSoundInput, multiBellSoundInput, editBellSoundInput,
         changeSoundSelect, quickBellSoundSelect, addStaticBellSound, 
-        relativeBellSoundSelect
+        relativeBellSoundSelect,
+        ...document.querySelectorAll('.custom-bell-sound-select')
     ];
     selects.forEach(select => {
         if (!select) return;
@@ -12168,6 +13283,7 @@ function updateSoundDropdowns() {
     // --- MODIFIED: v3.43 ---
     // with the v2.24 (working) logic of using `file.url` as the
     // value for the options. This is the other half of the fix.
+    // V5.63.2: Include custom bell sound selects
     
     const selects = [
         // This is the full list of selects from v3.42
@@ -12183,7 +13299,9 @@ function updateSoundDropdowns() {
         { el: relativeBellSoundSelect, myGroup: 'relative-my-sounds-optgroup', sharedGroup: 'relative-shared-sounds-optgroup' },
         // V5.58.0: Add period modal sound selects
         { el: multiPeriodStartSoundInput, myGroup: 'period-start-my-sounds-optgroup', sharedGroup: 'period-start-shared-sounds-optgroup' },
-        { el: multiPeriodEndSoundInput, myGroup: 'period-end-my-sounds-optgroup', sharedGroup: 'period-end-shared-sounds-optgroup' }
+        { el: multiPeriodEndSoundInput, myGroup: 'period-end-my-sounds-optgroup', sharedGroup: 'period-end-shared-sounds-optgroup' },
+        // V5.63.2: Include all custom bell sound selects from the manager
+        ...Array.from(document.querySelectorAll('.custom-bell-sound-select')).map(el => ({ el, myGroup: null, sharedGroup: null }))
     ];
 
     // NEW V4.76: Add [UPLOAD] option
@@ -12513,7 +13631,6 @@ function init() {
     }
     
     // Optional: Also update the Browser Tab Title automatically
-    document.title = `Ellis Web Bell ${APP_VERSION}`;
     console.log(`App Version Loaded: ${APP_VERSION}`);
     
     // V5.51.0: Register Service Worker for PWA support
@@ -12924,9 +14041,11 @@ function init() {
     
     // NEW V5.01: Listener for the Active/Deactive checkbox (Toggle interaction)
     // V5.43.1: Also handle visual dropdown changes
+    // V5.63.2: Also handle sound dropdown [UPLOAD]
     customQuickBellListContainer.addEventListener('change', (e) => {
         const toggle = e.target.closest('.custom-quick-bell-toggle');
         const visualSelect = e.target.closest('.custom-bell-visual-select');
+        const soundSelect = e.target.closest('.custom-bell-sound-select'); // V5.63.2
         
         if (toggle) {
             const row = toggle.closest('.p-4');
@@ -12980,6 +14099,7 @@ function init() {
             // Handle special values
             if (selectedValue === '[UPLOAD]') {
                 currentCustomBellIconSlot = bellId;
+                currentVisualSelectTarget = visualSelect; // V5.63.2: Set target so upload completion updates this dropdown
                 uploadVisualModal.style.zIndex = '70';
                 uploadVisualModal.classList.remove('hidden');
                 visualUploadStatus.classList.add('hidden');
@@ -13057,9 +14177,29 @@ function init() {
                 if (fgColorInput) fgColorInput.value = fgColor;
             }
         }
+        
+        // V5.63.2: Handle sound dropdown [UPLOAD] selection
+        if (soundSelect) {
+            const selectedValue = soundSelect.value;
+            
+            if (selectedValue === '[UPLOAD]') {
+                // Store the select element that triggered this
+                currentSoundSelectTarget = soundSelect;
+                
+                // Revert to previous selection
+                const bellId = parseInt(soundSelect.dataset.bellId);
+                const bellData = customQuickBells.find(b => b && b.id === bellId);
+                soundSelect.value = bellData?.sound || 'ellisBell.mp3';
+                
+                // Open the audio upload modal
+                uploadAudioModal.classList.remove('hidden');
+                audioUploadStatus.classList.add('hidden');
+            }
+        }
     });
 
     // NEW: Quick Launch Listener for Custom Buttons
+    // V5.65.0: Updated to support per-bell broadcast setting
     quickBellControls.addEventListener('click', (e) => {
         const customBtn = e.target.closest('.custom-quick-launch-btn');
         if (customBtn) {
@@ -13068,7 +14208,8 @@ function init() {
             const seconds = parseInt(customBtn.dataset.seconds, 10) || 0;
             const sound = customBtn.dataset.sound;
             const name = customBtn.dataset.name;
-            startQuickBell(hours, minutes, seconds, sound, name);
+            const shouldBroadcast = customBtn.dataset.broadcast === 'true';
+            startQuickBell(hours, minutes, seconds, sound, name, shouldBroadcast);
         }
     });
     
@@ -13239,6 +14380,58 @@ function init() {
         renamePersonalScheduleModal.classList.add('hidden');
         renamePersonalScheduleStatus.classList.add('hidden');
     });
+
+    // V5.63.0: Share Code Feature Event Listeners
+    if (shareScheduleBtn) {
+        shareScheduleBtn.addEventListener('click', openShareScheduleModal);
+    }
+    if (generateShareCodeBtn) {
+        generateShareCodeBtn.addEventListener('click', createShareCode);
+    }
+    if (copyShareCodeBtn) {
+        copyShareCodeBtn.addEventListener('click', copyShareCodeToClipboard);
+    }
+    if (revokeShareCodeBtn) {
+        revokeShareCodeBtn.addEventListener('click', revokeShareCode);
+    }
+    if (shareScheduleCloseBtn) {
+        shareScheduleCloseBtn.addEventListener('click', () => shareScheduleModal.classList.add('hidden'));
+    }
+    
+    // Enter Share Code
+    if (enterShareCodeInput) {
+        enterShareCodeInput.addEventListener('input', (e) => {
+            const code = e.target.value.toUpperCase();
+            e.target.value = code; // Force uppercase
+            lookupShareCode(code);
+        });
+    }
+    if (enterShareCodeForm) {
+        enterShareCodeForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            followSchedule();
+        });
+    }
+    if (enterShareCodeCancel) {
+        enterShareCodeCancel.addEventListener('click', () => {
+            enterShareCodeModal.classList.add('hidden');
+            enterShareCodeForm.reset();
+        });
+    }
+    
+    // Manage Following
+    if (manageFollowingBtn) {
+        manageFollowingBtn.addEventListener('click', openManageFollowingModal);
+    }
+    if (addShareCodeBtn) {
+        addShareCodeBtn.addEventListener('click', () => {
+            manageFollowingModal.classList.add('hidden');
+            openEnterShareCodeModal();
+        });
+    }
+    if (manageFollowingCloseBtn) {
+        manageFollowingCloseBtn.addEventListener('click', () => manageFollowingModal.classList.add('hidden'));
+    }
 
 
     // Modals (Delete Bell)
@@ -13411,6 +14604,10 @@ function init() {
     document.getElementById('preview-quick-bell-sound')?.addEventListener('click', () => {
         playBell(document.getElementById('quickBellSoundSelect').value);
     });
+    
+    // V5.65.0: Broadcast toggle button
+    document.getElementById('quick-bell-broadcast-toggle')?.addEventListener('click', toggleBroadcastMode);
+    
     document.getElementById('preview-multi-bell-sound')?.addEventListener('click', () => {
         playBell(document.getElementById('multi-bell-sound').value);
     });
@@ -13847,6 +15044,10 @@ function init() {
         if (queueActive) {
             cancelQueue();
         } else {
+            // V5.65.0: Broadcast cancel if the bell was broadcast-started
+            if (quickBellEndTime && quickBellEndTime.wasBroadcast && userId && !isUserAnonymous) {
+                broadcastQuickBell('cancel', 0, 0, 0, '', '', 0);
+            }
             quickBellEndTime = null;
             quickBellSound = 'ellisBell.mp3';
             document.getElementById('cancel-quick-bell-btn').classList.add('hidden');
@@ -15044,6 +16245,10 @@ function init() {
                 { id: 'bulk-edit-modal', close: () => bulkEditModal.classList.add('hidden') },
                 { id: 'custom-quick-bell-manager-modal', close: () => document.getElementById('custom-quick-bell-manager-modal')?.classList.add('hidden') },
                 { id: 'passing-period-visual-modal', close: () => document.getElementById('passing-period-visual-modal')?.classList.add('hidden') },
+                // V5.63.0: Share Code Feature Modals
+                { id: 'share-schedule-modal', close: () => shareScheduleModal?.classList.add('hidden') },
+                { id: 'enter-share-code-modal', close: () => { enterShareCodeModal?.classList.add('hidden'); enterShareCodeForm?.reset(); } },
+                { id: 'manage-following-modal', close: () => manageFollowingModal?.classList.add('hidden') },
             ];
             
             // Find the first visible modal and close it
