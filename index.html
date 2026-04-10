@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+	<meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.46.2</title>
+    <title>Ellis Web Bell 5.65.3</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -515,7 +515,7 @@
         </form>
     </div>
 
-    <!-- V5.46.2: Bulk Edit Modal -->
+    <!-- V5.47.3: Bulk Edit Modal -->
     <div id="bulk-edit-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-2">Bulk Edit Bells</h3>
@@ -932,7 +932,7 @@
         <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
             <h3 class="text-xl font-medium mb-4">Restore Personal Schedule</h3>
             <p id="confirm-restore-text" class="text-gray-700 mb-4">Are you sure?</p>
-            <!-- V5.46.2: Add name input for restored schedule -->
+            <!-- V5.47.3: Add name input for restored schedule -->
             <div class="mb-4">
                 <label for="restore-schedule-name" class="block text-sm font-medium text-gray-700">Schedule Name</label>
                 <input type="text" id="restore-schedule-name" placeholder="Enter schedule name" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -967,9 +967,102 @@
         </form>
     </div>
     
+    <!-- V5.63.0: Share Schedule Modal -->
+    <div id="share-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-2xl font-medium mb-4">Share Schedule</h3>
+            
+            <p class="text-gray-700 mb-4">
+                Share <strong id="share-schedule-name">...</strong> with colleagues
+            </p>
+            
+            <!-- No share code yet -->
+            <div id="share-code-generate" class="hidden">
+                <p class="text-gray-600 mb-4">Generate a share code that others can use to follow your schedule. They'll see your schedule (read-only) and can optionally duplicate it.</p>
+                <button type="button" id="generate-share-code-btn" class="w-full px-4 py-3 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition-colors">
+                    Generate Share Code
+                </button>
+            </div>
+            
+            <!-- Has share code -->
+            <div id="share-code-display" class="hidden">
+                <p class="text-gray-600 mb-2">Your share code:</p>
+                <div class="flex items-center gap-2 mb-4">
+                    <input type="text" id="share-code-value" readonly class="flex-grow px-4 py-3 text-2xl font-mono font-bold text-center tracking-widest bg-gray-100 border-2 border-gray-300 rounded-lg">
+                    <button type="button" id="copy-share-code-btn" class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700" title="Copy to clipboard">
+                        📋
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">Share this code with colleagues. They can enter it to follow your schedule.</p>
+                <button type="button" id="revoke-share-code-btn" class="w-full px-4 py-2 bg-red-100 text-red-700 font-medium rounded-lg hover:bg-red-200 transition-colors">
+                    Revoke Share Code
+                </button>
+            </div>
+            
+            <p id="share-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+            
+            <div class="mt-6 flex justify-end">
+                <button type="button" id="share-schedule-close" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V5.63.0: Enter Share Code Modal -->
+    <div id="enter-share-code-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <form id="enter-share-code-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-2xl font-medium mb-4">Follow a Colleague's Schedule</h3>
+            
+            <p class="text-gray-600 mb-4">Enter the share code from a colleague to follow their schedule. You'll see their schedule and any updates they make.</p>
+            
+            <div class="mb-4">
+                <label for="enter-share-code-input" class="block text-sm font-medium text-gray-700 mb-1">Share Code</label>
+                <input type="text" id="enter-share-code-input" placeholder="ABC123" maxlength="6" 
+                       class="w-full px-4 py-3 text-2xl font-mono font-bold text-center tracking-widest uppercase border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       autocomplete="off" autocapitalize="characters">
+            </div>
+            
+            <!-- Preview area (shown after code lookup) -->
+            <div id="share-code-preview" class="hidden mb-4 p-4 bg-gray-50 rounded-lg">
+                <p class="text-sm text-gray-500">Schedule found:</p>
+                <p class="text-lg font-semibold text-gray-800" id="share-code-preview-name">...</p>
+                <p class="text-sm text-gray-500" id="share-code-preview-owner">Shared by: ...</p>
+            </div>
+            
+            <p id="enter-share-code-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+            
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="enter-share-code-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="submit" id="enter-share-code-submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Follow Schedule
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- V5.63.0: Manage Following Modal -->
+    <div id="manage-following-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-4">Following</h3>
+            
+            <p class="text-gray-600 mb-4">Schedules you're following from colleagues.</p>
+            
+            <div id="following-list" class="space-y-3">
+                <!-- Populated by JS -->
+                <p class="text-gray-500 text-center py-4">You're not following any schedules yet.</p>
+            </div>
+            
+            <div class="mt-6 flex justify-between">
+                <button type="button" id="add-share-code-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    + Add Share Code
+                </button>
+                <button type="button" id="manage-following-close" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- V5.52.0: Countdown Warning Settings Modal -->
-    <div id="warning-settings-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div id="warning-settings-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 hidden p-4 overflow-y-auto">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md my-8">
             <h3 class="text-2xl font-medium mb-4">Countdown Warning Settings</h3>
             <p class="text-gray-600 mb-6">Get visual alerts as bells approach.</p>
             
@@ -1091,9 +1184,9 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.46.2</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.65.3</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
-            <!-- V5.44.0: Clock Display Link, V5.46.2: Added Dashboard Link -->
+            <!-- V5.44.0: Clock Display Link, V5.47.3: Added Dashboard Link -->
             <div class="mt-2 flex items-center justify-center gap-3 text-sm">
                 <a href="clock.html" target="_blank" class="text-gray-500 hover:text-blue-600 transition-colors" title="Open multi-schedule clock display for signage">
                     🕐 Clock Display
@@ -1211,6 +1304,7 @@
             <!-- 2. Sound Dropdown with Preview -->
             <!-- 5.14: Dynamically change size to factor in quick bells -->
             <!-- V5.49: Added preview button -->
+            <!-- V5.65.0: Added broadcast toggle button -->
 			<div class="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:min-w-0">
                 <!-- This select will be populated by JS to match the others -->
                 <select id="quickBellSoundSelect" class="flex-1 min-w-0 truncate px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-11">
@@ -1226,6 +1320,16 @@
                 </select>
                 <button type="button" id="preview-quick-bell-sound" class="w-11 h-11 flex-shrink-0 flex items-center justify-center text-lg bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors" aria-label="Preview">
                     ▶
+                </button>
+                <!-- V5.65.0: Broadcast toggle - syncs quick bells across all logged-in devices -->
+                <button type="button" id="quick-bell-broadcast-toggle" 
+                        class="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-gray-200 text-gray-500 rounded-lg hover:bg-gray-300 transition-colors" 
+                        title="Broadcast to all devices (off)" 
+                        aria-label="Broadcast to all devices">
+                    <!-- Broadcast/signal icon -->
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z"></path>
+                    </svg>
                 </button>
             </div>
 
@@ -1270,7 +1374,7 @@
                      <!-- End Collapse/Expand -->
                      <button id="mute-all-list-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Mute All</button>
                      <button id="unmute-all-list-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Unmute All</button>
-                     <!-- V5.46.2: Bulk Edit Toggle -->
+                     <!-- V5.47.3: Bulk Edit Toggle -->
                      <button id="bulk-edit-toggle-btn" class="px-3 py-1 text-sm bg-sky-100 text-sky-700 rounded-lg hover:bg-sky-200 hidden">Bulk Edit</button>
                  </div>
             </div>
@@ -1510,6 +1614,16 @@
                     </button>
                     <button type="button" id="restore-personal-schedule-btn" class="px-4 py-2 bg-yellow-500 text-black font-medium rounded-lg shadow-md hover:bg-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                         Load/Overwrite from Backup
+                    </button>
+                </div>
+
+                <!-- V5.63.0: ROW: Share & Follow -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-4 mb-4">
+                    <button type="button" id="share-schedule-btn" class="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg shadow-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        🔗 Share This Schedule
+                    </button>
+                    <button type="button" id="manage-following-btn" class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                        👥 Manage Followed Schedules
                     </button>
                 </div>
 
@@ -2628,4 +2742,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.46.2 -->
+<!-- Version 5.65.3 -->
