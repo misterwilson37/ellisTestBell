@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.65.3</title>
+    <title>Ellis Web Bell 5.66.3</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -42,6 +42,114 @@
 
 	<!-- Moving to stylesheet 5.06-->
     <link rel="stylesheet" href="styles.css">
+
+    <!-- V5.66.0: Theme CSS Variables & Overrides -->
+    <style id="theme-styles">
+        :root {
+            --theme-bg-primary: #f3f4f6;
+            --theme-bg-card: #ffffff;
+            --theme-bg-hover: #f9fafb;
+            --theme-bg-visual: #1f2937;
+            --theme-text-primary: #111827;
+            --theme-text-secondary: #4b5563;
+            --theme-text-muted: #6b7280;
+            --theme-accent: #2563eb;
+            --theme-countdown: #111827;
+            --theme-border: #d1d5db;
+            --theme-border-light: #e5e7eb;
+            --theme-button-bg: #e5e7eb;
+            --theme-button-text: #374151;
+        }
+        
+        /* Apply theme to page background */
+        body {
+            background-color: var(--theme-bg-primary) !important;
+            color: var(--theme-text-primary) !important;
+        }
+        
+        /* Apply theme to cards and panels */
+        .bg-white {
+            background-color: var(--theme-bg-card) !important;
+        }
+        
+        /* Apply theme to primary text */
+        .text-gray-900, .text-gray-800, .text-gray-700 {
+            color: var(--theme-text-primary) !important;
+        }
+        
+        /* Apply theme to secondary text */
+        .text-gray-600, .text-gray-500 {
+            color: var(--theme-text-secondary) !important;
+        }
+        
+        /* Apply theme to muted text */
+        .text-gray-400 {
+            color: var(--theme-text-muted) !important;
+        }
+        
+        /* Apply theme to accent/title colors */
+        .text-blue-700, .text-blue-600 {
+            color: var(--theme-accent) !important;
+        }
+        
+        /* Apply theme to countdown display */
+        #countdown-display {
+            color: var(--theme-countdown) !important;
+        }
+        
+        /* Apply theme to borders */
+        .border-gray-200, .border-gray-300 {
+            border-color: var(--theme-border) !important;
+        }
+        
+        /* Light borders (bell item separators) */
+        .border-gray-100 {
+            border-color: var(--theme-border-light) !important;
+        }
+        
+        /* Theme for inputs and selects */
+        input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+        select,
+        textarea {
+            background-color: var(--theme-bg-card) !important;
+            color: var(--theme-text-primary) !important;
+            border-color: var(--theme-border) !important;
+        }
+        
+        /* Theme for bell list items and hover states */
+        .bg-gray-50 {
+            background-color: var(--theme-bg-hover) !important;
+        }
+        
+        /* V5.66.3: Fix bell item hover - use theme color instead of gray-50 */
+        .bell-item:hover,
+        .hover\:bg-gray-50:hover {
+            background-color: var(--theme-bg-hover) !important;
+        }
+        
+        /* Theme for visual cue container */
+        #visual-cue-container {
+            background-color: var(--theme-bg-visual) !important;
+        }
+        
+        /* Theme for buttons (quick bell buttons, etc.) */
+        .bg-gray-200 {
+            background-color: var(--theme-button-bg) !important;
+        }
+        .text-gray-700:not(.text-gray-700.hover\:text-gray-700) {
+            color: var(--theme-button-text) !important;
+        }
+        
+        /* Hide visual cue when disabled */
+        body.hide-visual-cue #visual-cue-wrapper {
+            display: none !important;
+        }
+        
+        /* Adjust main display grid when visual hidden */
+        body.hide-visual-cue #main-display-content {
+            grid-template-columns: 1fr !important;
+        }
+    </style>
 
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans"> <!-- Added font-sans to apply tailwind default -->
@@ -1184,7 +1292,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.65.3</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.66.3</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             <!-- V5.44.0: Clock Display Link, V5.47.3: Added Dashboard Link -->
             <div class="mt-2 flex items-center justify-center gap-3 text-sm">
@@ -1325,9 +1433,10 @@
                 <button type="button" id="quick-bell-broadcast-toggle" 
                         class="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-gray-200 text-gray-500 rounded-lg hover:bg-gray-300 transition-colors" 
                         title="Broadcast to all devices (off)" 
-                        aria-label="Broadcast to all devices">
+                        aria-label="Broadcast to all devices"
+                        onclick="if(typeof toggleBroadcastMode === 'function') toggleBroadcastMode();">
                     <!-- Broadcast/signal icon -->
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg class="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z"></path>
                     </svg>
                 </button>
@@ -2667,6 +2776,109 @@
                 <!-- V5.44.8: Standardized header format -->
                 <h3 class="text-xl font-semibold text-gray-800 border-b pb-2 cursor-pointer" title="Click to refresh file lists">My Visual Manager</h3>
 
+                <!-- V5.66.0: Theme & Display Settings -->
+                <div class="border-b pb-6">
+                    <h4 class="text-lg font-medium text-gray-800 mb-4">Theme & Display</h4>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Left: Controls -->
+                        <div class="space-y-4">
+                            <!-- Theme Preset -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Theme</label>
+                                <div class="flex gap-2">
+                                    <button type="button" id="theme-light-btn" class="flex-1 px-4 py-2 bg-gray-100 text-gray-800 rounded-lg border-2 border-blue-500 font-medium transition-colors">
+                                        ☀️ Light
+                                    </button>
+                                    <button type="button" id="theme-dark-btn" class="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg border-2 border-transparent font-medium transition-colors hover:border-gray-500">
+                                        🌙 Dark
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Custom Colors (expandable) -->
+                            <div>
+                                <button type="button" id="toggle-custom-colors-btn" class="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800">
+                                    <svg id="custom-colors-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                    Customize Colors
+                                </button>
+                                <div id="custom-colors-panel" class="hidden mt-3 space-y-3 pl-2 border-l-2 border-gray-200">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">Page Background</label>
+                                            <input type="color" id="theme-color-bg" value="#f3f4f6" class="w-full h-8 rounded cursor-pointer">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">Card Background</label>
+                                            <input type="color" id="theme-color-card" value="#ffffff" class="w-full h-8 rounded cursor-pointer">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">Primary Text</label>
+                                            <input type="color" id="theme-color-text" value="#111827" class="w-full h-8 rounded cursor-pointer">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">Secondary Text</label>
+                                            <input type="color" id="theme-color-text-secondary" value="#6b7280" class="w-full h-8 rounded cursor-pointer">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">Accent (Title)</label>
+                                            <input type="color" id="theme-color-accent" value="#2563eb" class="w-full h-8 rounded cursor-pointer">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-600 mb-1">Countdown</label>
+                                            <input type="color" id="theme-color-countdown" value="#111827" class="w-full h-8 rounded cursor-pointer">
+                                        </div>
+                                    </div>
+                                    <button type="button" id="reset-custom-colors-btn" class="text-xs text-gray-500 hover:text-gray-700 underline">
+                                        Reset to theme defaults
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Visual Cue Toggle -->
+                            <div class="flex items-center gap-3 pt-2">
+                                <input type="checkbox" id="toggle-visual-cue" checked class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
+                                <label for="toggle-visual-cue" class="text-sm font-medium text-gray-700">Show visual cue graphic</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Right: Preview Panel -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+                            <div id="theme-preview-panel" class="rounded-lg p-4 border-2 border-dashed border-gray-300 transition-colors" style="background-color: var(--theme-bg-primary);">
+                                <!-- Mini display preview -->
+                                <div class="rounded-lg p-3 shadow-sm mb-3 transition-colors" style="background-color: var(--theme-bg-card);">
+                                    <div class="flex items-center gap-3">
+                                        <!-- Mini visual cue placeholder -->
+                                        <div id="preview-visual-cue" class="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                            <span class="text-lg">🔔</span>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-xs transition-colors" style="color: var(--theme-text-secondary);">The time is 10:30:00 AM.</p>
+                                            <p class="text-2xl font-bold transition-colors" style="color: var(--theme-countdown);">5:00</p>
+                                            <p class="text-xs transition-colors" style="color: var(--theme-text-secondary);">until 2nd Period.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Mini bell row preview -->
+                                <div class="rounded-lg p-2 shadow-sm transition-colors" style="background-color: var(--theme-bg-card);">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <span class="text-sm font-medium transition-colors" style="color: var(--theme-text-primary);">2nd Period</span>
+                                            <span class="text-xs ml-2 transition-colors" style="color: var(--theme-text-muted);">10:35 AM</span>
+                                        </div>
+                                        <span class="text-xs px-2 py-1 rounded transition-colors" style="background-color: var(--theme-accent); color: white;">Next</span>
+                                    </div>
+                                </div>
+                                <!-- Title preview -->
+                                <p class="text-center mt-3 text-sm font-bold transition-colors" style="color: var(--theme-accent);">Ellis Web Bell</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <h4 class="text-lg font-medium text-gray-800 mb-2">Upload New Visual File</h4>
                     <button type="button" id="show-visual-upload-modal-btn" class="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition-colors">
@@ -2742,4 +2954,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.65.3 -->
+<!-- Version 5.66.3 -->
