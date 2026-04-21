@@ -1,6 +1,33 @@
-const APP_VERSION = "5.65.3"
+const APP_VERSION = "5.66.3"
 const CLOCK_VERSION = "1.3.0"
 const DASHBOARD_VERSION = "1.2.3"
+// V5.66.3: Time Format Fixes & Theme Improvements
+// - FIX: Schedules with HH:MM times (without seconds) now work correctly
+//   - Root cause: setHours() with undefined seconds created Invalid Date, breaking countdown
+//   - Fixed in: updateClock(), isSafeToCleanup(), getDateForBellTime()
+// - NEW: Auto-migration normalizes HH:MM -> HH:MM:SS on schedule load (admins fix shared, users fix personal)
+// - Fixed bell item hover in dark mode (white-on-white issue)
+// - Added --theme-bg-hover and --theme-border-light CSS variables
+// V5.66.2: Theme & Bell Editing Fixes
+// - Fixed dark mode: visual cue container now uses theme variable
+// - Fixed light mode contrast: darker secondary text colors for readability
+// - Fixed shared bell sound editing:
+//   - ALL users can now change sound (creates personal override, only affects their room)
+//   - Sound dropdown enabled by default for everyone
+//   - Admins see "Override for all users" checkbox to optionally push to shared bell
+//   - Non-admins don't see checkbox (their changes are always personal)
+// - Added CSS variables for visual background, button colors
+// V5.66.1: Broadcast Toggle Fix
+// - Added onclick fallback to broadcast toggle button
+// - Added pointer-events-none to SVG to prevent click interception
+// V5.66.0: Theme & Display Settings
+// - Added Theme & Display panel in Visual Manager section
+// - Light/Dark theme presets with one-click toggle
+// - Custom color pickers for: background, card, text, secondary text, accent, countdown
+// - Toggle to hide visual cue graphic
+// - Live preview panel showing how changes will look
+// - Theme persists to localStorage and syncs to cloud
+// - CSS variables applied to entire page for seamless theming
 // V5.65.3: Remove broadcast popup messages
 // - Removed "Broadcast sent" and "synced from another device" modals (too intrusive)
 // - Console logging remains for debugging if needed
@@ -878,9 +905,13 @@ function isInSafeMemoryWindow() {
     
     if (!nextBell) return true; // No more bells today = safe
     
-    const [h, m, s] = nextBell.time.split(':').map(Number);
+    // V5.66.3: Handle both "HH:MM" and "HH:MM:SS" formats
+    const timeParts = nextBell.time.split(':').map(Number);
+    const h = timeParts[0] || 0;
+    const m = timeParts[1] || 0;
+    const secs = timeParts[2] || 0;
     const nextBellDate = new Date();
-    nextBellDate.setHours(h, m, s, 0);
+    nextBellDate.setHours(h, m, secs, 0);
     
     const msUntilBell = nextBellDate.getTime() - now.getTime();
     return msUntilBell > SAFE_WINDOW_THRESHOLD;
@@ -1671,6 +1702,25 @@ const generateBellId = () => { // MODIFIED in 4.18: Changed to const arrow funct
 };
 
 /**
+    * NEW in 5.66.3: Normalizes a time string to HH:MM:SS format.
+    * Handles "HH:MM" -> "HH:MM:00" conversion.
+    * @param {string} time - The time string (HH:MM or HH:MM:SS)
+    * @returns {string} Normalized time in HH:MM:SS format, or original if invalid
+    */
+const normalizeTimeString = (time) => {
+    if (!time || typeof time !== 'string') return time;
+    const parts = time.split(':');
+    if (parts.length === 2) {
+        // HH:MM format - add :00 for seconds
+        return `${parts[0]}:${parts[1]}:00`;
+    } else if (parts.length === 3) {
+        // Already HH:MM:SS - ensure proper padding
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+    }
+    return time; // Return as-is if format is unexpected
+};
+
+/**
     * NEW in 4.18: Calculates the absolute time (HH:MM:SS) based on an anchor and offset. (MOVED/REFACTORED)
     * @param {number} anchorSeconds - Anchor time in seconds from midnight.
     * @param {string} direction - 'before' or 'after'.
@@ -2038,12 +2088,16 @@ function findBellAfter(currentBell, allBells) {
 
 /**
     * NEW in 4.35: Helper to get a Date object for a bell's time on a specific day.
-    * @param {string} timeString - The HH:MM:SS time of the bell.
+    * @param {string} timeString - The HH:MM:SS or HH:MM time of the bell.
     * @param {Date} referenceDate - The "current" date object (from updateClock).
     * @returns {Date} A Date object for the bell on the reference day.
     */
 function getDateForBellTime(timeString, referenceDate) {
-    const [h, m, s] = timeString.split(':').map(Number);
+    // V5.66.3: Handle both "HH:MM" and "HH:MM:SS" formats
+    const timeParts = timeString.split(':').map(Number);
+    const h = timeParts[0] || 0;
+    const m = timeParts[1] || 0;
+    const s = timeParts[2] || 0;
     const bellDate = new Date(referenceDate);
     bellDate.setHours(h, m, s, 0); // Set time, clear milliseconds
     return bellDate;
@@ -2437,6 +2491,334 @@ function applyPipKioskMode(pipDoc, enabled) {
         if (toggleBtn) toggleBtn.title = 'Enter Kiosk Mode';
     }
 }
+
+// ============================================
+// V5.66.0: THEME & DISPLAY FUNCTIONALITY
+// ============================================
+
+// Theme state
+let currentTheme = 'light'; // 'light', 'dark', or 'custom'
+let customThemeColors = {
+    bgPrimary: '#f3f4f6',
+    bgCard: '#ffffff',
+    bgHover: '#f9fafb',
+    bgVisual: '#1f2937',
+    textPrimary: '#111827',
+    textSecondary: '#4b5563',
+    textMuted: '#6b7280',
+    accent: '#2563eb',
+    countdown: '#111827',
+    border: '#d1d5db',
+    borderLight: '#e5e7eb',
+    buttonBg: '#e5e7eb',
+    buttonText: '#374151'
+};
+let visualCueEnabled = true;
+
+// Light theme defaults
+const lightThemeColors = {
+    bgPrimary: '#f3f4f6',
+    bgCard: '#ffffff',
+    bgHover: '#f9fafb',
+    bgVisual: '#1f2937',
+    textPrimary: '#111827',
+    textSecondary: '#4b5563',
+    textMuted: '#6b7280',
+    accent: '#2563eb',
+    countdown: '#111827',
+    border: '#d1d5db',
+    borderLight: '#e5e7eb',
+    buttonBg: '#e5e7eb',
+    buttonText: '#374151'
+};
+
+// Dark theme defaults
+const darkThemeColors = {
+    bgPrimary: '#111827',
+    bgCard: '#1f2937',
+    bgHover: '#374151',
+    bgVisual: '#374151',
+    textPrimary: '#f9fafb',
+    textSecondary: '#d1d5db',
+    textMuted: '#9ca3af',
+    accent: '#60a5fa',
+    countdown: '#f9fafb',
+    border: '#374151',
+    borderLight: '#4b5563',
+    buttonBg: '#374151',
+    buttonText: '#e5e7eb'
+};
+
+/**
+ * Load theme preference from localStorage
+ */
+function loadThemePreference() {
+    try {
+        const storedTheme = localStorage.getItem('theme');
+        const storedVisualCue = localStorage.getItem('visualCueEnabled');
+        const storedCustomColors = localStorage.getItem('customThemeColors');
+        
+        if (storedTheme) {
+            currentTheme = storedTheme;
+        }
+        
+        if (storedVisualCue !== null) {
+            visualCueEnabled = storedVisualCue === 'true';
+        }
+        
+        if (storedCustomColors) {
+            customThemeColors = JSON.parse(storedCustomColors);
+        }
+        
+        applyTheme();
+        updateThemeUI();
+    } catch (e) {
+        console.error('Error loading theme preference:', e);
+    }
+}
+
+/**
+ * Save theme preference to localStorage
+ */
+function saveThemePreference() {
+    try {
+        localStorage.setItem('theme', currentTheme);
+        localStorage.setItem('visualCueEnabled', visualCueEnabled ? 'true' : 'false');
+        localStorage.setItem('customThemeColors', JSON.stringify(customThemeColors));
+        // Also save to cloud
+        saveUserPreferencesToCloud();
+    } catch (e) {
+        console.error('Error saving theme preference:', e);
+    }
+}
+
+/**
+ * Apply the current theme to the document
+ */
+function applyTheme() {
+    const root = document.documentElement;
+    
+    // Set data-theme attribute for CSS
+    if (currentTheme === 'dark') {
+        root.setAttribute('data-theme', 'dark');
+    } else {
+        root.removeAttribute('data-theme');
+    }
+    
+    // Apply custom colors (these override both light and dark)
+    const colors = currentTheme === 'dark' ? darkThemeColors : lightThemeColors;
+    const finalColors = { ...colors, ...customThemeColors };
+    
+    // Only apply custom colors if we have customizations different from the base theme
+    if (currentTheme !== 'custom') {
+        // Use theme defaults
+        root.style.setProperty('--theme-bg-primary', colors.bgPrimary);
+        root.style.setProperty('--theme-bg-card', colors.bgCard);
+        root.style.setProperty('--theme-bg-hover', colors.bgHover);
+        root.style.setProperty('--theme-bg-visual', colors.bgVisual);
+        root.style.setProperty('--theme-text-primary', colors.textPrimary);
+        root.style.setProperty('--theme-text-secondary', colors.textSecondary);
+        root.style.setProperty('--theme-text-muted', colors.textMuted);
+        root.style.setProperty('--theme-accent', colors.accent);
+        root.style.setProperty('--theme-countdown', colors.countdown);
+        root.style.setProperty('--theme-border', colors.border);
+        root.style.setProperty('--theme-border-light', colors.borderLight);
+        root.style.setProperty('--theme-button-bg', colors.buttonBg);
+        root.style.setProperty('--theme-button-text', colors.buttonText);
+    } else {
+        // Apply custom colors
+        root.style.setProperty('--theme-bg-primary', customThemeColors.bgPrimary);
+        root.style.setProperty('--theme-bg-card', customThemeColors.bgCard);
+        root.style.setProperty('--theme-bg-hover', customThemeColors.bgHover || '#f9fafb');
+        root.style.setProperty('--theme-bg-visual', customThemeColors.bgVisual || '#1f2937');
+        root.style.setProperty('--theme-text-primary', customThemeColors.textPrimary);
+        root.style.setProperty('--theme-text-secondary', customThemeColors.textSecondary);
+        root.style.setProperty('--theme-text-muted', customThemeColors.textMuted || customThemeColors.textSecondary);
+        root.style.setProperty('--theme-accent', customThemeColors.accent);
+        root.style.setProperty('--theme-countdown', customThemeColors.countdown);
+        root.style.setProperty('--theme-border', customThemeColors.border || '#d1d5db');
+        root.style.setProperty('--theme-border-light', customThemeColors.borderLight || '#e5e7eb');
+        root.style.setProperty('--theme-button-bg', customThemeColors.buttonBg || '#e5e7eb');
+        root.style.setProperty('--theme-button-text', customThemeColors.buttonText || '#374151');
+    }
+    
+    // Apply visual cue visibility
+    if (visualCueEnabled) {
+        document.body.classList.remove('hide-visual-cue');
+    } else {
+        document.body.classList.add('hide-visual-cue');
+    }
+    
+    // Update preview panel
+    updateThemePreview();
+}
+
+/**
+ * Update the preview panel with current colors
+ */
+function updateThemePreview() {
+    const preview = document.getElementById('theme-preview-panel');
+    const previewVisual = document.getElementById('preview-visual-cue');
+    
+    if (preview) {
+        // The preview uses CSS variables, so it updates automatically
+        // Just toggle visual cue visibility in preview
+        if (previewVisual) {
+            previewVisual.style.display = visualCueEnabled ? 'flex' : 'none';
+        }
+    }
+}
+
+/**
+ * Update the theme UI controls to reflect current state
+ */
+function updateThemeUI() {
+    const lightBtn = document.getElementById('theme-light-btn');
+    const darkBtn = document.getElementById('theme-dark-btn');
+    const visualCueToggle = document.getElementById('toggle-visual-cue');
+    
+    // Update theme buttons
+    if (lightBtn && darkBtn) {
+        if (currentTheme === 'dark') {
+            lightBtn.classList.remove('border-blue-500');
+            lightBtn.classList.add('border-transparent');
+            darkBtn.classList.add('border-blue-500');
+            darkBtn.classList.remove('border-transparent');
+        } else {
+            lightBtn.classList.add('border-blue-500');
+            lightBtn.classList.remove('border-transparent');
+            darkBtn.classList.remove('border-blue-500');
+            darkBtn.classList.add('border-transparent');
+        }
+    }
+    
+    // Update visual cue toggle
+    if (visualCueToggle) {
+        visualCueToggle.checked = visualCueEnabled;
+    }
+    
+    // Update color pickers
+    const colors = currentTheme === 'dark' ? darkThemeColors : 
+                   currentTheme === 'custom' ? customThemeColors : lightThemeColors;
+    
+    const bgInput = document.getElementById('theme-color-bg');
+    const cardInput = document.getElementById('theme-color-card');
+    const textInput = document.getElementById('theme-color-text');
+    const textSecInput = document.getElementById('theme-color-text-secondary');
+    const accentInput = document.getElementById('theme-color-accent');
+    const countdownInput = document.getElementById('theme-color-countdown');
+    
+    if (bgInput) bgInput.value = colors.bgPrimary;
+    if (cardInput) cardInput.value = colors.bgCard;
+    if (textInput) textInput.value = colors.textPrimary;
+    if (textSecInput) textSecInput.value = colors.textSecondary;
+    if (accentInput) accentInput.value = colors.accent;
+    if (countdownInput) countdownInput.value = colors.countdown;
+}
+
+/**
+ * Set theme to light mode
+ */
+function setLightTheme() {
+    currentTheme = 'light';
+    customThemeColors = { ...lightThemeColors };
+    applyTheme();
+    updateThemeUI();
+    saveThemePreference();
+}
+
+/**
+ * Set theme to dark mode
+ */
+function setDarkTheme() {
+    currentTheme = 'dark';
+    customThemeColors = { ...darkThemeColors };
+    applyTheme();
+    updateThemeUI();
+    saveThemePreference();
+}
+
+/**
+ * Apply a custom color change
+ */
+function applyCustomColor(property, value) {
+    customThemeColors[property] = value;
+    currentTheme = 'custom';
+    applyTheme();
+    saveThemePreference();
+}
+
+/**
+ * Reset custom colors to current theme defaults
+ */
+function resetCustomColors() {
+    const baseColors = currentTheme === 'dark' ? darkThemeColors : lightThemeColors;
+    customThemeColors = { ...baseColors };
+    currentTheme = currentTheme === 'dark' ? 'dark' : 'light';
+    applyTheme();
+    updateThemeUI();
+    saveThemePreference();
+}
+
+/**
+ * Toggle visual cue visibility
+ */
+function toggleVisualCue(enabled) {
+    visualCueEnabled = enabled;
+    applyTheme();
+    saveThemePreference();
+}
+
+/**
+ * Initialize theme event listeners
+ */
+function initThemeListeners() {
+    // Theme buttons
+    document.getElementById('theme-light-btn')?.addEventListener('click', setLightTheme);
+    document.getElementById('theme-dark-btn')?.addEventListener('click', setDarkTheme);
+    
+    // Custom colors toggle
+    document.getElementById('toggle-custom-colors-btn')?.addEventListener('click', () => {
+        const panel = document.getElementById('custom-colors-panel');
+        const chevron = document.getElementById('custom-colors-chevron');
+        if (panel && chevron) {
+            panel.classList.toggle('hidden');
+            chevron.classList.toggle('rotate-90');
+        }
+    });
+    
+    // Color pickers
+    document.getElementById('theme-color-bg')?.addEventListener('input', (e) => {
+        applyCustomColor('bgPrimary', e.target.value);
+    });
+    document.getElementById('theme-color-card')?.addEventListener('input', (e) => {
+        applyCustomColor('bgCard', e.target.value);
+    });
+    document.getElementById('theme-color-text')?.addEventListener('input', (e) => {
+        applyCustomColor('textPrimary', e.target.value);
+    });
+    document.getElementById('theme-color-text-secondary')?.addEventListener('input', (e) => {
+        applyCustomColor('textSecondary', e.target.value);
+    });
+    document.getElementById('theme-color-accent')?.addEventListener('input', (e) => {
+        applyCustomColor('accent', e.target.value);
+    });
+    document.getElementById('theme-color-countdown')?.addEventListener('input', (e) => {
+        applyCustomColor('countdown', e.target.value);
+    });
+    
+    // Reset button
+    document.getElementById('reset-custom-colors-btn')?.addEventListener('click', resetCustomColors);
+    
+    // Visual cue toggle
+    document.getElementById('toggle-visual-cue')?.addEventListener('change', (e) => {
+        toggleVisualCue(e.target.checked);
+    });
+}
+
+// ============================================
+// END V5.66.0: THEME & DISPLAY FUNCTIONALITY
+// ============================================
 
 // ============================================
 // V5.47.0: PICTURE-IN-PICTURE FUNCTIONALITY
@@ -2934,7 +3316,11 @@ function updateClock() {
     
     let millisToScheduleBell = Infinity;
     if (scheduleBellObject) {
-        const [h, m, s] = scheduleBellObject.time.split(':').map(Number);
+        // V5.66.3: Handle both "HH:MM" and "HH:MM:SS" formats
+        const timeParts = scheduleBellObject.time.split(':').map(Number);
+        const h = timeParts[0] || 0;
+        const m = timeParts[1] || 0;
+        const s = timeParts[2] || 0; // Default seconds to 0 if not provided
         const nextBellDate = new Date();
         nextBellDate.setHours(h, m, s, 0);
         millisToScheduleBell = nextBellDate.getTime() - nowTimestamp;
@@ -6500,6 +6886,7 @@ function setActiveSchedule(prefixedId) {
                 
                 // --- NEW V4.90: One-Time Bell ID Migration for BASE shared bells ---
                 // This must run for personal schedules too, so the base bells have IDs.
+                // V5.66.3: Also normalize time strings to HH:MM:SS format
                 let needsBaseMigration = false;
                 localSchedulePeriods.forEach(period => {
                     period.bells.forEach(bell => {
@@ -6508,14 +6895,23 @@ function setActiveSchedule(prefixedId) {
                             needsBaseMigration = true;
                             console.log(`Assigning new bellId to BASE bell: ${bell.name} in ${period.name}`);
                         }
+                        // V5.66.3: Normalize time strings (HH:MM -> HH:MM:SS)
+                        if (bell.time && !bell.relative) {
+                            const normalized = normalizeTimeString(bell.time);
+                            if (normalized !== bell.time) {
+                                console.log(`Normalizing time for BASE bell "${bell.name}": ${bell.time} -> ${normalized}`);
+                                bell.time = normalized;
+                                needsBaseMigration = true;
+                            }
+                        }
                     });
                 });
 
                 if (needsBaseMigration && document.body.classList.contains('admin-mode')) {
-                    console.log("Saving migrated bellId data back to BASE schedule...");
+                    console.log("Saving migrated data back to BASE schedule...");
                     updateDoc(scheduleRef, { periods: localSchedulePeriods }) 
-                        .then(() => console.log("Base schedule bellId migration successful."))
-                        .catch(err => console.error("Error saving base bellId migration:", err));
+                        .then(() => console.log("Base schedule migration successful."))
+                        .catch(err => console.error("Error saving base migration:", err));
                 }
                 // --- END V4.90 Migration ---
                 
@@ -6605,13 +7001,22 @@ function setActiveSchedule(prefixedId) {
                     let periodsToUse = personalData.periods || [];
                     let needsMigration = false;
                     
-                    // Check for missing bellIds
+                    // Check for missing bellIds and normalize time strings
                     periodsToUse.forEach(period => {
                         period.bells.forEach(bell => {
                             if (!bell.bellId) {
                                 bell.bellId = generateBellId();
                                 needsMigration = true;
                                 console.log(`Assigning new bellId to ${bell.name} in ${period.name}`);
+                            }
+                            // V5.66.3: Normalize time strings (HH:MM -> HH:MM:SS)
+                            if (bell.time && !bell.relative) {
+                                const normalized = normalizeTimeString(bell.time);
+                                if (normalized !== bell.time) {
+                                    console.log(`Normalizing time for "${bell.name}": ${bell.time} -> ${normalized}`);
+                                    bell.time = normalized;
+                                    needsMigration = true;
+                                }
                             }
                         });
                     });
@@ -6676,6 +7081,7 @@ function setActiveSchedule(prefixedId) {
 
                     // --- NEW V4.90: One-Time Bell ID Migration for SHARED bells ---
                     // This fixes the bug where overrides wouldn't save on refresh.
+                    // V5.66.3: Also normalize time strings to HH:MM:SS format
                     let needsSharedMigration = false;
                     localSchedulePeriods.forEach(period => {
                         period.bells.forEach(bell => {
@@ -6684,17 +7090,26 @@ function setActiveSchedule(prefixedId) {
                                 needsSharedMigration = true;
                                 console.log(`Assigning new bellId to SHARED bell: ${bell.name} in ${period.name}`);
                             }
+                            // V5.66.3: Normalize time strings (HH:MM -> HH:MM:SS)
+                            if (bell.time && !bell.relative) {
+                                const normalized = normalizeTimeString(bell.time);
+                                if (normalized !== bell.time) {
+                                    console.log(`Normalizing time for SHARED bell "${bell.name}": ${bell.time} -> ${normalized}`);
+                                    bell.time = normalized;
+                                    needsSharedMigration = true;
+                                }
+                            }
                         });
                     });
 
                     if (needsSharedMigration && document.body.classList.contains('admin-mode')) {
-                        console.log("Saving migrated bellId data back to SHARED schedule...");
+                        console.log("Saving migrated data back to SHARED schedule...");
                         // Fire-and-forget update.
                         // We only save if user is an admin to prevent write errors.
                         // Non-admins will still have the IDs in-memory for this session.
                         updateDoc(scheduleRef, { periods: localSchedulePeriods }) 
-                            .then(() => console.log("Shared schedule bellId migration successful."))
-                            .catch(err => console.error("Error saving shared bellId migration:", err));
+                            .then(() => console.log("Shared schedule migration successful."))
+                            .catch(err => console.error("Error saving shared migration:", err));
                     }
                     // --- END V4.90 Migration ---
                     
@@ -6747,13 +7162,23 @@ function setActiveSchedule(prefixedId) {
                         console.log("Running migration from flat 'bells' to 'periods' structure.");
                     }
                     
-                    // Now check for missing bellIds within the periods
+                    // Now check for missing bellIds and normalize time strings within the periods
                     periodsToUse.forEach(period => {
                         period.bells.forEach(bell => {
                             if (!bell.bellId) {
                                 bell.bellId = generateBellId();
                                 needsMigration = true;
                                 console.log(`Assigning new permanent bellId to ${bell.name} in ${period.name}`);
+                            }
+                            // V5.66.3: Normalize time strings (HH:MM -> HH:MM:SS)
+                            // Only for static bells (not relative bells)
+                            if (bell.time && !bell.relative) {
+                                const normalized = normalizeTimeString(bell.time);
+                                if (normalized !== bell.time) {
+                                    console.log(`Normalizing time for personal bell "${bell.name}": ${bell.time} -> ${normalized}`);
+                                    bell.time = normalized;
+                                    needsMigration = true;
+                                }
                             }
                         });
                     });
@@ -7424,38 +7849,38 @@ function handleEditBellClick(bell) {
         
         // NEW 5.32.3: Handle anchor bells (shared type) - lock time but allow visual/sound/name
         // FIX V5.57.1: Added else clause for custom bells to ensure time input is enabled
+        // FIX V5.66.2: All users can set personal sound override; admin checkbox escalates to shared
         if (bell.type === 'shared') {
             const isAdmin = document.body.classList.contains('admin-mode');
                 
+            // Lock time for non-admins
             if (isAdmin) {
-                // Admin editing shared bell - full control with override checkbox
                 editBellTimeInput.disabled = false;
                 editBellTimeInput.style.opacity = '1';
                 editBellTimeInput.style.cursor = 'text';
-                    
-                // Hide lock message
                 const lockMsgDiv = document.getElementById('edit-time-lock-message');
                 if (lockMsgDiv) lockMsgDiv.classList.add('hidden');
-                    
-                editBellOverrideContainer.classList.remove('hidden');
-                document.getElementById('edit-bell-visual-override-container')?.classList.remove('hidden');
-                if (editBellOverrideCheckbox) editBellOverrideCheckbox.checked = false;
-                editBellSoundInput.disabled = true;
             } else {
-                // Non-admin editing shared bell - lock time, auto-override sound/name/visual
                 editBellTimeInput.disabled = true;
                 editBellTimeInput.style.opacity = '0.5';
                 editBellTimeInput.style.cursor = 'not-allowed';
-                    
-                // Show lock message in dedicated div
                 const lockMsgDiv = document.getElementById('edit-time-lock-message');
                 if (lockMsgDiv) lockMsgDiv.classList.remove('hidden');
-                    
-                // Hide override checkboxes - teachers always override
+            }
+            
+            // Sound is ALWAYS editable (personal override)
+            editBellSoundInput.disabled = false;
+            
+            // Admin sees checkbox to optionally push change to all users
+            // Non-admin doesn't see it (their changes are always personal)
+            if (isAdmin) {
+                editBellOverrideContainer.classList.remove('hidden');
+                document.getElementById('edit-bell-visual-override-container')?.classList.remove('hidden');
+                // Default unchecked = personal override only
+                if (editBellOverrideCheckbox) editBellOverrideCheckbox.checked = false;
+            } else {
                 editBellOverrideContainer.classList.add('hidden');
                 document.getElementById('edit-bell-visual-override-container')?.classList.add('hidden');
-                // Enable sound editing (auto-override for teachers)
-                editBellSoundInput.disabled = false;
             }
         } else {
             // FIX V5.57.1: Custom bells (including personal period anchor/fluke bells)
@@ -7722,17 +8147,11 @@ async function handleEditBellSubmit(e) {
 
     // NEW in 4.21: Check if we should override the sound
     // FIX V5.42: Add null check for checkbox
-    // FIX V5.46.5: For non-admin users, always take the sound (checkbox is hidden for them)
-    const isAdmin = document.body.classList.contains('admin-mode');
+    // FIX V5.66.2: Always capture the sound value for shared bells
+    // The save path (personal override vs shared bell) is determined later
     if (oldBell.type === 'shared') {
-        if (isAdmin && editBellOverrideCheckbox?.checked) {
-            // Admin with checkbox checked - take the new sound
-            newBell.sound = editBellSoundInput.value;
-        } else if (!isAdmin) {
-            // Non-admin always overrides (checkbox is hidden)
-            newBell.sound = editBellSoundInput.value;
-        }
-        // If admin and checkbox NOT checked, newBell.sound stays as oldBell.sound
+        // Always capture the sound - save path determines where it goes
+        newBell.sound = editBellSoundInput.value;
     } else if (oldBell.type === 'custom') {
         // It's a custom bell, so always take the new sound
         newBell.sound = editBellSoundInput.value;
@@ -7763,10 +8182,12 @@ async function handleEditBellSubmit(e) {
         // --- Case 1: Editing a Shared Bell ---
         if (oldBell.type === 'shared') {
             const isAdmin = document.body.classList.contains('admin-mode');
+            const wantsToOverrideForAll = isAdmin && editBellOverrideCheckbox?.checked;
             
-            // FIX V5.42.3: Non-admins can save personal overrides (nickname, visual)
-            // They just can't edit the actual shared bell data
-            if (!isAdmin) {
+            // FIX V5.66.2: Admin with checkbox UNCHECKED saves personal override (same as non-admin)
+            // Admin with checkbox CHECKED edits the actual shared bell for everyone
+            if (!wantsToOverrideForAll) {
+                // Personal override path (non-admin, or admin without checkbox)
                 const overrideKey = getBellOverrideKey(activeBaseScheduleId, oldBell);
                 const soundChanged = editBellSoundInput.value !== oldBell.originalSound;
                 const nameChanged = newBell.name !== oldBell.name;
@@ -7848,7 +8269,8 @@ async function handleEditBellSubmit(e) {
                 return;
             }
             
-            // Admin path: Actually edit the shared bell
+            // Admin path with checkbox checked: Actually edit the shared bell for all users
+            // V5.66.2: Only reaches here if admin AND override checkbox is checked
             // V4.0 LOGIC: Find and update the bell within the periods array
             const currentSchedule = allSchedules.find(s => s.id === activeBaseScheduleId);
             if (!currentSchedule) throw new Error("Active shared schedule not found.");
@@ -10162,11 +10584,23 @@ function recalculateAndRenderAll() {
         console.warn("Delaying calculation: base and personal schedules have not both loaded.");
         return; // Exit, wait for the other listener to fire
     }
-    // console.log("Running recalculateAndRenderAll..."); // Good for debugging
+    // V5.66.3: Debug logging for calculation
+    console.log("Running recalculateAndRenderAll...", {
+        localSchedulePeriodsCount: localSchedulePeriods.length,
+        personalBellsPeriodsCount: personalBellsPeriods.length,
+        activeBaseScheduleId,
+        activePersonalScheduleId
+    });
 
     // 1. Run the calculation engine
     // It reads from the global localSchedulePeriods and personalBellsPeriods
     const { calculatedPeriods, flatBellList } = resolveAllBellTimes();
+    
+    // V5.66.3: Debug calculation results
+    console.log("Calculation complete:", {
+        calculatedPeriodsCount: calculatedPeriods.length,
+        flatBellListCount: flatBellList.length
+    });
     
     calculatedPeriodsList = calculatedPeriods; // NEW in 4.18: Store final calculated periods
 
@@ -13604,6 +14038,10 @@ async function confirmDeleteAudio() {
 // --- Init and Event Listeners ---
 function init() {
     initFirebase();
+    
+    // V5.66.0: Initialize theme early so it applies before page is visible
+    loadThemePreference();
+    initThemeListeners();
 
     // --- VERSION STAMP ---
     // This finds the HTML element and stamps the JS version onto it
