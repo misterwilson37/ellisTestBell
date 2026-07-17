@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Right v1.0.3</title>
+    <!-- Dashboard Right Display v1.0.3.1 -->
+    <!-- v1.0.3: House name bumped from 7cqw to 9cqw (~30% larger) per Jake's
+         eyeball test on live hardware. Score (16cqw) unchanged. -->
+    <!-- v1.0.2: Crest size fix. v1.0.1's removal of max-height let the crest
+         grow too large in narrow frames (height: 90% of card = ~90% of 20vh is
+         huge when the iframe is 25% of a 4K TV). Added max-width: 30cqw to cap
+         the crest at 30% of the scoreboard's width, restoring the v1.0.0
+         proportions that Jake approved. -->
+    <!-- v1.0.1: Text sizing fix for Yodeck narrow-frame deployment. v1.0.0 used
+         vw/vh viewport units, which resolve against the iframe's viewport — i.e.
+         the 25%-of-TV frame width. So a 4vw score was 1/4 the size intended.
+         Switched .houses-area to container-type: inline-size + cqw units so
+         sizing is proportional to the scoreboard's own rendered width regardless
+         of viewport dimensions. inline-size (not size) avoids the flex-child
+         collapse bug that sunk v1.4.1's cq attempt elsewhere. -->
+    <!-- v1.0.0: Full-screen clock-plus-scoreboard page. Lifts the right-column
+         contents of dashboard.html into a standalone page that fills the viewport.
+         20% clock on top, 80% four-card auto-sorted scoreboard below — identical
+         proportions to dashboard.html's right column, just scaled to the full frame.
+         
+         Pulls from the same Firestore dashboard-config doc as dashboard.html and
+         dashclock.html — one admin edit updates all three pages everywhere.
+         
+         Intended Yodeck layout: paired with a Canva frame (left ~75%) or similar,
+         filling the right ~25% of a TV. Also works full-screen on a narrower
+         secondary monitor dedicated to schedule + scores. -->
+    <meta name="theme-color" content="#4B9CD3">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="../firebase-config.js"></script>
+    <style>
+        /* Dashboard Right Display v1.0.3 — visual match to dashboard.html's right column */
+        :root {
+            --carolina-blue: #4B9CD3;
+            --carolina-blue-light: #7BAFD4;
+            --carolina-blue-sky: #8FC3E8;
+            --dark-grey: #1a1a1a;
+            --slate-bg: #111827;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100vw; height: 100vh; overflow: hidden; background: var(--slate-bg); }
+        
+        /* Top-level column. Clock area gets 20%, houses area gets 80% — identical
+           to the right column of dashboard.html (which is why we can lift it cleanly). */
+        .right-column {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .clock-area {
+            height: 20%;
+            overflow: hidden;
+            background: linear-gradient(180deg, var(--slate-bg) 0%, #1a1a1a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 3%;
+            container-type: size;
+            font-family: 'Century Gothic', 'Urbanist', 'Questrial', sans-serif;
+        }
+        
+        /* Clock text sizing — matches dashboard.html's right-column clock. */
+        #main-clock {
+            font-size: 15cqw;
+            font-weight: 700;
+            color: #fff;
+            text-align: center;
+            width: 100%;
+            line-height: 1.1;
+            white-space: nowrap;
+            letter-spacing: 0.02em;
+        }
+        
+        #schedule-columns {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 2cqw;
+            width: 100%;
+            margin-top: 3cqh;
+        }
+        
+        .schedule-column {
+            text-align: center;
+            padding: 2cqh 1cqw;
+            border-radius: 8px;
+            background: var(--dark-grey);
+            border: 1px solid #333;
+            min-width: 0;
+        }
+        
+        .column-label {
+            font-size: 4cqw;
+            font-weight: 600;
+            color: #a0a0a0;
+            margin-bottom: 1cqh;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .column-period {
+            font-size: 5cqw;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-height: 1.4em;
+        }
+        
+        .column-period.active { color: var(--carolina-blue); }
+        
+        .column-countdown {
+            font-size: 3.5cqw;
+            color: var(--carolina-blue);
+            margin-top: 1cqh;
+        }
+        
+        /* -- House scoreboard --
+           v1.0.1: Switched from vw/vh to cqw with container-type: inline-size.
+           Root cause of the tiny-text bug: vw scales to the iframe's viewport,
+           which is just 25% of the TV width inside Yodeck — so 4vw was 1/4
+           what it needed to be. inline-size containers measure the element's
+           actual rendered width (full iframe width), and cqw scales against
+           that. No flex-child sizing issues like the v1.4.1 disaster because
+           inline-size only measures the width axis, leaving block sizing alone.
+           Heights stay as % since we don't need to query height. */
+        .houses-area {
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+            container-type: inline-size;
+        }
+        
+        .house-card {
+            flex: 1 1 0;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: center;
+            gap: 3cqw;
+            padding: 2% 3cqw;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
+            font-family: 'Century Gothic', 'Urbanist', 'Questrial', serif;
+        }
+        
+        .house-crest {
+            height: 90%;
+            /* v1.0.2: Cap the crest width so it doesn't dominate the card in narrow
+               iframes. 30cqw = 30% of scoreboard width. Below this, height: 90%
+               governs. Above, we top out. Restores the v1.0.0 proportions that Jake
+               liked. */
+            max-width: 30cqw;
+            width: auto;
+            object-fit: contain;
+        }
+        
+        .house-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-end;
+            min-width: 0;
+            gap: 1%;
+            height: 100%;
+        }
+        
+        .house-name {
+            font-family: 'Century Gothic', Georgia, 'Times New Roman', serif;
+            font-weight: 700;
+            font-size: 9cqw;
+            font-variant-caps: small-caps;
+            text-transform: lowercase;
+            letter-spacing: 0.05em;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        
+        .house-score {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-weight: 700;
+            font-size: 16cqw;
+            line-height: 1;
+            letter-spacing: -0.02em;
+        }
+        
+        /* Per-house palette — identical to dashboard.html. */
+        .house-accomodore { background: #ffffff; color: #111827; }
+        .house-callidus   { background: #d1d5db; color: #111827; }
+        .house-princeps   { background: var(--carolina-blue); color: #111827; }
+        .house-vevaios    { background: var(--slate-bg); color: #ffffff; }
+        
+        .version-stamp {
+            position: fixed;
+            bottom: 4px;
+            right: 8px;
+            font-size: 10px;
+            color: #333;
+            font-family: -apple-system, sans-serif;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="right-column">
+        <div class="clock-area">
+            <div id="main-clock">--:--:-- --</div>
+            <div id="schedule-columns">
+                <div class="schedule-column">
+                    <div class="column-label">--</div>
+                    <div class="column-period">--</div>
+                    <div class="column-countdown"></div>
+                </div>
+                <div class="schedule-column">
+                    <div class="column-label">--</div>
+                    <div class="column-period">--</div>
+                    <div class="column-countdown"></div>
+                </div>
+                <div class="schedule-column">
+                    <div class="column-label">--</div>
+                    <div class="column-period">--</div>
+                    <div class="column-countdown"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="houses-area" id="houses-area">
+            <div class="house-card house-accomodore" data-house="accomodore">
+                <img class="house-crest" src="accomodore.png" alt="Accomodore crest">
+                <div class="house-info">
+                    <div class="house-name">Accomodore</div>
+                    <div class="house-score" id="score-accomodore">—</div>
+                </div>
+            </div>
+            <div class="house-card house-callidus" data-house="callidus">
+                <img class="house-crest" src="callidus.png" alt="Callidus crest">
+                <div class="house-info">
+                    <div class="house-name">Callidus</div>
+                    <div class="house-score" id="score-callidus">—</div>
+                </div>
+            </div>
+            <div class="house-card house-princeps" data-house="princeps">
+                <img class="house-crest" src="princeps.png" alt="Princeps crest">
+                <div class="house-info">
+                    <div class="house-name">Princeps</div>
+                    <div class="house-score" id="score-princeps">—</div>
+                </div>
+            </div>
+            <div class="house-card house-vevaios" data-house="vevaios">
+                <img class="house-crest" src="vevaios.png" alt="Vevaios crest">
+                <div class="house-info">
+                    <div class="house-name">Vevaios</div>
+                    <div class="house-score" id="score-vevaios">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="version-stamp">v1.0.3.1</div>
+
+    <script>
+        // Dashboard Right Display v1.0.3
+        
+        if (!window.firebaseConfig) {
+            throw new Error("firebase-config.js failed to load. Check <script> tag order in <head>.");
+        }
+        const firebaseConfig = window.firebaseConfig;
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const appId = firebaseConfig.appId;
+        
+        // State
+        let schedules = {};
+        let scheduleConfig = {};
+        let housesFetchTimer = null;
+        let currentHousesUrl = null;
+        
+        const configRef = db.collection('artifacts').doc(appId)
+            .collection('public').doc('data')
+            .collection('config').doc('dashboard');
+        
+        async function init() {
+            try {
+                await auth.signInAnonymously();
+            } catch (err) {
+                console.error('[dashright] anonymous sign-in failed:', err);
+            }
+            
+            // Single listener on the dashboard config doc. Drives both the clock
+            // (schedule IDs + labels) and the scoreboard (housesSheetCsvUrl).
+            configRef.onSnapshot(doc => {
+                if (!doc.exists) {
+                    console.warn('[dashright] dashboard config doc does not exist');
+                    return;
+                }
+                const data = doc.data() || {};
+                scheduleConfig = {
+                    s1: data.s1 || null, s2: data.s2 || null, s3: data.s3 || null,
+                    l1: data.l1 || '',   l2: data.l2 || '',   l3: data.l3 || ''
+                };
+                loadSchedules(scheduleConfig);
+                applyHousesSheetUrl(data.housesSheetCsvUrl || '');
+                updateClock();
+            }, err => {
+                console.error('[dashright] config listener error:', err);
+            });
+            
+            setInterval(updateClock, 1000);
+            updateClock();
+        }
+        
+        async function loadSchedules(config) {
+            const scheduleIds = [config.s1, config.s2, config.s3].filter(Boolean);
+            for (const id of scheduleIds) {
+                const scheduleRef = db.collection('artifacts').doc(appId)
+                    .collection('public').doc('data')
+                    .collection('schedules').doc(id);
+                scheduleRef.onSnapshot(snapshot => {
+                    if (snapshot.exists) {
+                        const data = snapshot.data();
+                        schedules[id] = {
+                            name: data.name,
+                            periods: (data.periods || []).filter(p => p.isEnabled !== false)
+                        };
+                        updateClock();
+                    }
+                });
+            }
+        }
+        
+        function applyHousesSheetUrl(url) {
+            const normalizedUrl = (url || '').trim();
+            if (normalizedUrl === currentHousesUrl) return;
+            currentHousesUrl = normalizedUrl;
+            if (housesFetchTimer) { clearInterval(housesFetchTimer); housesFetchTimer = null; }
+            if (!normalizedUrl) return;
+            fetchHouseScores();
+            housesFetchTimer = setInterval(fetchHouseScores, 5 * 60 * 1000);
+        }
+        
+        /**
+         * Fetches the published-to-web CSV and updates house scores.
+         * Auto-sorts cards by score descending (CSS `order`).
+         * Logic duplicated from dashboard.html — see note in dashclock.html
+         * about potential shared-utils refactor.
+         */
+        async function fetchHouseScores() {
+            if (!currentHousesUrl) return;
+            try {
+                const response = await fetch(currentHousesUrl, { cache: 'no-store' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const csvText = await response.text();
+                const rows = csvText.split(/\r?\n/).filter(r => r.length > 0);
+                if (rows.length < 2) {
+                    console.warn('[scores] CSV has fewer than 2 rows');
+                    return;
+                }
+                const scores = rows[1].split(',').map(s => s.trim());
+                const houseOrder = ['accomodore', 'callidus', 'princeps', 'vevaios'];
+                
+                const ranked = houseOrder.map((house, i) => {
+                    const raw = scores[i];
+                    const parsed = (raw !== undefined && raw !== '') ? parseInt(raw, 10) : NaN;
+                    return {
+                        house: house,
+                        raw: raw,
+                        numeric: isNaN(parsed) ? null : parsed
+                    };
+                });
+                
+                ranked.sort((a, b) => {
+                    if (a.numeric === null && b.numeric === null) return 0;
+                    if (a.numeric === null) return 1;
+                    if (b.numeric === null) return -1;
+                    return b.numeric - a.numeric;
+                });
+                
+                ranked.forEach((entry, rank) => {
+                    const card = document.querySelector('.house-' + entry.house);
+                    if (card) card.style.order = rank;
+                    const scoreEl = document.getElementById('score-' + entry.house);
+                    if (scoreEl && entry.raw !== undefined && entry.raw !== '') {
+                        scoreEl.textContent = entry.numeric !== null
+                            ? entry.numeric.toLocaleString()
+                            : entry.raw;
+                    }
+                });
+            } catch (err) {
+                console.warn('[scores] fetch failed (will retry next interval):', err);
+            }
+        }
+        
+        // -- Clock display -- identical to dashclock.html / dashboard.html
+        
+        function updateClock() {
+            const now = new Date();
+            const hours = now.getHours();
+            const mins = now.getMinutes();
+            const secs = now.getSeconds();
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            const displayHours = hours % 12 || 12;
+            
+            document.getElementById('main-clock').textContent =
+                `${displayHours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} ${ampm}`;
+            
+            const columns = document.querySelectorAll('.schedule-column');
+            const scheduleIds = [scheduleConfig.s1, scheduleConfig.s2, scheduleConfig.s3];
+            const labels = [scheduleConfig.l1, scheduleConfig.l2, scheduleConfig.l3];
+            
+            scheduleIds.forEach((scheduleId, index) => {
+                if (scheduleId && schedules[scheduleId]) {
+                    const schedule = schedules[scheduleId];
+                    const label = labels[index] || schedule.name || '';
+                    const status = getScheduleStatus(schedule);
+                    columns[index].querySelector('.column-label').textContent = label;
+                    columns[index].querySelector('.column-period').textContent = status.period;
+                    columns[index].querySelector('.column-countdown').textContent = status.countdown;
+                    columns[index].querySelector('.column-period').classList.toggle('active', status.active);
+                }
+            });
+        }
+        
+        function getScheduleStatus(schedule) {
+            const now = new Date();
+            const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            for (const period of schedule.periods) {
+                const bells = period.bells || [];
+                if (bells.length === 0) continue;
+                const times = bells.map(b => timeToSeconds(b.time)).sort((a, b) => a - b);
+                const start = times[0];
+                const end = times[times.length - 1];
+                if (nowSeconds >= start && nowSeconds < end) {
+                    return { period: period.name, countdown: `ends at ${formatTime12Hour(end)}`, active: true };
+                }
+            }
+            let nextPeriod = null, nextStart = Infinity;
+            for (const period of schedule.periods) {
+                const bells = period.bells || [];
+                if (bells.length === 0) continue;
+                const times = bells.map(b => timeToSeconds(b.time)).sort((a, b) => a - b);
+                const start = times[0];
+                if (start > nowSeconds && start < nextStart) {
+                    nextStart = start;
+                    nextPeriod = period;
+                }
+            }
+            if (nextPeriod) {
+                return { period: nextPeriod.name, countdown: `starts in ${formatCountdown(nextStart - nowSeconds)}`, active: false };
+            }
+            return { period: 'Day Complete', countdown: '', active: false };
+        }
+        
+        function timeToSeconds(timeStr) {
+            const parts = timeStr.split(':').map(Number);
+            return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
+        }
+        
+        function formatTime12Hour(seconds) {
+            let hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12 || 12;
+            return `${hours}:${String(mins).padStart(2, '0')} ${ampm}`;
+        }
+        
+        function formatCountdown(seconds) {
+            if (seconds >= 3600) {
+                const hours = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                return `${hours}:${String(mins).padStart(2, '0')}`;
+            } else {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}:${String(secs).padStart(2, '0')}`;
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>
