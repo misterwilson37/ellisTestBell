@@ -3,24 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Config</title>
+    <title>Dashboard Config v1.2.0</title>
+    <!-- Dashboard Config v1.2.0 -->
+    <!-- v1.2.0: Dashboard rewrite support. Replaced Google Drive "Video" section
+         with Canva Embed URL field. Renamed sheetID -> housesSheetCsvUrl and
+         updated helper text to request the full published-CSV URL (the dashboard
+         code now fetches that URL directly, no more constructing it from a raw ID).
+         Subtitle updated (dropped "tvOS" — that deployment target isn't happening). -->
+    <!-- v1.1.0: Palette alignment — body background to slate, added Carolina Sky variable. -->
+    <!-- v1.0.0: First explicit version. Audit pass — shared firebase-config.js; version in <title> and footer. -->
     
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <!-- Shared Firebase config (v1.0.0: extracted from inline) -->
+    <script src="firebase-config.js"></script>
     
     <style>
         :root {
             --carolina-blue: #4B9CD3;
             --carolina-blue-light: #7BAFD4;
+            --carolina-blue-sky: #8FC3E8;   /* v1.1.0 */
             --dark-grey: #1a1a1a;
+            --slate-bg: #111827;            /* v1.1.0 */
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            background: #000;
+            background: var(--slate-bg);    /* v1.1.0: was #000 */
             color: #fff;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             min-height: 100vh;
@@ -250,7 +263,7 @@
 <body>
     <div class="container">
         <h1>📺 Dashboard Config</h1>
-        <p class="subtitle">Configure the Ellis tvOS Dashboard & Web Dashboard</p>
+        <p class="subtitle">Configure the School Dashboard</p>
         
         <!-- Login Section -->
         <div id="login-section">
@@ -275,16 +288,16 @@
                 <button class="btn-signout" onclick="signOut()">Sign Out</button>
             </div>
             
-            <!-- Video Section -->
+            <!-- Canva Section (v1.2.0: replaces the old Google Drive video workflow) -->
             <div class="section">
-                <h2>🎬 Video</h2>
+                <h2>🎨 Canva</h2>
                 <div class="field">
-                    <label>Google Drive Folder ID</label>
-                    <input type="text" id="videoFolderId" placeholder="1rhirAMiKrhkteVPk4wB7Giumi9agnP6N">
+                    <label>Canva Embed URL</label>
+                    <input type="text" id="canvaUrl" placeholder="https://www.canva.com/design/DAG.../view?embed">
                     <p class="help">
-                        Share a Google Drive folder (Anyone with link), then paste the ID here.<br>
-                        The ID is the last part of the folder URL: <code>drive.google.com/drive/folders/<strong>ID_HERE</strong></code><br>
-                        The newest video in this folder will play automatically on both dashboards.
+                        Open your Canva presentation, click <strong>Share → More → Embed</strong>, and paste the URL.<br>
+                        The URL ends in <code>/view?embed</code>. Canva handles its own auto-play loop — the dashboard does not reload the iframe on a timer, so the presentation plays continuously without interruption.<br>
+                        Leave blank to show the school logo instead.
                     </p>
                 </div>
             </div>
@@ -333,13 +346,17 @@
                 </div>
             </div>
             
-            <!-- Google Sheet Section -->
+            <!-- Google Sheet Section (v1.2.0: renamed sheetID -> housesSheetCsvUrl) -->
             <div class="section">
                 <h2>📊 House Scores Sheet</h2>
                 <div class="field">
-                    <label>Google Sheet ID</label>
-                    <input type="text" id="sheetID" placeholder="1v7ZuPnQcG2FnDRITFo55u-c4CRT9CMhDL_-yDmzE5sA">
-                    <p class="help">The ID from your published Google Sheet URL (between /d/ and /edit)</p>
+                    <label>Published Sheet CSV URL</label>
+                    <input type="text" id="housesSheetCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv">
+                    <p class="help">
+                        Open your scores sheet, <strong>File → Share → Publish to web</strong>, choose <em>Comma-separated values (.csv)</em>, click Publish, and paste the generated URL.<br>
+                        Expected structure: row 1 = house names (headers), row 2 = scores. Columns A=Accomodore, B=Callidus, C=Princeps, D=Vevaios.<br>
+                        The dashboard fetches this every 5 minutes.
+                    </p>
                 </div>
             </div>
             
@@ -367,28 +384,31 @@
                 </p>
             </div>
             
-            <!-- Back Link -->
+            <!-- Back Link + Version -->
             <div style="margin-top: 32px; text-align: center;">
                 <a href="index.html" style="color: var(--carolina-blue); text-decoration: none;">← Back to Bell Schedule</a>
+                <div style="margin-top: 12px; font-size: 11px; color: #666;">
+                    Dashboard Config v1.2.0
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Firebase config
-        const firebaseConfig = {
-            apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
-            authDomain: "ellisbell-c185c.firebaseapp.com",
-            projectId: "ellisbell-c185c",
-            storageBucket: "ellisbell-c185c.firebasestorage.app",
-            appId: "1:441560045695:web:94e51a006663404b8f474a"
-        };
+        // Dashboard Config v1.2.0
+        
+        // v1.0.0: Firebase config comes from shared firebase-config.js
+        // (loaded via <script src="firebase-config.js"> in <head>).
+        if (!window.firebaseConfig) {
+            throw new Error("firebase-config.js failed to load. Check <script> tag order in <head>.");
+        }
+        const firebaseConfig = window.firebaseConfig;
         
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
         
-        const appId = "1:441560045695:web:94e51a006663404b8f474a";
+        const appId = firebaseConfig.appId;
         const provider = new firebase.auth.GoogleAuthProvider();
         
         // Config document path
@@ -467,14 +487,27 @@
                 const doc = await configRef.get();
                 if (doc.exists) {
                     const data = doc.data();
-                    document.getElementById('videoFolderId').value = data.videoFolderId || '1rhirAMiKrhkteVPk4wB7Giumi9agnP6N';
+                    // v1.2.0: videoFolderId is no longer used. canvaUrl + housesSheetCsvUrl are new.
+                    document.getElementById('canvaUrl').value = data.canvaUrl || '';
                     document.getElementById('s1').value = data.s1 || '';
                     document.getElementById('s2').value = data.s2 || '';
                     document.getElementById('s3').value = data.s3 || '';
                     document.getElementById('l1').value = data.l1 || '';
                     document.getElementById('l2').value = data.l2 || '';
                     document.getElementById('l3').value = data.l3 || '';
-                    document.getElementById('sheetID').value = data.sheetID || '1v7ZuPnQcG2FnDRITFo55u-c4CRT9CMhDL_-yDmzE5sA';
+                    // Backward-compat: if the old sheetID field exists in Firestore, render
+                    // the published-CSV URL synthesized from it. Next save overwrites to the
+                    // new housesSheetCsvUrl field. Old sheetID remains in the doc harmlessly
+                    // and can be removed via console after all TVs have pulled the new config.
+                    let existingSheetUrl = data.housesSheetCsvUrl || '';
+                    if (!existingSheetUrl && data.sheetID) {
+                        // Raw ID from old config — no way to reconstruct the "published-to-web"
+                        // /e/2PACX... URL from just the sheet ID, so leave blank and prompt
+                        // the user to paste the new URL. Log for debugging.
+                        console.warn('[config] Found legacy sheetID in Firestore but no housesSheetCsvUrl. ' +
+                            'Please paste the Published Sheet CSV URL to migrate.');
+                    }
+                    document.getElementById('housesSheetCsvUrl').value = existingSheetUrl;
                 }
             } catch (error) {
                 console.error('Error loading config:', error);
@@ -487,25 +520,26 @@
             showStatus('status', 'Saving...', 'loading');
             
             const config = {
-                videoFolderId: document.getElementById('videoFolderId').value.trim() || '1rhirAMiKrhkteVPk4wB7Giumi9agnP6N',
+                // v1.2.0: new fields replacing videoFolderId + sheetID
+                canvaUrl: document.getElementById('canvaUrl').value.trim() || null,
+                housesSheetCsvUrl: document.getElementById('housesSheetCsvUrl').value.trim() || null,
                 s1: document.getElementById('s1').value || null,
                 s2: document.getElementById('s2').value || null,
                 s3: document.getElementById('s3').value || null,
                 l1: document.getElementById('l1').value.trim() || null,
                 l2: document.getElementById('l2').value.trim() || null,
                 l3: document.getElementById('l3').value.trim() || null,
-                sheetID: document.getElementById('sheetID').value.trim() || '1v7ZuPnQcG2FnDRITFo55u-c4CRT9CMhDL_-yDmzE5sA',
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
             
-            // Remove null values
+            // Remove null values — keeps Firestore doc tidy
             Object.keys(config).forEach(key => {
                 if (config[key] === null) delete config[key];
             });
             
             try {
                 await configRef.set(config, { merge: true });
-                showStatus('status', '✓ Configuration saved! Both tvOS and web dashboards will update automatically.', 'success');
+                showStatus('status', '✓ Configuration saved! All dashboards will update automatically.', 'success');
             } catch (error) {
                 console.error('Save error:', error);
                 showStatus('status', 'Error saving: ' + error.message, 'error');

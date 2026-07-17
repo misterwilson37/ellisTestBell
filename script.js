@@ -1,6 +1,47 @@
-const APP_VERSION = "5.66.3"
-const CLOCK_VERSION = "1.3.0"
-const DASHBOARD_VERSION = "1.2.3"
+const APP_VERSION = "5.69.4"
+// V5.69.4: PiP broadcast toggle fix
+// - Removed the broadcast toggle from the Picture-in-Picture popup. The toggle
+//   was being deep-cloned into the PiP from the main page's #quickBellControls,
+//   but the cloned button's inline onclick="toggleBroadcastMode()" referenced a
+//   function that doesn't exist in the PiP window's scope — silently no-op. Also
+//   created a duplicate-ID conflict with the main-page toggle.
+// - Broadcast sync still works as expected via the main-page toggle. The PiP is
+//   meant for at-a-glance bell display, not configuration.
+// V5.69.1: Carolina Blue palette — foundation pass (Tier 2 of audit, part 1 of ~3)
+// - Light/dark theme objects now use Carolina Blue hues instead of
+//   Tailwind blue-600/blue-400:
+//     Light accent: #38759E (Carolina Deep, WCAG AA-compliant on white at 4.99:1)
+//     Dark accent:  #8FC3E8 (Carolina Sky, excellent contrast on dark at 9.41:1)
+//     Bold accent:  #4B9CD3 (canonical Carolina Blue, used for large surfaces)
+// - Added --theme-accent-bold custom property for buttons/headers/backgrounds
+//   where contrast requirements are relaxed (large text / non-text UI).
+//   Existing --theme-accent remains the text-safe variant.
+// - Visual cue default background: 18 instances of #4338CA (indigo) replaced
+//   with #4B9CD3 (Carolina). Audited in context; all were "default bg color
+//   for custom-text visual cues" — not semantic, just a leftover default.
+// NOTE: This is the *foundation* of Tier 2. Tailwind class replacements
+// (blue-500 → theme-accent-bold, etc.) and the other files (clock.html,
+// dashboard.html, old.html, manifest.json) come in 5.70.0 and 5.71.0.
+// V5.68.0: Inline rename button for discoverability
+// - Added a pencil-icon button next to the schedule title in the main view.
+//   The admin-rename capability already existed (in the Admin Zone since v4.91),
+//   but was undiscoverable. The new inline button dispatches to the existing
+//   handlers: openRenameSharedScheduleModal() for admins (handles both shared
+//   and personal schedules), handleRenamePersonalSchedule() for authenticated
+//   non-admins with a personal schedule selected.
+// - The inline button mirrors the enabled state of the existing two rename
+//   buttons — no new permission logic, just a more findable entry point.
+// - Hidden in kiosk mode via the existing .kiosk-hide class.
+// V5.67.0: Audit pass — versioning cleanup + shared config + dead code removal
+// - REMOVED: CLOCK_VERSION and DASHBOARD_VERSION constants (stale cross-references).
+//   Each sibling file (clock.html, dashboard.html, dashboard-config.html) now
+//   tracks and displays its own version. index.html footer updated to match.
+// - REMOVED: Inline firebaseConfig declaration. Now read from window.firebaseConfig
+//   (defined in shared firebase-config.js). Consumers: index.html loads it before
+//   script.js; clock/dashboard/dashboard-config load it before their init logic.
+// - REMOVED: Dead functions — checkQueueUntilBell (never called outside definition),
+//   findPeriodAnchorBell (same), plus already-commented-out flattenPeriodsToBells
+//   and handleRelativeTimeChange blocks.
 // V5.66.3: Time Format Fixes & Theme Improvements
 // - FIX: Schedules with HH:MM times (without seconds) now work correctly
 //   - Root cause: setHours() with undefined seconds created Invalid Date, breaking countdown
@@ -335,6 +376,9 @@ const renameSharedNewNameInput = document.getElementById('rename-shared-new-name
 const renameSharedScheduleStatus = document.getElementById('rename-shared-schedule-status');
 const renameSharedCancelBtn = document.getElementById('rename-shared-cancel');
 const renameScheduleBtn = document.getElementById('rename-schedule-btn'); // The button in Admin Zone
+// v5.68.0: Inline pencil button next to schedule title. Mirrors the enabled state of
+// renameScheduleBtn (admin) or renamePersonalScheduleBtn (personal, non-admin).
+const inlineRenameScheduleBtn = document.getElementById('inline-rename-schedule-btn');
 
 // Personal Schedule Manager Buttons (These were missing!)
 const renamePersonalScheduleBtn = document.getElementById('rename-personal-schedule-btn');
@@ -2515,7 +2559,10 @@ let customThemeColors = {
 };
 let visualCueEnabled = true;
 
-// Light theme defaults
+// Light theme defaults — v5.69.1: Carolina Blue palette
+// School colors: Carolina Blue, black, grey, white.
+// Accent is AA-compliant Carolina ("Carolina Deep", #38759E) for text-level UI.
+// Bold accent is canonical Carolina (#4B9CD3) for buttons/headers/backgrounds.
 const lightThemeColors = {
     bgPrimary: '#f3f4f6',
     bgCard: '#ffffff',
@@ -2524,7 +2571,8 @@ const lightThemeColors = {
     textPrimary: '#111827',
     textSecondary: '#4b5563',
     textMuted: '#6b7280',
-    accent: '#2563eb',
+    accent: '#38759E',       // Carolina Deep — passes WCAG AA on white (4.99)
+    accentBold: '#4B9CD3',   // Canonical Carolina Blue — for large surfaces
     countdown: '#111827',
     border: '#d1d5db',
     borderLight: '#e5e7eb',
@@ -2532,7 +2580,7 @@ const lightThemeColors = {
     buttonText: '#374151'
 };
 
-// Dark theme defaults
+// Dark theme defaults — v5.69.1: Carolina Blue palette (lighter for dark bg contrast)
 const darkThemeColors = {
     bgPrimary: '#111827',
     bgCard: '#1f2937',
@@ -2541,7 +2589,8 @@ const darkThemeColors = {
     textPrimary: '#f9fafb',
     textSecondary: '#d1d5db',
     textMuted: '#9ca3af',
-    accent: '#60a5fa',
+    accent: '#8FC3E8',       // Carolina Sky — 9.41 on dark-bg, 11.14 on black (excellent)
+    accentBold: '#4B9CD3',   // Canonical Carolina still works on dark (5.91 on dark-bg)
     countdown: '#f9fafb',
     border: '#374151',
     borderLight: '#4b5563',
@@ -2620,6 +2669,7 @@ function applyTheme() {
         root.style.setProperty('--theme-text-secondary', colors.textSecondary);
         root.style.setProperty('--theme-text-muted', colors.textMuted);
         root.style.setProperty('--theme-accent', colors.accent);
+        root.style.setProperty('--theme-accent-bold', colors.accentBold); // v5.69.1: Carolina Blue for large surfaces
         root.style.setProperty('--theme-countdown', colors.countdown);
         root.style.setProperty('--theme-border', colors.border);
         root.style.setProperty('--theme-border-light', colors.borderLight);
@@ -2635,6 +2685,8 @@ function applyTheme() {
         root.style.setProperty('--theme-text-secondary', customThemeColors.textSecondary);
         root.style.setProperty('--theme-text-muted', customThemeColors.textMuted || customThemeColors.textSecondary);
         root.style.setProperty('--theme-accent', customThemeColors.accent);
+        // v5.69.1: If user hasn't set a custom accent-bold, fall back to canonical Carolina
+        root.style.setProperty('--theme-accent-bold', customThemeColors.accentBold || '#4B9CD3');
         root.style.setProperty('--theme-countdown', customThemeColors.countdown);
         root.style.setProperty('--theme-border', customThemeColors.border || '#d1d5db');
         root.style.setProperty('--theme-border-light', customThemeColors.borderLight || '#e5e7eb');
@@ -3087,6 +3139,13 @@ async function togglePictureInPicture() {
         // V5.55.8: Remove Q button - queue modal can't work in PiP
         const oldQueueBtn = quickBellsClone.querySelector('#quick-bell-queue-btn');
         if (oldQueueBtn) oldQueueBtn.remove();
+        // V5.69.4: Remove broadcast toggle - cloned button's onclick references
+        // toggleBroadcastMode which doesn't exist in the PiP window's scope, so the
+        // cloned button is dead. Also creates duplicate-ID issues with the main-page
+        // toggle. Broadcast sync still works fine via the main-page toggle; the PiP
+        // is meant for at-a-glance bell display, not configuration.
+        const oldBroadcastToggle = quickBellsClone.querySelector('#quick-bell-broadcast-toggle');
+        if (oldBroadcastToggle) oldBroadcastToggle.remove();
         container.appendChild(quickBellsClone);
         
         pipDoc.body.appendChild(container);
@@ -4252,16 +4311,6 @@ function cancelQueue() {
     updateClock();
 }
 
-function checkQueueUntilBell(bellId) {
-    // Called when a bell rings - check if it matches our "until" bell
-    if (queueActive && queueRepeatMode === 'until' && queueUntilBellId === bellId) {
-        console.log('Queue "until" bell reached, stopping queue');
-        cancelQueue();
-        return true;
-    }
-    return false;
-}
-
 function getQueueVisualHtml() {
     if (queueVisual === '[DEFAULT_Q]') {
         // Default Q visual - a simple styled Q
@@ -4337,9 +4386,9 @@ function renderCustomQuickBells() {
         const minutes = bell ? bell.minutes : 5;
         const seconds = bell ? bell.seconds : 0;
         // V5.03: Read/default the full visual cue (which includes custom text/colors or URL)
-        const rawVisualCue = bell ? (bell.visualCue || '[CUSTOM_TEXT] ?|#4338CA|#FFFFFF') : '[CUSTOM_TEXT] ?|#4338CA|#FFFFFF'; 
+        const rawVisualCue = bell ? (bell.visualCue || '[CUSTOM_TEXT] ?|#4B9CD3|#FFFFFF') : '[CUSTOM_TEXT] ?|#4B9CD3|#FFFFFF'; 
         const rawIconText = bell ? bell.iconText : String(id); // Legacy/Custom Text value
-        let iconColor = bell ? (bell.iconBgColor || '#4338CA') : '#4338CA';
+        let iconColor = bell ? (bell.iconBgColor || '#4B9CD3') : '#4B9CD3';
         let textColor = bell ? (bell.iconFgColor || '#FFFFFF') : '#FFFFFF';
         const sound = bell ? bell.sound : 'ellisBell.mp3';
         
@@ -5178,14 +5227,6 @@ function renderScheduleSelector() {
         setActiveSchedule(``); // No schedules at all
     }
 }
-
-// DELETED in 4.38: This function is no longer used.
-// The 'resolveAllBellTimes' engine now creates the flat bell list.
-/*
-function flattenPeriodsToBells(periodList) {
-    ...
-}
-*/
 
 /**
     * MODIFIED: v4.07 - Final robust logic for migrating old flat bell structure to the new period structure.
@@ -6240,17 +6281,13 @@ async function initFirebase() {
     if (auth) return; 
 
     try {
-        // MODIFIED: v4.26 - Reverted to hardcoded config from v4.23.
-        // The dynamic __firebase_config check (v4.24) is ONLY for the
-        // canvas environment and fails on external hosting (like GitHub Pages),
-        // which caused the "config is not defined" error.
-        const firebaseConfig = {
-            apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
-            authDomain: "ellisbell-c185c.firebaseapp.com", 
-            projectId: "ellisbell-c185c",
-            storageBucket: "ellisbell-c185c.firebasestorage.app",
-            appId: "1:441560045695:web:94e51a006663404b8f474a"
-        };
+        // V5.67.0: Read config from shared firebase-config.js (loaded before this
+        // module in index.html). Previously this block declared a local
+        // firebaseConfig const — now kept in one place across all surfaces.
+        if (!window.firebaseConfig) {
+            throw new Error("firebase-config.js must load before script.js. Check index.html <script> order.");
+        }
+        const firebaseConfig = window.firebaseConfig;
         
         // MODIFIED: v4.26 - Set global appId from hardcoded config
         appId = firebaseConfig.appId;
@@ -6700,10 +6737,10 @@ function listenForCustomQuickBells(userId) {
                 seconds: b.seconds || 0,
                 // NEW V5.00: Read Icon Colors
                 iconText: b.iconText || String(index + 1),
-                iconBgColor: b.iconBgColor || '#4338CA',
+                iconBgColor: b.iconBgColor || '#4B9CD3',
                 iconFgColor: b.iconFgColor || '#FFFFFF',
                 // Added 5.25 to get visual uploads working
-                visualCue: b.visualCue || `[CUSTOM_TEXT] ${index + 1}|#4338CA|#FFFFFF`,
+                visualCue: b.visualCue || `[CUSTOM_TEXT] ${index + 1}|#4B9CD3|#FFFFFF`,
                     
                 sound: b.sound || 'ellisBell.mp3',
                 isActive: b.isActive !== false // 5.19.3 Default to TRUE (active/checked)
@@ -6805,6 +6842,7 @@ function setActiveSchedule(prefixedId) {
 
     // NEW V4.91: Disable admin rename button
     renameScheduleBtn.disabled = true;
+    updateInlineRenameScheduleBtn(); // v5.68.0: mirror state to inline pencil button
     
     // v3.03: Disable personal schedule buttons
     createPersonalScheduleBtn.disabled = true;
@@ -6859,6 +6897,7 @@ function setActiveSchedule(prefixedId) {
                 importCurrentScheduleBtn.disabled = false;
                 // NEW V4.91: Enable shared rename button
                 renameScheduleBtn.disabled = false;
+                updateInlineRenameScheduleBtn(); // v5.68.0: mirror to inline pencil
             }
         }
 
@@ -6976,6 +7015,10 @@ function setActiveSchedule(prefixedId) {
         if (document.body.classList.contains('admin-mode')) {
             renameScheduleBtn.disabled = false;
         }
+        // v5.68.0: Personal schedule is selected — either the admin button or the
+        // user's own rename-personal button will be enabled; show the inline pencil.
+        renamePersonalScheduleBtn.disabled = false; // (already set just above; re-affirmed for clarity)
+        updateInlineRenameScheduleBtn();
         
         // NEW in 4.57: Enable new period button
         newPeriodBtn.disabled = false;
@@ -7433,6 +7476,39 @@ async function handleRenameSharedScheduleSubmit(e) {
     }
 }
 // --- END V4.91 ---
+
+/**
+ * v5.68.0: Keeps the inline pencil button next to the schedule title in sync
+ * with whichever of the two existing rename buttons is currently enabled.
+ * This is a pure mirror — it does not introduce new permission logic. The
+ * button is shown if renameScheduleBtn (Admin Zone) or renamePersonalScheduleBtn
+ * (personal-schedule panel) is enabled, and clicking it dispatches to the
+ * appropriate existing handler.
+ *
+ * Call this after any code path that toggles either of those two buttons.
+ */
+function updateInlineRenameScheduleBtn() {
+    if (!inlineRenameScheduleBtn) return; // Defensive: element may not exist in older cached HTML
+    const adminCanRename = !renameScheduleBtn.disabled;
+    const userCanRenamePersonal = !renamePersonalScheduleBtn.disabled;
+    if (adminCanRename || userCanRenamePersonal) {
+        inlineRenameScheduleBtn.classList.remove('hidden');
+    } else {
+        inlineRenameScheduleBtn.classList.add('hidden');
+    }
+}
+
+function handleInlineRenameScheduleClick() {
+    // Prefer the admin flow (works for both shared and personal) when admin-mode is on.
+    if (document.body.classList.contains('admin-mode') && !renameScheduleBtn.disabled) {
+        openRenameSharedScheduleModal();
+        return;
+    }
+    // Otherwise fall back to the personal-only flow.
+    if (!renamePersonalScheduleBtn.disabled) {
+        handleRenamePersonalSchedule();
+    }
+}
 
 /**
     * NEW: v3.02 (4.03?) - Opens the modal to confirm bell deletion.
@@ -10142,14 +10218,6 @@ function openRelativeBellModal() {
     relativeBellModal.classList.remove('hidden');
 }
 
-// DELETED in 4.38: This function is no longer used.
-// The 'updateCalculatedTime' function now handles this logic.
-/*
-async function handleRelativeTimeChange() {
-    ...
-}
-*/
-
 /**
     * MODIFIED: v4.10 - Submits the new "relative" bell object.
     * This now saves a dependency link, NOT a static time.
@@ -10461,23 +10529,6 @@ function openMultiAddRelativeModal() {
     
     // 4. Show the modal
     multiAddRelativeBellModal.classList.remove('hidden');
-}
-
-/**
-    * NEW: v4.42 - Finds the "Period Start" or "Period End" bell for a given period.
-    */
-function findPeriodAnchorBell(periodName, anchorType) {
-    const period = calculatedPeriodsList.find(p => p.name === periodName);
-    if (!period || !period.bells || period.bells.length === 0) {
-        return null; // Period not found or is empty
-    }
-    
-    // Bells are already sorted by time
-    if (anchorType === 'period_start') {
-        return period.bells[0]; // First bell
-    } else {
-        return period.bells[period.bells.length - 1]; // Last bell
-    }
 }
 
 /**
@@ -11508,7 +11559,7 @@ function getVisualHtml(value, periodName, _skipOverrideLookup = false) {
         // MODIFIED V5.41: Use centralized config
         const parts = value.replace('[CUSTOM_TEXT] ', '').split('|');
         const customText = parts[0] || '...';
-        const bgColor = parts[1] || '#4338CA'; // Default bg
+        const bgColor = parts[1] || '#4B9CD3'; // Default bg
         const fgColor = parts[2] || '#FFFFFF'; // Default fg
         
         const svgFontSize = customText.length > 2 ? 
@@ -11625,7 +11676,7 @@ function getVisualIconHtml(value, periodName) {
     if (value.startsWith('[CUSTOM_TEXT]')) {
         const parts = value.replace('[CUSTOM_TEXT] ', '').split('|');
         const customText = parts[0] || '...';
-        const bgColor = parts[1] || '#4338CA'; // Default bg
+        const bgColor = parts[1] || '#4B9CD3'; // Default bg
         const fgColor = parts[2] || '#FFFFFF'; // Default fg
         
         const svgFontSize = customText.length > 2 ? 
@@ -14057,17 +14108,6 @@ function init() {
         cssVersionElement.textContent = `v${cssVersion || '?.?.?'}`;
     }
     
-    // V5.46.2: Clock and Dashboard version displays
-    const clockVersionElement = document.getElementById('clock-version-display');
-    if (clockVersionElement) {
-        clockVersionElement.textContent = `v${CLOCK_VERSION}`;
-    }
-    
-    const dashboardVersionElement = document.getElementById('dashboard-version-display');
-    if (dashboardVersionElement) {
-        dashboardVersionElement.textContent = `v${DASHBOARD_VERSION}`;
-    }
-    
     // Optional: Also update the Browser Tab Title automatically
     console.log(`App Version Loaded: ${APP_VERSION}`);
     
@@ -14162,6 +14202,11 @@ function init() {
     renameSharedCancelBtn.addEventListener('click', () => {
         renameSharedScheduleModal.classList.add('hidden');
     });
+    // v5.68.0: Inline pencil button next to schedule title — routes to the
+    // appropriate existing rename handler.
+    if (inlineRenameScheduleBtn) {
+        inlineRenameScheduleBtn.addEventListener('click', handleInlineRenameScheduleClick);
+    }
 
     // NEW V5.00: Custom Quick Bell Manager Listeners
     showCustomQuickBellManagerBtn.addEventListener('click', () => {
@@ -14265,9 +14310,9 @@ function init() {
                     
                     // NEW V5.00: Include Icon colors and text
                     iconText: slotData.iconText.trim().substring(0, 3) || String(id),
-                    iconBgColor: slotData.iconBgColor || '#4338CA',
+                    iconBgColor: slotData.iconBgColor || '#4B9CD3',
                     iconFgColor: slotData.iconFgColor || '#FFFFFF',
-                    visualCue: slotData.visualCue || '[CUSTOM_TEXT] ?|#4338CA|#FFFFFF',
+                    visualCue: slotData.visualCue || '[CUSTOM_TEXT] ?|#4B9CD3|#FFFFFF',
                     
                     sound: slotData.sound || 'ellisBell.mp3',
                     isActive: isActive
@@ -14329,7 +14374,7 @@ function init() {
                     minutes: 5,
                     seconds: 0,
                     iconText: String(newId),
-                    iconBgColor: '#4338CA',
+                    iconBgColor: '#4B9CD3',
                     iconFgColor: '#FFFFFF',
                     sound: 'ellisBell.mp3',
                     isActive: true
@@ -14372,7 +14417,7 @@ function init() {
                 if (visualCue.startsWith('[CUSTOM_TEXT] ')) {
                     const parts = visualCue.replace('[CUSTOM_TEXT] ', '').split('|');
                     customTextInput.value = parts[0] || '';
-                    customTextBgColorInput.value = parts[1] || '#4338CA';
+                    customTextBgColorInput.value = parts[1] || '#4B9CD3';
                     customTextColorInput.value = parts[2] || '#FFFFFF';
                 }
                 
@@ -14555,11 +14600,11 @@ function init() {
                 if (selectedValue.startsWith('[CUSTOM_TEXT] ')) {
                     const parts = selectedValue.replace('[CUSTOM_TEXT] ', '').split('|');
                     customTextInput.value = parts[0] || '';
-                    customTextBgColorInput.value = parts[1] || '#4338CA';
+                    customTextBgColorInput.value = parts[1] || '#4B9CD3';
                     customTextColorInput.value = parts[2] || '#FFFFFF';
                 } else {
                     customTextInput.value = '';
-                    customTextBgColorInput.value = '#4338CA';
+                    customTextBgColorInput.value = '#4B9CD3';
                     customTextColorInput.value = '#FFFFFF';
                 }
                 
@@ -14591,7 +14636,7 @@ function init() {
             const buttonPreview = row.querySelector('.custom-bell-button-preview');
             if (buttonPreview) {
                 // V5.43.2: Determine bg/fg colors from value
-                let bgColor = '#4338CA';
+                let bgColor = '#4B9CD3';
                 let fgColor = '#FFFFFF';
                 
                 // Check for [BG:...] prefix first
@@ -15759,14 +15804,14 @@ function init() {
             
             // ALWAYS clear inputs first, then fill if there's a saved value
             customTextInput.value = ''; 
-            customTextBgColorInput.value = '#4338CA';
+            customTextBgColorInput.value = '#4B9CD3';
             customTextColorInput.value = '#FFFFFF';
             
             // MODIFIED V4.75: Logic to pre-fill input AND colors if saved
             if (originalValueCustom.startsWith('[CUSTOM_TEXT]')) {
                 const parts = originalValueCustom.replace('[CUSTOM_TEXT] ', '').split('|');
                 customTextInput.value = parts[0] || '';
-                customTextBgColorInput.value = parts[1] || '#4338CA';
+                customTextBgColorInput.value = parts[1] || '#4B9CD3';
                 customTextColorInput.value = parts[2] || '#FFFFFF';
                 e.target.value = originalValueCustom; // Keep the original custom value selected
             } else {
@@ -15814,7 +15859,7 @@ function init() {
             // Custom text - extract parts
             const parts = value.replace('[CUSTOM_TEXT] ', '').split('|');
             const text = parts[0] || '?';
-            const bgColor = parts[1] || '#4338CA';
+            const bgColor = parts[1] || '#4B9CD3';
             const fgColor = parts[2] || '#FFFFFF';
             
             previewFull.innerHTML = `<span class="text-6xl font-bold" style="color: ${fgColor};">${text}</span>`;

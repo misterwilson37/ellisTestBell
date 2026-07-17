@@ -3,11 +3,12 @@
 <head>
 	<meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.66.3</title>
+    <title>Ellis Web Bell 5.69.2</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1d4ed8">
+    <!-- v5.69.1: Carolina Blue (was indigo-700 #1d4ed8) -->
+    <meta name="theme-color" content="#4B9CD3">
     <meta name="description" content="A real-time, synchronized school bell schedule and timer system">
     
     <!-- iOS PWA Support -->
@@ -16,8 +17,8 @@
     <meta name="apple-mobile-web-app-title" content="Web Bell">
     <link rel="apple-touch-icon" href="icon-192.png">
     
-    <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
+    <!-- Favicon (v5.69.1: fill updated from blue-600 #2563EB to Carolina #4B9CD3) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%234B9CD3%22><path d=%22M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z%22/></svg>">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
     
@@ -44,6 +45,8 @@
     <link rel="stylesheet" href="styles.css">
 
     <!-- V5.66.0: Theme CSS Variables & Overrides -->
+    <!-- v5.69.1: Carolina Blue palette. --theme-accent is text-safe (AA on white),
+         --theme-accent-bold is canonical Carolina for large surfaces (buttons, etc.). -->
     <style id="theme-styles">
         :root {
             --theme-bg-primary: #f3f4f6;
@@ -53,7 +56,8 @@
             --theme-text-primary: #111827;
             --theme-text-secondary: #4b5563;
             --theme-text-muted: #6b7280;
-            --theme-accent: #2563eb;
+            --theme-accent: #38759E;        /* Carolina Deep, AA on white */
+            --theme-accent-bold: #4B9CD3;   /* Canonical Carolina Blue */
             --theme-countdown: #111827;
             --theme-border: #d1d5db;
             --theme-border-light: #e5e7eb;
@@ -139,6 +143,102 @@
         .text-gray-700:not(.text-gray-700.hover\:text-gray-700) {
             color: var(--theme-button-text) !important;
         }
+        
+        /* =========================================================
+           v5.69.2: Tailwind blue/sky/indigo class overrides.
+           Rather than renaming 200+ class references across the HTML
+           (which would make the markup harder to read and the classes
+           less semantically meaningful), we override the Tailwind
+           utility classes here so `bg-blue-600` still reads as "primary
+           button" but the paint comes from our Carolina Blue tokens.
+           
+           Rules are grouped by role, not by class. Higher specificity
+           selectors beat the Tailwind CDN's utility classes.
+           ========================================================= */
+        
+        /* Primary buttons — solid Carolina. Classes: bg-blue-500, bg-blue-600,
+           bg-blue-700, bg-sky-500, bg-sky-600, bg-indigo-600. */
+        .bg-blue-500,
+        .bg-blue-600,
+        .bg-blue-700,
+        .bg-sky-500,
+        .bg-sky-600,
+        .bg-indigo-600 {
+            background-color: var(--theme-accent-bold) !important;
+        }
+        /* Primary button hover — darker Carolina (Carolina Deep, AA on white) */
+        .hover\:bg-blue-600:hover,
+        .hover\:bg-blue-700:hover,
+        .hover\:bg-blue-800:hover,
+        .hover\:bg-sky-600:hover,
+        .hover\:bg-sky-700:hover,
+        .hover\:bg-indigo-700:hover {
+            background-color: var(--theme-accent) !important;
+        }
+        
+        /* Text-as-accent (links, titles that use blue for emphasis). Classes:
+           text-blue-600, text-blue-700, text-sky-600, text-sky-700 */
+        .text-blue-600,
+        .text-blue-700,
+        .text-sky-600,
+        .text-sky-700 {
+            color: var(--theme-accent) !important;
+        }
+        .hover\:text-blue-600:hover,
+        .hover\:text-blue-800:hover {
+            color: var(--theme-accent-bold) !important;
+        }
+        
+        /* Borders and focus rings — use the bolder variant for visibility */
+        .border-blue-500,
+        .border-blue-600 {
+            border-color: var(--theme-accent-bold) !important;
+        }
+        .focus\:ring-blue-500:focus,
+        .focus\:ring-sky-500:focus,
+        .focus\:ring-indigo-500:focus {
+            --tw-ring-color: var(--theme-accent-bold) !important;
+        }
+        
+        /* Subtle tint backgrounds (bg-blue-50, bg-blue-100, bg-sky-100) need
+           special handling: in light mode they read as a faint blue tint; in
+           dark mode pure Tailwind blue-50 (#eff6ff) is jarring white-on-dark.
+           Solve by routing to --theme-bg-hover, which is appropriately light
+           in light mode and appropriately dark-gray in dark mode. */
+        .bg-blue-50,
+        .bg-blue-100,
+        .bg-sky-100 {
+            background-color: var(--theme-bg-hover) !important;
+        }
+        .hover\:bg-blue-200:hover,
+        .hover\:bg-sky-200:hover {
+            background-color: var(--theme-border) !important;
+        }
+        
+        /* --- BUG FIX for dark mode white-on-white ---
+           The Light/Dark theme-preset buttons (#theme-light-btn, #theme-dark-btn)
+           are intentionally theme-previews — they should look light and dark
+           respectively regardless of current theme. Override the theme
+           overrides above so the Light button stays legible in dark mode.
+           (v5.69.2, spotted by user in a screenshot.) */
+        #theme-light-btn {
+            background-color: #f3f4f6 !important; /* Tailwind gray-100 */
+            color: #1f2937 !important; /* Tailwind gray-800 */
+            border-color: var(--theme-accent-bold) !important;
+        }
+        #theme-dark-btn {
+            background-color: #374151 !important; /* Tailwind gray-700 */
+            color: #ffffff !important;
+        }
+        /* Selected state for theme buttons — handled dynamically by JS adding
+           .border-blue-500 / removing it. Ensure the selected border uses Carolina. */
+        #theme-light-btn.border-blue-500,
+        #theme-dark-btn.border-blue-500 {
+            border-color: var(--theme-accent-bold) !important;
+        }
+        /* =========================================================
+           END v5.69.2 Tailwind overrides
+           ========================================================= */
         
         /* Hide visual cue when disabled */
         body.hide-visual-cue #visual-cue-wrapper {
@@ -1292,7 +1392,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.66.3</h1>
+            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.69.2</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             <!-- V5.44.0: Clock Display Link, V5.47.3: Added Dashboard Link -->
             <div class="mt-2 flex items-center justify-center gap-3 text-sm">
@@ -1475,6 +1575,18 @@
                             class="h-5 w-5 text-sky-600 rounded focus:ring-sky-500 mr-3 hidden"
                             title="Select/deselect all bells">
                      <h2 id="schedule-title" class="text-2xl font-semibold">Current Schedule</h2>
+                     <!-- v5.68.0: Inline rename button next to title. Routes to the existing
+                          rename-schedule-btn's handler in the Admin Zone via JS. Visible when a
+                          shared schedule is selected and admin-mode is on, OR when a personal
+                          schedule is selected and the user is authenticated. Hidden in kiosk mode. -->
+                     <button type="button" id="inline-rename-schedule-btn"
+                             class="ml-2 p-1 text-gray-400 hover:text-gray-700 rounded hover:bg-gray-100 kiosk-hide hidden"
+                             title="Rename this schedule" aria-label="Rename this schedule">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <path d="M12 20h9"></path>
+                             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                         </svg>
+                     </button>
                  </div>
                  <div class="flex-shrink-0 flex gap-2">
                      <!-- NEW in 4.49: Collapse/Expand Buttons -->
@@ -2337,7 +2449,7 @@
                         </div>
                         <div class="text-center">
                             <label for="custom-text-bg-color" class="block text-sm font-medium text-gray-700 mb-1">Background</label>
-                            <input type="color" id="custom-text-bg-color" value="#4338CA" class="w-16 h-10 p-0 border-none rounded-md cursor-pointer mx-auto block">
+                            <input type="color" id="custom-text-bg-color" value="#4B9CD3" class="w-16 h-10 p-0 border-none rounded-md cursor-pointer mx-auto block">
                         </div>
                     </div>
                 </div>
@@ -2824,7 +2936,8 @@
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-gray-600 mb-1">Accent (Title)</label>
-                                            <input type="color" id="theme-color-accent" value="#2563eb" class="w-full h-8 rounded cursor-pointer">
+                                            <!-- v5.69.1: default Carolina Deep (AA on white) -->
+                                            <input type="color" id="theme-color-accent" value="#38759E" class="w-full h-8 rounded cursor-pointer">
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-gray-600 mb-1">Countdown</label>
@@ -2915,10 +3028,6 @@
    		 		App Version: <span id="app-version-display" class="font-bold text-gray-600">Loading...</span>
    		 		&nbsp;|&nbsp;
    		 		CSS Version: <span id="css-version-display" class="font-bold text-gray-600">Loading...</span>
-   		 		&nbsp;|&nbsp;
-   		 		Clock Version: <span id="clock-version-display" class="font-bold text-gray-600">Loading...</span>
-   		 		&nbsp;|&nbsp;
-   		 		Dashboard Version: <span id="dashboard-version-display" class="font-bold text-gray-600">Loading...</span>
 			</div>
         </footer>
 
@@ -2927,6 +3036,8 @@
     </div>
 
        	<!-- 5.06 Moving JS out -->
+        <!-- v5.67.0: firebase-config.js must load BEFORE script.js so window.firebaseConfig is populated when the module initializes -->
+        <script src="firebase-config.js"></script>
 		<script type="module" src="script.js"></script>
 </body>
 </html>
@@ -2954,4 +3065,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.66.3 -->
+<!-- Version 5.69.2 -->

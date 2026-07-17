@@ -1,10 +1,10 @@
 /* ============================================
    Ellis Web Bell Stylesheet
-   Version: 2.4
+   Version: 2.5
    ============================================ */
 
 :root {
-    --css-version: "2.4";
+    --css-version: "2.5";
     
     /* V5.52.1: Customizable warning colors */
     --warning-color-subtle: #fbbf24;
@@ -148,7 +148,7 @@ body {
 }
 .visual-preview-full.clickable:hover {
     opacity: 0.9;
-    box-shadow: 0 0 0 2px #3b82f6;  /* blue-500 ring */
+    box-shadow: 0 0 0 2px #4B9CD3;  /* v2.5: Carolina Blue ring (was blue-500) */
 }
 .visual-preview-full.clickable:hover::after {
     content: 'Click to change background';

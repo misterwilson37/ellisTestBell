@@ -3,8 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bell Schedule Clock</title>
-    <!-- Clock Display v1.3.0 -->
+    <title>Bell Schedule Clock v1.4.0</title>
+    <!-- Clock Display v1.4.0 -->
+    <!-- v1.4.0: Palette alignment with main app (Tier 2 of audit, sibling pass).
+         - Body background #000 -> #111827 (slate). Aligns with main app dark-mode
+           background token; still reads as black at typical Yodeck TV viewing
+           distance; reduces LCD backlight bleed; OLED-safe. Consistent with
+           dashboard.html's new background.
+         - Added --carolina-blue-sky (#8FC3E8) variable for future dark-mode UI
+           that needs a brighter accent than Carolina proper.
+         - Auth section and setup-panel backgrounds adjusted for the lighter bg. -->
+    <!-- v1.3.2: Audit pass — shared firebase-config.js; service worker registration; removed stale cross-refs to sibling versions; version in <title> -->
+    <!-- v1.3.1: Fix grid overflow in narrow frames (minmax(0,1fr) + min-width:0 + wrappable labels) -->
     <!-- v1.3.0: Support up to 9 schedules with automatic grid layout -->
     <!-- v1.2.0: Added personal schedule support for teachers with multiple personal schedules -->
     <!-- v1.2.0: Added relative bell time calculation (personal schedules use relative bells) -->
@@ -15,17 +25,22 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+    <!-- Shared Firebase config (v1.3.2: extracted from inline) -->
+    <script src="firebase-config.js"></script>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&family=Questrial&display=swap" rel="stylesheet">
     
     <style>
-        /* Clock Display v1.3.0 - School Colors: Black, White, Grey, Carolina Blue */
+        /* Clock Display v1.4.0 - School Colors: Black, White, Grey, Carolina Blue */
         :root {
             --carolina-blue: #4B9CD3;
             --carolina-blue-light: #7BAFD4;
+            --carolina-blue-sky: #8FC3E8;   /* v1.4.0: brighter variant for dark-mode accents */
             --dark-grey: #1a1a1a;
             --darker-grey: #111111;
+            --slate-bg: #111827;            /* v1.4.0: main app dark-bg token; used as body background */
         }
         
         * {
@@ -35,7 +50,7 @@
         }
         
         body {
-            background: #000;
+            background: var(--slate-bg);  /* v1.4.0: was #000; slate matches main app dark mode */
             color: #fff;
             font-family: 'Century Gothic', 'Urbanist', 'Questrial', sans-serif;
             min-height: 100vh;
@@ -397,19 +412,22 @@
         
         #schedule-columns {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            /* v1.3.1: minmax(0, 1fr) instead of bare 1fr — prevents columns from refusing
+               to shrink below their intrinsic content width, which was causing the grid
+               to overflow narrow iframes (Yodeck, dashboard.html, etc.). */
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 20px;
             width: 100%;
             transition: all 0.3s;
         }
         
         /* Dynamic grid layouts */
-        #schedule-columns.grid-1 { grid-template-columns: 1fr; max-width: 400px; }
-        #schedule-columns.grid-2 { grid-template-columns: repeat(2, 1fr); }
-        #schedule-columns.grid-3 { grid-template-columns: repeat(3, 1fr); }
-        #schedule-columns.grid-2x2 { grid-template-columns: repeat(2, 1fr); }
-        #schedule-columns.grid-3x2 { grid-template-columns: repeat(3, 1fr); }
-        #schedule-columns.grid-3x3 { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        #schedule-columns.grid-1 { grid-template-columns: minmax(0, 1fr); max-width: 400px; }
+        #schedule-columns.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #schedule-columns.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        #schedule-columns.grid-2x2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #schedule-columns.grid-3x2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        #schedule-columns.grid-3x3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         
         .schedule-column {
             text-align: center;
@@ -418,6 +436,9 @@
             background: var(--dark-grey);
             border: 1px solid #333;
             display: none; /* Hidden by default */
+            /* v1.3.1: min-width: 0 belts-and-suspenders with grid's minmax(0, 1fr).
+               Grid items default to min-content width, which breaks ellipsis/wrapping. */
+            min-width: 0;
         }
         
         .schedule-column.active {
@@ -425,13 +446,15 @@
         }
         
         .column-label {
-            font-size: clamp(1rem, 3vw, 1.5rem);
+            font-size: clamp(0.85rem, 3vw, 1.5rem);
             font-weight: 600;
             color: #a0a0a0;
             margin-bottom: 8px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            /* v1.3.1: Allow the label to wrap onto 2 lines in narrow frames instead of
+               hard-truncating with ellipsis. More informative on narrow Yodeck/dashboard frames. */
+            line-height: 1.2;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
         
         .column-period {
@@ -585,7 +608,7 @@
         </div>
         
         <div class="version-info" style="margin-top: 16px; font-size: 11px; color: #666; text-align: center;">
-            Clock v1.3.0 | Dashboard v1.2.3 | Ellis Web Bell v5.46.2
+            Clock v1.4.0
             <br>
             <a href="index.html" style="color: var(--carolina-blue); text-decoration: none;">← Back to Bell Schedule</a>
         </div>
@@ -650,16 +673,14 @@
     </div>
     
     <script>
-        // Clock Display v1.3.0 - Support up to 9 schedules with automatic grid layout
+        // Clock Display v1.4.0 - Support up to 9 schedules with automatic grid layout
         
-        // Firebase config (must match main app)
-        const firebaseConfig = {
-            apiKey: "AIzaSyDfo45UBu-pR8nqMQhVlS_QgyYZ2kzBdvM",
-            authDomain: "ellisbell-c185c.firebaseapp.com", 
-            projectId: "ellisbell-c185c",
-            storageBucket: "ellisbell-c185c.firebasestorage.app",
-            appId: "1:441560045695:web:94e51a006663404b8f474a"
-        };
+        // v1.3.2: Firebase config now comes from shared firebase-config.js
+        // (loaded via <script src="firebase-config.js"> before this block).
+        if (!window.firebaseConfig) {
+            throw new Error("firebase-config.js failed to load. Check <script> tag order in <head>.");
+        }
+        const firebaseConfig = window.firebaseConfig;
         
         // App ID for Firestore paths
         const appId = firebaseConfig.appId;
@@ -1695,7 +1716,7 @@
         
         // Initialize
         async function init() {
-            console.log('Clock Display v1.3.0 initializing...');
+            console.log('Clock Display v1.4.0 initializing...');
             
             // Check if user is already authenticated (e.g., from main app)
             let currentUser = null;
@@ -1813,6 +1834,19 @@
         
         // Start
         init();
+
+        // v1.3.2: Register service worker for PWA caching.
+        // Benefits classroom use (3x3 grid all day): instant reload after network
+        // blips, first-paint from cache on subsequent opens, offline continuity.
+        // Service worker uses network-first (see service-worker.js), so new
+        // versions are not hidden behind stale caches.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then((reg) => console.log('[clock.html] Service worker registered:', reg.scope))
+                    .catch((err) => console.warn('[clock.html] Service worker registration failed:', err));
+            });
+        }
     </script>
 </body>
 </html>

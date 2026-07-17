@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ellis Bell - Legacy (iOS 9)</title>
+    <title>Ellis Bell - Legacy v1.7.0 (iOS 9+)</title>
+    <!-- Ellis Bell Legacy v1.7.0 -->
+    <!-- v1.7.0: Palette unification with main app (Tier 2 of audit, sibling pass).
+         Collapsed 23 distinct blue/indigo/violet values down to 4 Carolina-based
+         shades. Three rainbow action buttons (Refresh sky / Dark indigo /
+         Fullscreen violet) are now three shades of Carolina Blue.
+         Kept non-blue semantic colors (amber warning, red error, grays).
+         No JS logic changes — this file remains a self-contained iOS 9+ surface. -->
+    <!-- v1.6.4: Previous release. -->
     
     <!-- Add to Home Screen - iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -53,7 +61,7 @@
             color: #f3f4f6;
         }
         body.dark-mode input[type="text"]:focus {
-            border-color: #60a5fa;
+            border-color: #8FC3E8;
         }
         body.dark-mode .btn-secondary {
             background: #374151;
@@ -63,7 +71,7 @@
             background: #4b5563;
         }
         body.dark-mode .header-title {
-            color: #93c5fd;
+            color: #8FC3E8;
         }
         body.dark-mode .bell-item {
             border-bottom-color: #374151;
@@ -72,13 +80,13 @@
             color: #e5e7eb;
         }
         body.dark-mode .bell-next {
-            background: #1e3a5f;
+            background: #1a2f4a;
         }
         body.dark-mode .bell-next .bell-time {
-            color: #93c5fd;
+            color: #8FC3E8;
         }
         body.dark-mode .bell-next .bell-name {
-            color: #bfdbfe;
+            color: #AED5EC;
         }
         
         .container {
@@ -89,7 +97,7 @@
             text-align: center;
             font-size: 6vmin;
             margin-bottom: 3vmin;
-            color: #1e3a5f;
+            color: #1a2f4a;
             font-weight: bold;
         }
         .card {
@@ -176,7 +184,7 @@
             transition: background-color 0.3s, border-color 0.3s, color 0.3s;
         }
         input[type="text"]:focus {
-            border-color: #3b82f6;
+            border-color: #4B9CD3;
             -webkit-box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
@@ -197,12 +205,12 @@
             min-height: 12vmin;
         }
         .btn-primary {
-            background: #3b82f6;
+            background: #4B9CD3;
             color: #fff;
         }
         .btn-primary:hover,
         .btn-primary:active {
-            background: #2563eb;
+            background: #38759E;
         }
         .btn-primary:disabled {
             background: #9ca3af;
@@ -267,7 +275,7 @@
             border-bottom: none;
         }
         .bell-time {
-            color: #3b82f6;
+            color: #4B9CD3;
             font-family: 'Century Gothic', 'Avant Garde', Arial, Helvetica, sans-serif;
             font-weight: 600;
         }
@@ -281,7 +289,7 @@
             text-decoration: line-through;
         }
         .bell-next {
-            background: #dbeafe;
+            background: #E6F1F9;
             margin: 0 -4vmin;
             padding: 2.5vmin 4vmin;
             border-radius: 0;
@@ -289,10 +297,10 @@
             transition: background-color 0.3s;
         }
         .bell-next .bell-time {
-            color: #1d4ed8;
+            color: #38759E;
         }
         .bell-next .bell-name {
-            color: #1e40af;
+            color: #2E5F7E;
             font-weight: 600;
         }
         .version {
@@ -333,28 +341,28 @@
             min-width: 30%;
         }
         .btn-refresh {
-            background: #0ea5e9;
+            background: #7BAFD4;
             color: #fff;
         }
         .btn-refresh:hover,
         .btn-refresh:active {
-            background: #0284c7;
+            background: #4B9CD3;
         }
         .btn-dark-toggle {
-            background: #6366f1;
+            background: #4B9CD3;
             color: #fff;
         }
         .btn-dark-toggle:hover,
         .btn-dark-toggle:active {
-            background: #4f46e5;
+            background: #38759E;
         }
         .btn-fullscreen {
-            background: #8b5cf6;
+            background: #8FC3E8;
             color: #fff;
         }
         .btn-fullscreen:hover,
         .btn-fullscreen:active {
-            background: #7c3aed;
+            background: #4B9CD3;
         }
         .last-refresh {
             text-align: center;
@@ -369,7 +377,7 @@
         }
         .header-title {
             font-size: 7vmin;
-            color: #1e3a5f;
+            color: #1a2f4a;
             font-weight: bold;
             margin: 0;
             line-height: 1.1;
@@ -490,7 +498,7 @@
             padding-right: 10vmin;
         }
         select:focus {
-            border-color: #3b82f6;
+            border-color: #4B9CD3;
             -webkit-box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
@@ -501,7 +509,7 @@
             background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239ca3af'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
         }
         body.dark-mode select:focus {
-            border-color: #60a5fa;
+            border-color: #8FC3E8;
         }
         
         /* ===========================================
@@ -860,7 +868,7 @@
             <div id="last-refresh" class="last-refresh"></div>
         </div>
         
-        <div class="version">Ellis Bell Legacy v1.6.4 (iOS 9+)</div>
+        <div class="version">Ellis Bell Legacy v1.7.0 (iOS 9+)</div>
     </div>
     
     <!-- Invisible tap zone to exit kiosk mode (top-right corner) -->
@@ -1210,7 +1218,7 @@
                 var textPart = visualCue.replace('[CUSTOM_TEXT] ', '').replace('[CUSTOM_TEXT]', '');
                 var parts = textPart.split('|');
                 var text = parts[0] || '?';
-                var bgColor = parts[1] || '#4338CA';
+                var bgColor = parts[1] || '#4B9CD3';
                 var fgColor = parts[2] || '#FFFFFF';
                 
                 return '<div class="visual-cue-text-box" style="background-color:' + bgColor + ';">' +
