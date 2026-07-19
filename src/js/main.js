@@ -32,4 +32,6 @@ import './24-notifications.js';
 import './25-status-view.js';
 import './26-modal-chrome.js'; // 6.2.0: expand shared modal chrome BEFORE init wiring
 import './27-school-branding.js'; // 6.3.0: apply school-config.js branding
+import './28-presence.js'; // 6.4.0: presence heartbeat (design Layer 1)
+import './29-admin-dashboard.js'; // 6.4.0: Who's Online admin panel
 import './99-init-and-listeners.js';

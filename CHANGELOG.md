@@ -2,6 +2,32 @@
 
 Release history for the main app (src/js / index.html; script.js before 6.0.0). Sibling surfaces (clock.html, old.html, dashboard-config.html, service-worker.js) carry their own version notes in their file headers.
 
+## V6.4.0 — Usage dashboard (presence): design Layer 1 ships
+(First built piece of DESIGN-CALENDAR-V2.md; additive schema per its I0.)
+
+- **NEW `src/js/28-presence.js`**: self-starting heartbeat. Writes
+  `artifacts/{appId}/public/data/presence/{uid}` — lastSeen, appVersion,
+  schedule label + ids, displayName — when the visible schedule changes
+  or every 5 min while the tab is visible (~12 writes/hr/user; hidden
+  tabs pause, with a catch-up write on return). Failures log and never
+  disturb the app. Departure = staleness; no goodbye write.
+- **NEW `src/js/29-admin-dashboard.js`** + "Who's Online" in the Admin
+  Zone: live table (name · running · version · last seen · active dot),
+  summary counts (active now / seen today / total ever). Listener is
+  lazy — attached on modal open, detached on close.
+- The dashboard modal is the FIRST new modal authored on the 6.2.0
+  data-modal chrome (jsdom-verified it assembles correctly).
+- **firestore.rules**: additive presence block — write own doc only,
+  read admins-only (reuses the isAdmin helper). MUST be published to the
+  console for 6.4.0 to function; safe for live 5.79.x clients (no old
+  code touches the path).
+- **service-worker.js -> 1.11.0** (caches both modules).
+- Census truth-in-advertising: only 6.4.0+ clients report. The school
+  repo (5.79.x) reports nothing until the 6.x batch ships there —
+  ideally before the first day of school, so day one = full census.
+- clock.html presence (TVs/grids; it does authenticate) deliberately
+  deferred — see the design doc's open questions.
+
 ## V6.3.0 — Schoolification pass: one-file branding
 (Additive; zero visible change for Ellis — jsdom-verified no-op.)
 

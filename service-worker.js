@@ -1,6 +1,9 @@
 /**
  * Ellis Web Bell - Service Worker
- * Version: 1.10.0
+ * Version: 1.11.0
+ *
+ * v1.11.0 changelog (2026-07, app 6.4.0): + 28-presence.js +
+ *   29-admin-dashboard.js (usage dashboard, design Layer 1).
  *
  * v1.10.0 changelog (2026-07, app 6.3.0): + school-config.js +
  *   27-school-branding.js (schoolification pass).
@@ -95,7 +98,7 @@
  *   to fetch them).
  */
 
-const CACHE_VERSION = '1.10.0';
+const CACHE_VERSION = '1.11.0';
 // v1.8.0: derived — bumping CACHE_VERSION is the ONLY bump needed; the
 // activate handler evicts every cache whose name differs from this one.
 const CACHE_NAME = 'ellis-web-bell-' + CACHE_VERSION;
@@ -139,6 +142,8 @@ const CORE_ASSETS = [
   '/src/js/25-status-view.js',
   '/src/js/26-modal-chrome.js', // v1.9.0 (app 6.2.0, Stage 6b)
   '/src/js/27-school-branding.js', // v1.10.0 (app 6.3.0, schoolification)
+  '/src/js/28-presence.js', // v1.11.0 (app 6.4.0, presence)
+  '/src/js/29-admin-dashboard.js', // v1.11.0 (app 6.4.0, presence)
   '/src/js/99-init-and-listeners.js',
   '/src/js/main.js',
   '/src/js/state.js',

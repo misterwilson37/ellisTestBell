@@ -10,7 +10,7 @@
 // ║  Import/export blocks marked "6.0.0" were machine-generated during    ║
 // ║  the conversion; maintain them by hand from here on (lint enforces).  ║
 // ╚══════════════════════════════════════════════════════════════════════╝
-const APP_VERSION = "6.3.0"
+const APP_VERSION = "6.4.0"
 // Release history lives in CHANGELOG.md — add new version notes there, not here.
 // (Extracted 2026-07: ~280 lines of V3–V5.69 notes moved out of this file.)
 

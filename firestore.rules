@@ -80,6 +80,18 @@ service cloud.firestore {
       allow write: if isAdmin(appId);
     }
 
+    // --- PUBLIC DATA (Presence, v6.4.0) ---
+    // Telemetry heartbeats from 6.4.0+ clients (28-presence.js): who is
+    // signed in, on which app version, running which schedule. ADDITIVE:
+    // no pre-6.4.0 client touches this path. Each user may write only
+    // their own doc; only admins may read (usage dashboard).
+    match /artifacts/{appId}/public/data/presence/{uid} {
+      allow read: if isAdmin(appId);
+      allow create, update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null
+        && (request.auth.uid == uid || isAdmin(appId));
+    }
+
     // --- PUBLIC DATA (Admins List) ---
     match /artifacts/{appId}/public/data/admins/{adminId} {
       allow read: if request.auth != null;

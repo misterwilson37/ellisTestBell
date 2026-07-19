@@ -2,7 +2,7 @@
 
 **Audience:** a fresh Claude instance picking up this project cold (or the
 teacher who maintains it, re-orienting after time away). Read this whole file
-before writing any code. Last updated: **6.3.0 schoolification, 2026-07 (round 4, "Whitechapel" — see §10).**
+before writing any code. Last updated: **6.4.0 presence dashboard, 2026-07 (round 4, "Whitechapel" — see §10).**
 
 ---
 
@@ -39,9 +39,11 @@ break (no live users anywhere until school resumes). Consequences:
   resumes; re-verify the calendar and which repo you're touching each round.
 - v5.79.0 launched cleanly for ~50 faculty in spring 2026. **6.1.0 is
   DEPLOYED on alpha (2026-07-18) and works per the owner (full modal
-  click-through not yet done).** 6.2.0 (Stage 6b modal chrome) AND 6.3.0
-  (schoolification) are built and verified but not yet pushed —
-  DEPLOY-6.3.0.md is the single CUMULATIVE step-by-step for both,
+  click-through not yet done).** 6.2.0 (modal chrome), 6.3.0
+  (schoolification) AND 6.4.0 (presence dashboard) are built and
+  verified but not yet pushed — DEPLOY-6.4.0.md is the single CUMULATIVE
+  step-by-step for all three (NOTE: 6.4.0 requires publishing the
+  updated firestore.rules in the console — additive, live-school-safe),
   including the modal smoke test that doubles as the outstanding 6.1.0
   click-through. The school repo is
   still on the 5.79.x line; when the 6.x line ships there it goes as one
@@ -70,7 +72,7 @@ break (no live users anywhere until school resumes). Consequences:
 Surfaces:
 | File | What | Notes |
 |---|---|---|
-| `index.html` + `src/js/` | Main teacher app (Firebase v11, native ES modules since 6.0.0) | **src/js/ IS production** — entry `src/js/main.js`; 31 modules (29 feature + `state.js` + `main.js`; init module numbered 99 so insertions never rename it). Since 6.2.0, modal chrome is expanded from data attributes by 26-modal-chrome.js; since 6.3.0, school branding (name/labels/theme-color) comes from root /school-config.js applied by 27-school-branding.js — both headers document the contracts. script.js no longer exists |
+| `index.html` + `src/js/` | Main teacher app (Firebase v11, native ES modules since 6.0.0) | **src/js/ IS production** — entry `src/js/main.js`; 33 modules (31 feature + `state.js` + `main.js`; init module numbered 99 so insertions never rename it). Since 6.2.0, modal chrome is expanded from data attributes by 26-modal-chrome.js; since 6.3.0, school branding (name/labels/theme-color) comes from root /school-config.js applied by 27-school-branding.js — both headers document the contracts. script.js no longer exists |
 | `clock.html` v1.6.1 | 3x3 grid clock for Yodeck TVs (v9 compat) | Uses shared engine; refreshes data every 2 min |
 | `old.html` v2 | ES5 iPad wall clock (unauthenticated REST) | Shift support + 5-min auto-refresh added |
 | `dashboard-config.html` | Admin tool for signage config | Untouched by this engagement |
@@ -96,13 +98,13 @@ Shared infrastructure:
   conversion tools (`analyze-deps.mjs`, `convert-esm-pass[123].mjs`) are
   kept for archaeology.
 - **`firestore.rules`** — deploy manually via Firebase console (ROLLOUT §2).
-- **service-worker.js v1.10.0**, cache name DERIVED: 'ellis-web-bell-' +
+- **service-worker.js v1.11.0**, cache name DERIVED: 'ellis-web-bell-' +
   CACHE_VERSION (6.1.0 — one bump busts the cache; the old two-constant
   footgun is dead, and `npm run check:sw` enforces header==constant and
   CORE_ASSETS==filesystem). Tone.js is SELF-HOSTED since 6.1.0
   (/tone.min.js, pinned 14.8.49; upgrade path in README-BUILD.md);
   gstatic Firebase SDKs remain CDN by design. CORE_ASSETS
-  lists all 31 src/js modules + /school-config.js. Bump CACHE_NAME whenever CORE_ASSETS changes;
+  lists all 33 src/js modules + /school-config.js. Bump CACHE_NAME whenever CORE_ASSETS changes;
   a NEW MODULE means three touches: src/js file + main.js import + SW entry.
 
 Firestore data model:
@@ -112,6 +114,7 @@ artifacts/{appId}/
     schedules/{id}         # shared schedules; admin-write; may carry
                            #   temporaryShift {seconds, date, setAt} (v5.74)
     share_codes/{code}     # create: own uid as ownerId; revoke: owner/admin
+    presence/{uid}         # 6.4.0 heartbeats (write: own; read: admins)
     config/dashboard       # signage page config
     config/schedule_calendar  # RESERVED by parked calendar feature (unused)
     admins/{uid}           # doc presence = admin
@@ -187,6 +190,13 @@ arrows/template literals/const).
 
 ## 6. What's been done (details in CHANGELOG.md)
 
+- **v6.4.0** — Presence dashboard (design Layer 1 SHIPS): 28-presence.js
+  heartbeats + 29-admin-dashboard.js "Who's Online" panel (first modal
+  authored on the 6.2.0 chrome); additive firestore.rules presence block
+  (publish required). SW 1.11.0. Census covers 6.4.0+ clients only.
+- **(no version) 2026-07-19** — Calendar v2 DESIGN conversation completed;
+  DESIGN-CALENDAR-V2.md written (absorbs shift v2 + dashboard; additive-
+  only schema invariant; six-step build order).
 - **v6.3.0** — Schoolification: NEW /school-config.js (one-file branding)
   + 27-school-branding.js (text/attr writes only; jsdom no-op proof with
   stock config); notifications use APP_NAME; old.html 1.7.1 PROJECT_ID
@@ -277,8 +287,8 @@ CHANGELOG.md + §6.
   (static JSON), replacing the sound FILE, clock.html's one label, signage
   crests (Firestore-config-driven). Clock/signage config consumption would
   be a small additive pass if ever wanted.
-- Emergency shift v2: much more customization — per-period shifts, finer
-  schedule selection, beyond the current per-schedule/all + whole-day model.
+- ~~Emergency shift v2~~ MERGED into Calendar v2 as transformation
+  recipes (Verb B) — see DESIGN-CALENDAR-V2.md §2 Layer 4.
 - Admin broadcast layer: school-wide messages and/or admin-pushed countdown
   quick bells ("2 minutes until announcements", tornado-drill notices) —
   a redundancy layer on top of the PA, riding the same live-sync machinery
@@ -311,11 +321,21 @@ src/js/ is production, eliminating the generated-file drift problem class
 entirely. Follow-ups parked: chunk 02 is still "DOM consts + misc" and could
 split; import blocks could be alphabetized/pruned over time.
 
-**Stage 27 (deliberately last) — Calendar v2.** Un-park the day-type
-calendar with per-teacher groups (grade/role; the two grid teachers as
-special cases). **Starts with a design conversation with the user about how
-their six schedules map to faculty groups — do not start coding.** Resolver
-+ tests already exist.
+**Stage 27 — Calendar v2: DESIGNED, GO AT OWNER'S PACE (2026-07-19;
+see DESIGN-CALENDAR-V2.md status block for the deferral-then-
+verification story). One gate before Building Bells: confirm the
+5.79.x save-path spread idiom (owner supplies script.js; audit seeded
+in the design doc's open questions).**
+The full agreed architecture is in **DESIGN-CALENDAR-V2.md** — read it
+before touching anything v2. Headlines: it ABSORBS the "Emergency shift
+v2" and "admin broadcast/dashboard" roadmap items (one system, two of
+its layers); invariant zero is that alpha/beta/school SHARE ONE
+FIRESTORE, so all schema work is additive-only; build order is Building
+Bells -> dashboard -> identity anchors (the long pole) -> tags/roster ->
+calendar (two verbs) -> wall-clock follow-along. Owner is moving 6.3.0
+to a beta channel so v2 work owns alpha; confirm the channel->repo->
+domain map for §2 at the start of the next session (open question #1
+in the design doc).
 
 ## 8. Protocol for updating this document
 
@@ -415,4 +435,21 @@ off-limits.) Rounds 1–2 predate this log and went unnamed.
   for both. Method note for successors: the jsdom harness (run the real
   module against the real DOM, diff before/after) is cheap — reuse it for
   any future index.html surgery; it proved 6b (1,629 elements, zero
-  class-set diffs) and the 6.3.0 stock-config no-op.
+  class-set diffs) and the 6.3.0 stock-config no-op. Closed the session
+  with the Stage 27 design conversation -> DESIGN-CALENDAR-V2.md (key
+  facts learned: 8 admin schedules, 6 intercom "building bells", anchors
+  are TIME-keyed today, tags=picker-filters not runtime targeting, one
+  shared Firestore across channels, building-wins culture). Owner raised the
+  one-steering-wheel question (would v2 mean maintaining parallel
+  schedule edits across channels?); verified in code the answer is no
+  (live shared docs, live anchor resolution, spread round-trip saves) —
+  deferral lifted, Stage 27 is go-at-owner's-pace. Then BUILT Layer 1
+  (presence dashboard) as 6.4.0 at the owner's request — his day-one
+  census of who actually uses the app. Then BACKPORTED presence to the
+  base channel at his request: repo "ellisTestBell" turned out to be
+  5.69.4 (a line BEHIND the school's launched 5.79.0 — channel topology
+  still §7's open question); delivered script.js 5.69.5 (serverTimestamp
+  import + appended IIFE-scoped presence block, sole changes) + SW 1.3.0
+  cache bump + BACKPORT-NOTE.md. Save-path audit ANSWERED on that file:
+  spread round-trips everywhere, additive fields survive old saves.
+  Known drift left alone per owner: that repo's index title says 5.69.2.

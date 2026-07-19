@@ -4,7 +4,12 @@
 
 ## ✅ v5.79.1 delta: DEPLOYED 2026-07 (alpha repo).
 
-## LATEST — v6.3.0 (CUMULATIVE: 6.2.0 modal chrome + 6.3.0 schoolification — deploy this next)
+## LATEST — v6.4.0 (CUMULATIVE: 6.2.0 chrome + 6.3.0 schoolification + 6.4.0 presence — deploy this next)
+
+DEPLOY-6.4.0.md is the single source; it covers all three and includes the
+one NEW console step this batch: publishing the updated firestore.rules.
+
+### was: v6.3.0 cumulative
 
 DEPLOY-6.3.0.md is the single source; it covers BOTH releases and has you
 delete DEPLOY-6.1.0.md. The 6.2.0 section below is folded in, kept for the

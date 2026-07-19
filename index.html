@@ -7,7 +7,7 @@
          always match — this <title>, the visible <h1> banner, and the comment on
          the last line of this file. Update all three together. (z = fix/tweak,
          y = new feature, x = major shift with the owner's sign-off.) -->
-    <title>Ellis Web Bell 6.3.0</title>
+    <title>Ellis Web Bell 6.4.0</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -903,6 +903,28 @@
         </div>
     </div>
     <!-- NEW: Confirm Delete Schedule Modal -->
+    <!-- **** V6.4.0: Presence dashboard modal (uses 6.2.0 data-modal chrome) **** -->
+    <div id="presence-dashboard-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-2">Usage Dashboard</h3>
+            <p id="presence-dashboard-summary" class="text-sm text-gray-500 mb-4">Loading…</p>
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b text-gray-600">
+                        <th class="py-2 pr-4">Who</th>
+                        <th class="py-2 pr-4">Running</th>
+                        <th class="py-2 pr-4">Version</th>
+                        <th class="py-2 pr-4">Last seen</th>
+                    </tr>
+                </thead>
+                <tbody id="presence-dashboard-table-body"></tbody>
+            </table>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="presence-dashboard-close" data-btn="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="confirm-delete-modal" data-modal class="hidden">
         <div data-modal-panel class="max-w-sm">
             <h3 class="text-xl font-medium mb-4">Delete Schedule</h3>
@@ -1427,7 +1449,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 id="app-banner-title" class="text-4xl font-bold text-blue-700">Ellis Web Bell 6.3.0</h1>
+            <h1 id="app-banner-title" class="text-4xl font-bold text-blue-700">Ellis Web Bell 6.4.0</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             <!-- V5.44.0: Clock Display Link, V5.47.3: Added Dashboard Link -->
             <div class="mt-2 flex items-center justify-center gap-3 text-sm">
@@ -1703,6 +1725,15 @@
                     View Edit History
                 </button>
                 <p class="text-xs text-gray-500 mt-1">Who changed what, on which shared schedule, and when. Logging began in v5.75.0.</p>
+            </div>
+
+            <!-- V6.4.0: Presence dashboard (DESIGN-CALENDAR-V2.md Layer 1) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Who's Online</label>
+                <button type="button" id="presence-dashboard-open-btn" class="px-6 py-2 bg-blue-700 text-white font-medium rounded-lg shadow-md hover:bg-blue-800">
+                    View Usage Dashboard
+                </button>
+                <p class="text-xs text-gray-500 mt-1">Who is signed in, running which schedule, on which app version. Only 6.4.0+ clients report.</p>
             </div>
 
             <!-- V5.74.0: Emergency schedule shift (today only) -->
@@ -3137,4 +3168,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 6.3.0 -->
+<!-- Version 6.4.0 -->
