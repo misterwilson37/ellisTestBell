@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the requester on the admin allowlist?
+    // (Uses the matched {appId} segment instead of a hardcoded ID, so the
+    //  function keeps working if the app ID ever changes.)
+    function isAdmin(appId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/artifacts/$(appId)/public/data/admins/$(request.auth.uid));
+    }
+
+    // =====================================================
+    // ELLIS BELL APP
+    // =====================================================
+
+    // --- USER DATA ---
+    //
+    // TIGHTENED 2026-07: The old rule granted `allow read: if true` on
+    // users/{userId}/{document=**}, which made EVERY user subcollection
+    // (following/, quick_bell_broadcast/, preferences, ...) world-readable.
+    // Only personal_schedules actually needs public reads:
+    //   - old.html (iPad/Kindle clocks) reads them via the unauthenticated
+    //     Firestore REST API
+    //   - share-code "following" reads other users' schedules
+    // So: personal_schedules stays publicly readable; everything else under a
+    // user is owner-only.
+    //
+    // NOTE: if signage/dashboard.html reads any OTHER users/ subcollection
+    // while signed in anonymously, add a matching read rule for just that
+    // subcollection — do not restore the blanket read.
+
+    // Personal schedules: world-readable (display surfaces + share codes),
+    // writable only by the owner.
+    match /artifacts/{appId}/users/{userId}/personal_schedules/{scheduleId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Everything else under a user: owner-only.
+    match /artifacts/{appId}/users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // --- PUBLIC DATA (Schedules) ---
+    match /artifacts/{appId}/public/data/schedules/{scheduleId} {
+      allow read: if true;
+      allow write: if isAdmin(appId);
+    }
+
+    // --- EDIT AUDIT LOG (v5.75.0) ---
+    // Append-only record of shared-schedule changes. Create is admin-gated
+    // (matching who can edit schedules at all); update/delete are denied to
+    // EVERYONE so the log cannot be rewritten, even by admins. Reads require
+    // sign-in (any teacher may check "who moved 4th period?").
+    match /artifacts/{appId}/public/data/schedules/{scheduleId}/edit_log/{entryId} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin(appId);
+      allow update, delete: if false;
+    }
+
+    // --- PUBLIC DATA (Share Codes) ---
+    //
+    // TIGHTENED 2026-07: The old rule let ANY authenticated user (including
+    // anonymous sign-ins) overwrite or delete ANYONE's share code. Now:
+    //   - create: only with your own uid stamped as ownerId
+    //   - update/delete: only the code's owner (revoke) or an admin
+    // This matches how script.js already writes the docs (ownerId: userId).
+    match /artifacts/{appId}/public/data/share_codes/{codeId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth != null
+        && (resource.data.ownerId == request.auth.uid || isAdmin(appId));
+    }
+
+    // --- PUBLIC DATA (Config) ---
+    match /artifacts/{appId}/public/data/config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin(appId);
+    }
+
+    // --- PUBLIC DATA (Admins List) ---
+    match /artifacts/{appId}/public/data/admins/{adminId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin(appId);
+    }
+  }
+}

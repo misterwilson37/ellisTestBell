@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Clock v1.0.0</title>
-    <!-- Dashboard Clock Display v1.0.0 -->
-    <!-- v1.0.0: Full-screen multi-schedule clock that pulls its schedule selection
+    <title>Dashboard Clock v1.1.0</title>
+    <!-- Dashboard Clock Display v1.1.0 -->
+    <!-- v1.1.0: Full-screen multi-schedule clock that pulls its schedule selection
          from the shared Firestore dashboard-config doc — the same config that powers
          dashboard.html and dashright.html. Intended use: a Yodeck frame that needs
          just the clock section, without Canva or scoreboard. When the admin changes
@@ -21,8 +21,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="../firebase-config.js"></script>
+    <!-- Shared bell engine + signage schedule utils (v5.76.0): relative-bell
+         resolution and emergency-shift support, shared across all three
+         signage pages AND the rest of the app. Load order matters. -->
+    <script src="../bell-engine.js"></script>
+    <script src="schedule-utils.js"></script>
     <style>
-        /* Dashboard Clock Display v1.0.0 — visual match to dashboard.html's clock area */
+        /* Dashboard Clock Display v1.1.0 — visual match to dashboard.html's clock area */
         :root {
             --carolina-blue: #4B9CD3;
             --carolina-blue-light: #7BAFD4;
@@ -141,10 +146,10 @@
             </div>
         </div>
     </div>
-    <div class="version-stamp">Dashboard Clock v1.0.0</div>
+    <div class="version-stamp">Dashboard Clock v1.1.0</div>
 
     <script>
-        // Dashboard Clock Display v1.0.0
+        // Dashboard Clock Display v1.1.0
         
         if (!window.firebaseConfig) {
             throw new Error("firebase-config.js failed to load. Check <script> tag order in <head>.");
@@ -212,10 +217,9 @@
                 scheduleRef.onSnapshot(snapshot => {
                     if (snapshot.exists) {
                         const data = snapshot.data();
-                        schedules[id] = {
-                            name: data.name,
-                            periods: (data.periods || []).filter(p => p.isEnabled !== false)
-                        };
+                        // v5.76.0: shared record — resolves relative bells and
+                        // applies today's emergency shift at read time.
+                        schedules[id] = SignageScheduleUtils.makeScheduleRecord(data);
                         updateClock();
                     }
                 });
@@ -257,66 +261,15 @@
         //    ever drift, they MUST be re-synced across all three signage pages. Future
         //    refactor idea: move into a shared /signage/schedule-utils.js. --
         
-        function getScheduleStatus(schedule) {
-            const now = new Date();
-            const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-            
-            for (const period of schedule.periods) {
-                const bells = period.bells || [];
-                if (bells.length === 0) continue;
-                const times = bells.map(b => timeToSeconds(b.time)).sort((a, b) => a - b);
-                const start = times[0];
-                const end = times[times.length - 1];
-                if (nowSeconds >= start && nowSeconds < end) {
-                    const endsAt = formatTime12Hour(end);
-                    return { period: period.name, countdown: `ends at ${endsAt}`, active: true };
-                }
-            }
-            
-            let nextPeriod = null;
-            let nextStart = Infinity;
-            for (const period of schedule.periods) {
-                const bells = period.bells || [];
-                if (bells.length === 0) continue;
-                const times = bells.map(b => timeToSeconds(b.time)).sort((a, b) => a - b);
-                const start = times[0];
-                if (start > nowSeconds && start < nextStart) {
-                    nextStart = start;
-                    nextPeriod = period;
-                }
-            }
-            
-            if (nextPeriod) {
-                const countdown = nextStart - nowSeconds;
-                return { period: nextPeriod.name, countdown: `starts in ${formatCountdown(countdown)}`, active: false };
-            }
-            return { period: 'Day Complete', countdown: '', active: false };
-        }
+        // (getScheduleStatus moved to schedule-utils.js in v5.76.0 — now resolves
+//  relative bells and applies emergency shifts via the shared engine)
+        const getScheduleStatus = window.SignageScheduleUtils.getScheduleStatus;
         
-        function timeToSeconds(timeStr) {
-            const parts = timeStr.split(':').map(Number);
-            return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
-        }
+        // (timeToSeconds moved to schedule-utils.js in v5.76.0)
         
-        function formatTime12Hour(seconds) {
-            let hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            const ampm = hours >= 12 ? 'pm' : 'am';
-            hours = hours % 12 || 12;
-            return `${hours}:${String(mins).padStart(2, '0')} ${ampm}`;
-        }
+        // (formatTime12Hour moved to schedule-utils.js in v5.76.0)
         
-        function formatCountdown(seconds) {
-            if (seconds >= 3600) {
-                const hours = Math.floor(seconds / 3600);
-                const mins = Math.floor((seconds % 3600) / 60);
-                return `${hours}:${String(mins).padStart(2, '0')}`;
-            } else {
-                const mins = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                return `${mins}:${String(secs).padStart(2, '0')}`;
-            }
-        }
+        // (formatCountdown moved to schedule-utils.js in v5.76.0)
         
         init();
     </script>

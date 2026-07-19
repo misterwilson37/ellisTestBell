@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ellis Bell - Legacy v1.7.0 (iOS 9+)</title>
+    <title>Ellis Bell - Legacy v1.7.1 (iOS 9+)</title>
     <!-- Ellis Bell Legacy v1.7.0 -->
     <!-- v1.7.0: Palette unification with main app (Tier 2 of audit, sibling pass).
          Collapsed 23 distinct blue/indigo/violet values down to 4 Carolina-based
@@ -868,7 +868,7 @@
             <div id="last-refresh" class="last-refresh"></div>
         </div>
         
-        <div class="version">Ellis Bell Legacy v1.7.0 (iOS 9+)</div>
+        <div class="version">Ellis Bell Legacy v1.7.1 (iOS 9+)</div>
     </div>
     
     <!-- Invisible tap zone to exit kiosk mode (top-right corner) -->
@@ -990,6 +990,10 @@
         // === CONFIGURATION ===
         // ===========================================
         
+        // v1.7.1: for OTHER SCHOOLS — this is the one hardcoded Firebase project
+        // id in this file. Set it to the projectId value in /firebase-config.js
+        // (this ES5 page reads Firestore over plain REST and does not load the
+        // Firebase SDK or that config file). See SETUP.md.
         var PROJECT_ID = 'ellisbell-c185c';
         var APP_ID = '1:441560045695:web:94e51a006663404b8f474a';
         var FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/' + PROJECT_ID + '/databases/(default)/documents';
@@ -1083,6 +1087,42 @@
                 }
             }
             return result;
+        }
+
+        // v2 (2026-07): EMERGENCY SCHEDULE SHIFT support (ES5 for iOS 9).
+        // If a schedule doc carries temporaryShift { seconds, date } stamped
+        // with TODAY'S local date, shift its STATIC bells before any bell
+        // extraction/merging. Relative bells resolve from the shifted anchors,
+        // matching the main app and clock.html exactly. Self-expires when the
+        // date no longer matches (checked on every load/refresh).
+        function localDateStr(d) {
+            var m = d.getMonth() + 1, day = d.getDate();
+            return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+        }
+        function applyShiftToScheduleData(scheduleData) {
+            if (!scheduleData || !scheduleData.temporaryShift) return scheduleData;
+            var shift = scheduleData.temporaryShift;
+            var secs = Number(shift.seconds);
+            if (!secs || !isFinite(secs)) return scheduleData;
+            if (shift.date !== localDateStr(new Date())) return scheduleData;
+            var periods = scheduleData.periods || [];
+            for (var p = 0; p < periods.length; p++) {
+                var bells = periods[p].bells || [];
+                for (var b = 0; b < bells.length; b++) {
+                    var bell = bells[b];
+                    if (bell && bell.time && !bell.relative) {
+                        var parts = bell.time.split(':');
+                        var total = (parseInt(parts[0], 10) || 0) * 3600 +
+                                    (parseInt(parts[1], 10) || 0) * 60 +
+                                    (parseInt(parts[2], 10) || 0) + secs;
+                        total = ((total % 86400) + 86400) % 86400;
+                        var h = Math.floor(total / 3600), mn = Math.floor((total % 3600) / 60), s = total % 60;
+                        bell.time = (h < 10 ? '0' : '') + h + ':' + (mn < 10 ? '0' : '') + mn + ':' + (s < 10 ? '0' : '') + s;
+                    }
+                }
+            }
+            console.log('[Shift] Applied ' + (secs / 60) + ' min shift to schedule for today.');
+            return scheduleData;
         }
         
         // Format time to 12-hour with lowercase am/pm
@@ -1424,7 +1464,7 @@
                                 publicSchedules.push({
                                     id: scheduleId,
                                     name: fields.name || fields.scheduleName || scheduleId,
-                                    data: fields
+                                    data: applyShiftToScheduleData(fields)
                                 });
                             }
                             
@@ -1591,7 +1631,7 @@
                                 console.warn('Could not load base schedule, using personal only');
                                 bells = extractBellsFromSchedule(scheduleData);
                             } else {
-                                var baseData = parseFields(baseDoc.fields || {});
+                                var baseData = applyShiftToScheduleData(parseFields(baseDoc.fields || {}));
                                 console.log('Base schedule data:', baseData);
                                 
                                 var basePeriods = baseData.periods || [];
@@ -2276,6 +2316,13 @@
             } catch (e) {}
         };
         
+        // v2 (2026-07): auto-refresh every 5 minutes through the existing
+        // Refresh handler, so mid-day schedule edits and emergency shifts
+        // reach these wall clocks without anyone touching them.
+        setInterval(function() {
+            try { refreshScheduleBtn.onclick(); } catch (e) { /* retry next cycle */ }
+        }, 300000);
+
         refreshScheduleBtn.onclick = function() {
             var savedCode = null;
             try {

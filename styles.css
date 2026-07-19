@@ -1,10 +1,10 @@
 /* ============================================
    Ellis Web Bell Stylesheet
-   Version: 2.5
+   Version: 2.6
    ============================================ */
 
 :root {
-    --css-version: "2.5";
+    --css-version: "2.6";
     
     /* V5.52.1: Customizable warning colors */
     --warning-color-subtle: #fbbf24;
@@ -272,9 +272,19 @@ body.admin-mode #combined-bell-list .delete-btn {
 }
 
 /* Modals that appear on top of other modals (z-60) */
+/* v2.6: Added orphan-handling and user-confirmation modals. Their markup uses
+   z-60/z-70 utility classes that Tailwind never actually generated (not in the
+   default scale), so they were stacking by DOM-order luck. Now explicit. */
 #confirm-linked-edit-modal,
-#internal-conflict-confirm-modal {
+#internal-conflict-confirm-modal,
+#orphan-handling-modal,
+#user-confirmation-modal {
     z-index: 60;
+}
+
+/* v2.6: Upload modal opens on top of z-50/z-60 modals */
+#upload-visual-modal {
+    z-index: 70;
 }
 
 /* File Input Hiding */

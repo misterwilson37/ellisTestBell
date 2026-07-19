@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard v1.5.4</title>
-    <!-- Dashboard Display v1.5.4 -->
-    <!-- v1.5.4: Companion to dashright.html v1.0.2 — added max-width: 30cqw on
+    <title>Dashboard v1.6.0</title>
+    <!-- Dashboard Display v1.6.0 -->
+    <!-- v1.6.0: Companion to dashright.html v1.0.2 — added max-width: 30cqw on
          .house-crest so the crest doesn't balloon oversized when the scoreboard
          renders in a narrow frame. Consistency with dashright. -->
     <!-- v1.5.3: Scoreboard text sizing rewrite. Same issue as dashright.html v1.0.1:
@@ -89,12 +89,17 @@
 
     <!-- Shared Firebase config -->
     <script src="../firebase-config.js"></script>
+    <!-- Shared bell engine + signage schedule utils (v5.76.0): relative-bell
+         resolution and emergency-shift support, shared across all three
+         signage pages AND the rest of the app. Load order matters. -->
+    <script src="../bell-engine.js"></script>
+    <script src="schedule-utils.js"></script>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&family=Questrial&display=swap" rel="stylesheet">
     
     <style>
-        /* Dashboard Display v1.5.4 */
+        /* Dashboard Display v1.6.0 */
         :root {
             --carolina-blue: #4B9CD3;
             --carolina-blue-light: #7BAFD4;
@@ -155,7 +160,7 @@
         
         .house-crest {
             height: 90%;           /* 90% of card height per Jake */
-            max-width: 30cqw;      /* v1.5.4: cap width so the crest doesn't balloon in narrow frames */
+            max-width: 30cqw;      /* v1.6.0: cap width so the crest doesn't balloon in narrow frames */
             width: auto;
             object-fit: contain;
             /* transparent PNGs — card color shows through */
@@ -536,7 +541,7 @@
         </div>
         
         <div class="version-info">
-            Dashboard v1.5.4
+            Dashboard v1.6.0
             <br>
             <a href="../index.html">← Back to Bell Schedule</a>
         </div>
@@ -617,7 +622,7 @@
     </div>
 
     <script>
-        // Dashboard Display v1.5.4
+        // Dashboard Display v1.6.0
         
         // v1.4.3: Diagnostic — log any postMessage events from canva.com so we can
         // see whether Canva broadcasts slide-ended / playback-complete events we
@@ -1010,10 +1015,9 @@
                 scheduleRef.onSnapshot(snapshot => {
                     if (snapshot.exists) {
                         const data = snapshot.data();
-                        schedules[id] = {
-                            name: data.name,
-                            periods: (data.periods || []).filter(p => p.isEnabled !== false)
-                        };
+                        // v5.76.0: shared record — resolves relative bells and
+                        // applies today's emergency shift at read time.
+                        schedules[id] = SignageScheduleUtils.makeScheduleRecord(data);
                         updateClock();
                     }
                 });
@@ -1055,72 +1059,15 @@
             });
         }
         
-        function getScheduleStatus(schedule) {
-            const now = new Date();
-            const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-            
-            for (const period of schedule.periods) {
-                const bells = period.bells || [];
-                if (bells.length === 0) continue;
-                
-                const times = bells.map(b => timeToSeconds(b.time)).sort((a, b) => a - b);
-                const start = times[0];
-                const end = times[times.length - 1];
-                
-                if (nowSeconds >= start && nowSeconds < end) {
-                    const endsAt = formatTime12Hour(end);
-                    return { period: period.name, countdown: `ends at ${endsAt}`, active: true };
-                }
-            }
-            
-            let nextPeriod = null;
-            let nextStart = Infinity;
-            
-            for (const period of schedule.periods) {
-                const bells = period.bells || [];
-                if (bells.length === 0) continue;
-                
-                const times = bells.map(b => timeToSeconds(b.time)).sort((a, b) => a - b);
-                const start = times[0];
-                
-                if (start > nowSeconds && start < nextStart) {
-                    nextStart = start;
-                    nextPeriod = period;
-                }
-            }
-            
-            if (nextPeriod) {
-                const countdown = nextStart - nowSeconds;
-                return { period: nextPeriod.name, countdown: `starts in ${formatCountdown(countdown)}`, active: false };
-            }
-            
-            return { period: 'Day Complete', countdown: '', active: false };
-        }
+        // (getScheduleStatus moved to schedule-utils.js in v5.76.0 — now resolves
+//  relative bells and applies emergency shifts via the shared engine)
+        const getScheduleStatus = window.SignageScheduleUtils.getScheduleStatus;
         
-        function timeToSeconds(timeStr) {
-            const parts = timeStr.split(':').map(Number);
-            return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
-        }
+        // (timeToSeconds moved to schedule-utils.js in v5.76.0)
         
-        function formatTime12Hour(seconds) {
-            let hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            const ampm = hours >= 12 ? 'pm' : 'am';
-            hours = hours % 12 || 12;
-            return `${hours}:${String(mins).padStart(2, '0')} ${ampm}`;
-        }
+        // (formatTime12Hour moved to schedule-utils.js in v5.76.0)
         
-        function formatCountdown(seconds) {
-            if (seconds >= 3600) {
-                const hours = Math.floor(seconds / 3600);
-                const mins = Math.floor((seconds % 3600) / 60);
-                return `${hours}:${String(mins).padStart(2, '0')}`;
-            } else {
-                const mins = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                return `${mins}:${String(secs).padStart(2, '0')}`;
-            }
-        }
+        // (formatCountdown moved to schedule-utils.js in v5.76.0)
         
         // v1.4.0: checkForNewVideo() + loadVideo() removed. The old Drive-video-playback
         // path is replaced by the Canva iframe via applyCanvaUrl(). Google Drive API

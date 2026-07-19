@@ -3,8 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bell Schedule Clock v1.4.0</title>
-    <!-- Clock Display v1.4.0 -->
+    <title>Bell Schedule Clock v1.6.2</title>
+    <!-- Clock Display v1.6.2 -->
+    <!-- v1.6.2 (2026-07, app 6.0.1): comment-only — version-number correction:
+         the modularization release was mislabeled 7.0.0; it is 6.0.0. -->
+    <!-- v1.6.1 (2026-07, app 6.0.0): comment-only — engine-sharing note updated
+         (main app is now src/js/ modules; script.js retired). No code change. -->
+    <!-- v1.6.0: Emergency schedule shift support (temporaryShift on shared
+         schedule docs, applied via the shared engine) + 2-minute schedule
+         data refresh so mid-day edits and shifts reach TVs without a page
+         reload. -->
+    <!-- v1.5.0: Shared bell engine. The local calculateRelativeBellTime copy is
+         gone — it had silently diverged from the main app (missing V5.44.1
+         anchor-selection logic). Relative-bell math now comes from
+         bell-engine.js, shared with the main app (src/js/) and covered by
+         tests/bell-engine.test.mjs. -->
     <!-- v1.4.0: Palette alignment with main app (Tier 2 of audit, sibling pass).
          - Body background #000 -> #111827 (slate). Aligns with main app dark-mode
            background token; still reads as black at typical Yodeck TV viewing
@@ -28,6 +41,10 @@
 
     <!-- Shared Firebase config (v1.3.2: extracted from inline) -->
     <script src="firebase-config.js"></script>
+
+    <!-- Shared bell engine (v1.5.0): the SAME time/relative-bell math the main
+         app uses. Must load before the inline logic below. -->
+    <script src="bell-engine.js"></script>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&family=Questrial&display=swap" rel="stylesheet">
@@ -811,111 +828,48 @@
         }
         
         // Convert time string (HH:MM:SS) to seconds since midnight
-        function timeToSeconds(timeStr) {
-            const [h, m, s] = timeStr.split(':').map(Number);
-            return h * 3600 + m * 60 + (s || 0);
-        }
-        
-        // Convert seconds since midnight to HH:MM:SS string
-        function secondsToTime(totalSeconds) {
-            // Handle negative or overflow
-            while (totalSeconds < 0) totalSeconds += 86400;
-            totalSeconds = totalSeconds % 86400;
-            
-            const h = Math.floor(totalSeconds / 3600);
-            const m = Math.floor((totalSeconds % 3600) / 60);
-            const s = totalSeconds % 60;
-            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        }
+        // v1.5.0: delegate to the shared engine (identical math, one home).
+        const timeToSeconds = window.BellEngine.timeToSeconds;
+        const secondsToTime = window.BellEngine.secondsToTime;
         
         // Calculate relative bell time recursively
         function calculateRelativeBellTime(bell, bellMap, allPeriods, visited = new Set()) {
-            // 1. If the bell already has a static time (and isn't relative), return it
-            if (bell.time && !bell.relative) {
-                return bell.time;
+            // v1.5.0: This used to be a local copy of the main app's resolver —
+            // and it had DIVERGED: it was missing the V5.44.1 anchor-selection
+            // logic (shared static bells for linked periods vs anchorRole bells
+            // for standalone periods), so TVs could anchor relative bells to the
+            // wrong bell. It now delegates to the shared engine in
+            // bell-engine.js — the SAME code the main app runs. Do not re-inline.
+            // The engine returns {isCorrupt|isOrphan, fallbackTime} objects for
+            // broken data where this file's callers expect a time string or
+            // null, so map those to their fallback time (which is also an
+            // upgrade: previously such bells were silently dropped from TVs).
+            const result = window.BellEngine.calculateRelativeBellTime(bell, bellMap, allPeriods, visited, []);
+            if (result && typeof result === 'object') {
+                return result.fallbackTime || null;
             }
-            
-            // 2. Handle relative bell (by parentBellId)
-            if (bell.relative && bell.relative.parentBellId) {
-                if (visited.has(bell.bellId)) {
-                    console.error(`Circular dependency for bell "${bell.name}"`);
-                    return null;
-                }
-                visited.add(bell.bellId);
-                
-                const parentBell = bellMap.get(bell.relative.parentBellId);
-                if (!parentBell) {
-                    console.warn(`Parent bell not found for "${bell.name}"`);
-                    return null;
-                }
-                
-                const parentTime = calculateRelativeBellTime(parentBell, bellMap, allPeriods, new Set(visited));
-                if (!parentTime || typeof parentTime === 'object') return null;
-                
-                const parentSeconds = timeToSeconds(parentTime);
-                const myTimeSeconds = parentSeconds + bell.relative.offsetSeconds;
-                return secondsToTime(myTimeSeconds);
-            }
-            
-            // 3. Handle relative bell (by parentPeriodName + parentAnchorType)
-            if (bell.relative && bell.relative.parentPeriodName) {
-                if (visited.has(bell.bellId)) {
-                    console.error(`Circular dependency for bell "${bell.name}"`);
-                    return null;
-                }
-                visited.add(bell.bellId);
-                
-                const { parentPeriodName, parentAnchorType, offsetSeconds } = bell.relative;
-                const parentPeriod = allPeriods.find(p => p.name === parentPeriodName);
-                
-                if (!parentPeriod || !parentPeriod.bells) {
-                    console.warn(`Parent period "${parentPeriodName}" not found for "${bell.name}"`);
-                    return null;
-                }
-                
-                // Find anchor bell - look for anchorRole first, then fall back to name
-                let anchorBell = null;
-                const targetRole = parentAnchorType === 'period_start' ? 'start' : 'end';
-                
-                // Try anchorRole first
-                anchorBell = parentPeriod.bells.find(b => b.anchorRole === targetRole && !b.relative);
-                
-                // Fall back to name match
-                if (!anchorBell) {
-                    const targetName = parentAnchorType === 'period_start' ? 'Period Start' : 'Period End';
-                    anchorBell = parentPeriod.bells.find(b => b.name === targetName && !b.relative);
-                }
-                
-                // Fall back to first/last static bell
-                if (!anchorBell) {
-                    const staticBells = parentPeriod.bells.filter(b => b.time && !b.relative);
-                    if (staticBells.length > 0) {
-                        staticBells.sort((a, b) => timeToSeconds(a.time) - timeToSeconds(b.time));
-                        anchorBell = parentAnchorType === 'period_start' ? staticBells[0] : staticBells[staticBells.length - 1];
-                    }
-                }
-                
-                if (!anchorBell) {
-                    console.warn(`No anchor bell found in "${parentPeriodName}" for "${bell.name}"`);
-                    return null;
-                }
-                
-                const anchorTime = calculateRelativeBellTime(anchorBell, bellMap, allPeriods, new Set(visited));
-                if (!anchorTime || typeof anchorTime === 'object') return null;
-                
-                const anchorSeconds = timeToSeconds(anchorTime);
-                const myTimeSeconds = anchorSeconds + offsetSeconds;
-                return secondsToTime(myTimeSeconds);
-            }
-            
-            // 4. Invalid bell
-            console.warn(`Invalid bell: "${bell.name}" has no time or relative data`);
-            return null;
+            return result;
         }
         
         // Resolve all bell times in a schedule's periods (handles relative bells)
-        function resolveScheduleBellTimes(periods) {
+        function resolveScheduleBellTimes(periods, temporaryShift) {
             if (!periods || periods.length === 0) return periods;
+
+            // v1.6.0: Emergency schedule shift — if the schedule doc carries a
+            // temporaryShift stamped with TODAY's local date, shift the static
+            // bells (on copies) BEFORE building the bell map, so relative bells
+            // resolve from the shifted anchors. Same engine check the main app
+            // uses; expires automatically because the date no longer matches.
+            const shiftSecs = window.BellEngine.getActiveScheduleShiftSeconds(temporaryShift || null, new Date());
+            if (shiftSecs) {
+                periods = periods.map(p => ({
+                    ...p,
+                    bells: (p.bells || []).map(b =>
+                        (b.time && !b.relative)
+                            ? { ...b, time: window.BellEngine.shiftTimeString(b.time, shiftSecs) }
+                            : b)
+                }));
+            }
             
             // Build a map of all bells by bellId
             const bellMap = new Map();
@@ -1214,9 +1168,24 @@
                     
                 if (doc.exists) {
                     const data = doc.data();
+                    // v1.6.0: apply today's emergency shift (if any) to static
+                    // bells at load time; relative bells resolve from the
+                    // shifted anchors wherever this schedule is consumed.
+                    let periods = data.periods || [];
+                    const shiftSecs = window.BellEngine.getActiveScheduleShiftSeconds(data.temporaryShift || null, new Date());
+                    if (shiftSecs) {
+                        periods = periods.map(p => ({
+                            ...p,
+                            bells: (p.bells || []).map(b =>
+                                (b.time && !b.relative)
+                                    ? { ...b, time: window.BellEngine.shiftTimeString(b.time, shiftSecs) }
+                                    : b)
+                        }));
+                        console.log(`[Shift] Applied ${shiftSecs / 60} min to "${data.name}" for today.`);
+                    }
                     scheduleData[scheduleId] = {
                         name: data.name,
-                        periods: data.periods || [],
+                        periods: periods,
                         isPersonal: false
                     };
                     console.log(`Loaded shared schedule: ${data.name}`);
@@ -1290,7 +1259,7 @@
                     }
                     
                     // Resolve relative bell times
-                    periods = resolveScheduleBellTimes(periods);
+                    periods = resolveScheduleBellTimes(periods); // base anchors pre-shifted in loadSchedule
                     console.log(`Resolved bell times for personal schedule: ${data.name}`);
                     
                     // Log period bell counts for debugging
@@ -1829,6 +1798,32 @@
                     checkBellTimes();
                     updateColumns(); // Update columns every second for smooth countdown
                 }, 1000);
+
+                // v1.6.0: refresh schedule data every 2 minutes so mid-day
+                // edits and emergency shifts reach TVs without a page reload
+                // (schedules used to load exactly once per page load).
+                setInterval(async () => {
+                    try {
+                        // Rebuild the id lists from config here: the originals
+                        // are block-scoped inside init's if-branches and are
+                        // not visible to this closure.
+                        const sharedIds = [];
+                        const personalIds = [];
+                        for (let i = 1; i <= 9; i++) {
+                            if (config[`s${i}`]) sharedIds.push(config[`s${i}`]);
+                            if (config[`p${i}`]) personalIds.push(config[`p${i}`]);
+                        }
+                        for (const key of Object.keys(scheduleData)) delete scheduleData[key];
+                        await Promise.all(sharedIds.map(id => loadSchedule(id)));
+                        if (userIdForPersonal && personalIds.length > 0) {
+                            await Promise.all(personalIds.map(id => loadPersonalSchedule(id, userIdForPersonal)));
+                        }
+                        updateColumns();
+                        console.log('[Refresh] Schedule data refreshed.');
+                    } catch (e) {
+                        console.error('[Refresh] Schedule refresh failed (will retry):', e);
+                    }
+                }, 120000);
             }
         }
         

@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Right v1.0.3</title>
-    <!-- Dashboard Right Display v1.0.3.1 -->
-    <!-- v1.0.3: House name bumped from 7cqw to 9cqw (~30% larger) per Jake's
+    <title>Dashboard Right v1.1.0</title>
+    <!-- Dashboard Right Display v1.1.0 -->
+    <!-- v1.1.0: House name bumped from 7cqw to 9cqw (~30% larger) per Jake's
          eyeball test on live hardware. Score (16cqw) unchanged. -->
     <!-- v1.0.2: Crest size fix. v1.0.1's removal of max-height let the crest
          grow too large in narrow frames (height: 90% of card = ~90% of 20vh is
@@ -35,8 +35,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="../firebase-config.js"></script>
+    <!-- Shared bell engine + signage schedule utils (v5.76.0): relative-bell
+         resolution and emergency-shift support, shared across all three
+         signage pages AND the rest of the app. Load order matters. -->
+    <script src="../bell-engine.js"></script>
+    <script src="schedule-utils.js"></script>
     <style>
-        /* Dashboard Right Display v1.0.3 — visual match to dashboard.html's right column */
+        /* Dashboard Right Display v1.1.0 — visual match to dashboard.html's right column */
         :root {
             --carolina-blue: #4B9CD3;
             --carolina-blue-light: #7BAFD4;
@@ -266,10 +271,10 @@
             </div>
         </div>
     </div>
-    <div class="version-stamp">v1.0.3.1</div>
+    <div class="version-stamp">v1.1.0</div>
 
     <script>
-        // Dashboard Right Display v1.0.3
+        // Dashboard Right Display v1.1.0
         
         if (!window.firebaseConfig) {
             throw new Error("firebase-config.js failed to load. Check <script> tag order in <head>.");
@@ -329,10 +334,9 @@
                 scheduleRef.onSnapshot(snapshot => {
                     if (snapshot.exists) {
                         const data = snapshot.data();
-                        schedules[id] = {
-                            name: data.name,
-                            periods: (data.periods || []).filter(p => p.isEnabled !== false)
-                        };
+                        // v5.76.0: shared record — resolves relative bells and
+                        // applies today's emergency shift at read time.
+                        schedules[id] = SignageScheduleUtils.makeScheduleRecord(data);
                         updateClock();
                     }
                 });
@@ -431,60 +435,15 @@
             });
         }
         
-        function getScheduleStatus(schedule) {
-            const now = new Date();
-            const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-            for (const period of schedule.periods) {
-                const bells = period.bells || [];
-                if (bells.length === 0) continue;
-                const times = bells.map(b => timeToSeconds(b.time)).sort((a, b) => a - b);
-                const start = times[0];
-                const end = times[times.length - 1];
-                if (nowSeconds >= start && nowSeconds < end) {
-                    return { period: period.name, countdown: `ends at ${formatTime12Hour(end)}`, active: true };
-                }
-            }
-            let nextPeriod = null, nextStart = Infinity;
-            for (const period of schedule.periods) {
-                const bells = period.bells || [];
-                if (bells.length === 0) continue;
-                const times = bells.map(b => timeToSeconds(b.time)).sort((a, b) => a - b);
-                const start = times[0];
-                if (start > nowSeconds && start < nextStart) {
-                    nextStart = start;
-                    nextPeriod = period;
-                }
-            }
-            if (nextPeriod) {
-                return { period: nextPeriod.name, countdown: `starts in ${formatCountdown(nextStart - nowSeconds)}`, active: false };
-            }
-            return { period: 'Day Complete', countdown: '', active: false };
-        }
+        // (getScheduleStatus moved to schedule-utils.js in v5.76.0 — now resolves
+//  relative bells and applies emergency shifts via the shared engine)
+        const getScheduleStatus = window.SignageScheduleUtils.getScheduleStatus;
         
-        function timeToSeconds(timeStr) {
-            const parts = timeStr.split(':').map(Number);
-            return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
-        }
+        // (timeToSeconds moved to schedule-utils.js in v5.76.0)
         
-        function formatTime12Hour(seconds) {
-            let hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            const ampm = hours >= 12 ? 'pm' : 'am';
-            hours = hours % 12 || 12;
-            return `${hours}:${String(mins).padStart(2, '0')} ${ampm}`;
-        }
+        // (formatTime12Hour moved to schedule-utils.js in v5.76.0)
         
-        function formatCountdown(seconds) {
-            if (seconds >= 3600) {
-                const hours = Math.floor(seconds / 3600);
-                const mins = Math.floor((seconds % 3600) / 60);
-                return `${hours}:${String(mins).padStart(2, '0')}`;
-            } else {
-                const mins = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                return `${mins}:${String(secs).padStart(2, '0')}`;
-            }
-        }
+        // (formatCountdown moved to schedule-utils.js in v5.76.0)
         
         init();
     </script>

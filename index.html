@@ -3,7 +3,11 @@
 <head>
 	<meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ellis Web Bell 5.69.2</title>
+    <!-- VERSIONING RULE: index.html's version appears in THREE places that must
+         always match — this <title>, the visible <h1> banner, and the comment on
+         the last line of this file. Update all three together. (z = fix/tweak,
+         y = new feature, x = major shift with the owner's sign-off.) -->
+    <title>Ellis Web Bell 6.3.0</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -22,22 +26,17 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
     
-    <!-- Using Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Using Tone.js for web audio -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        // Use Century Gothic, with Urbanist and Questrial as web-safe fallbacks
-                        sans: ['Century Gothic', 'Urbanist', 'Questrial', 'sans-serif'],
-                    },
-                },
-            },
-        }
-    </script>
+    <!-- v5.71.0: Compiled, self-hosted Tailwind (replaces the Play CDN runtime
+         JIT). Rebuild with build/README-BUILD.md workflow whenever you use a
+         Tailwind class that has never appeared in index.html/src/js/ before.
+         The old inline tailwind.config (fontFamily) now lives in
+         build/tailwind.config.js. -->
+    <link rel="stylesheet" href="tailwind.css">
+    <!-- Using Tone.js for web audio. v6.1.0: SELF-HOSTED (was cdnjs) —
+         same 14.8.49 minified UMD build, from the npm `tone` package.
+         License: tone.min.js.LICENSE.txt (MIT). Cached by the SW, so the
+         bell engine now loads fully offline. -->
+    <script src="tone.min.js"></script>
     <!-- V5.49.3: Added Urbanist as Century Gothic fallback (before Questrial) -->
     <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&family=Questrial&display=swap" rel="stylesheet">
 
@@ -254,10 +253,17 @@
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans"> <!-- Added font-sans to apply tailwind default -->
 
+    <!-- V5.77.0: Device clock drift warning (shown only when this device's
+         clock is >45s off Firestore server time; measurement in chunk 23) -->
+    <div id="clock-drift-banner" class="hidden kiosk-hide bg-amber-100 border-b border-amber-300 text-amber-900 px-4 py-2 text-sm flex items-center justify-between gap-4">
+        <span id="clock-drift-text" class="flex-grow"></span>
+        <button type="button" id="clock-drift-dismiss" class="px-2 py-1 text-amber-900 hover:bg-amber-200 rounded-lg font-bold" title="Dismiss for this session">&times;</button>
+    </div>
+
 
     <div id="welcome-overlay" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
         <div class="bg-white p-10 rounded-lg shadow-xl w-full max-w-md text-center">
-            <h2 class="text-3xl font-bold text-blue-700 mb-4">Welcome to the Ellis Web Bell!</h2>
+            <h2 id="welcome-heading" class="text-3xl font-bold text-blue-700 mb-4">Welcome to the Ellis Web Bell!</h2>
             <p class="text-gray-600 mb-8">Please sign in to load and sync schedules.</p>
             <div class="space-y-4">
                 <button id="google-start-btn" class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 font-medium rounded-lg shadow-md border border-gray-200 hover:bg-gray-50 transition-colors">
@@ -286,8 +292,8 @@
     </div>
 
     <!-- NEW: Add Bell to Multiple Schedules Modal -->
-    <div id="add-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="multi-add-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div id="add-bell-modal" data-modal class="hidden">
+        <form id="multi-add-bell-form" data-modal-panel class="max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-6">Add Bell to Schedules</h3>
 
             <!-- Bell Details -->
@@ -385,15 +391,15 @@
             <p id="multi-add-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="multi-add-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="submit" id="multi-add-submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Bell</button>
+                <button type="button" id="multi-add-cancel" data-btn="cancel">Cancel</button>
+                <button type="submit" id="multi-add-submit" data-btn="primary">Add Bell</button>
             </div>
         </form>
     </div>
 
     <!-- V5.58.0: Add Period to Multiple Schedules Modal -->
-    <div id="add-period-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="multi-add-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div id="add-period-modal" data-modal class="hidden">
+        <form id="multi-add-period-form" data-modal-panel class="max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-6">Add Period to Schedules</h3>
 
             <!-- Period Name -->
@@ -517,15 +523,15 @@
             <p id="multi-period-status" class="text-purple-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="multi-period-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="multi-period-cancel" data-btn="cancel">Cancel</button>
                 <button type="submit" id="multi-period-submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Add Period</button>
             </div>
         </form>
     </div>
 
     <!-- V5.58.4: Import Preview Modal (Admin) -->
-    <div id="import-preview-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div id="import-preview-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-2">Import Preview</h3>
             
             <!-- Warning Banner (shown for personal -> admin imports) -->
@@ -598,15 +604,15 @@
             
             <!-- Buttons -->
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="import-preview-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="import-preview-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Import Selected</button>
+                <button type="button" id="import-preview-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="import-preview-confirm" data-btn="primary">Import Selected</button>
             </div>
         </div>
     </div>
 
     <!-- NEW: Edit Bell Modal (Admin) -->
-    <div id="edit-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="edit-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div id="edit-bell-modal" data-modal class="hidden">
+        <form id="edit-bell-form" data-modal-panel class="max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-6">Edit Bell</h3>
 
             <!-- Bell Details -->
@@ -717,15 +723,15 @@
             <p id="edit-bell-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="edit-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="submit" id="edit-bell-submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+                <button type="button" id="edit-bell-cancel" data-btn="cancel">Cancel</button>
+                <button type="submit" id="edit-bell-submit" data-btn="primary">Save Changes</button>
             </div>
         </form>
     </div>
 
     <!-- V5.47.3: Bulk Edit Modal -->
-    <div id="bulk-edit-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div id="bulk-edit-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-2">Bulk Edit Bells</h3>
             <p id="bulk-edit-count" class="text-gray-600 mb-6">0 bells selected</p>
 
@@ -825,15 +831,15 @@
             <p id="bulk-edit-status" class="text-blue-600 text-sm mb-4 hidden"></p>
 
             <div class="flex justify-end gap-3">
-                <button type="button" id="bulk-edit-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="bulk-edit-apply" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Apply to Selected</button>
+                <button type="button" id="bulk-edit-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="bulk-edit-apply" data-btn="primary">Apply to Selected</button>
             </div>
         </div>
     </div>
 
     <!-- **** NEW: Change Bell SOUND Modal (All Users) **** -->
-    <div id="change-sound-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="change-sound-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="change-sound-modal" data-modal class="hidden">
+        <form id="change-sound-form" data-modal-panel class="max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Change Bell Sound</h3>
 
             <!-- Bell Info (Read-only) -->
@@ -870,15 +876,15 @@
             </div>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="change-sound-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="submit" id="change-sound-submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Sound</button>
+                <button type="button" id="change-sound-cancel" data-btn="cancel">Cancel</button>
+                <button type="submit" id="change-sound-submit" data-btn="primary">Save Sound</button>
             </div>
         </form>
     </div>
 
     <!-- NEW: Confirm Linked Edit Modal -->
-    <div id="confirm-linked-edit-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="confirm-linked-edit-modal" data-modal data-modal-z="z-[60]" class="hidden">
+        <div data-modal-panel class="max-w-lg">
             <h3 class="text-xl font-medium mb-4">Update Linked Schedules?</h3>
             <p class="text-gray-700 mb-4">This bell was found in other schedules. Do you want to apply your edit to them as well?</p>
 
@@ -890,40 +896,40 @@
             <p id="linked-edit-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
-                <button type="button" id="linked-edit-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="linked-edit-cancel" data-btn="cancel">Cancel</button>
                 <button type="button" id="linked-edit-this-only" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Update This Schedule Only</button>
-                <button type="button" id="linked-edit-apply" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Apply to All Selected</button>
+                <button type="button" id="linked-edit-apply" data-btn="primary">Apply to All Selected</button>
             </div>
         </div>
     </div>
     <!-- NEW: Confirm Delete Schedule Modal -->
-    <div id="confirm-delete-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+    <div id="confirm-delete-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-sm">
             <h3 class="text-xl font-medium mb-4">Delete Schedule</h3>
             <p id="confirm-delete-text" class="text-gray-700 mb-6">Are you sure you want to delete this schedule? This action cannot be undone.</p>
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="delete-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="delete-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                <button type="button" id="delete-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="delete-confirm" data-btn="danger">Delete</button>
             </div>
         </div>
     </div>
 
     <!-- **** NEW: Confirm Delete BELL Modal **** -->
     <!-- This replaces the browser's `confirm()` dialog -->
-    <div id="confirm-delete-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+    <div id="confirm-delete-bell-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-sm">
             <h3 class="text-xl font-medium mb-4">Delete Bell</h3>
             <p id="confirm-delete-bell-text" class="text-gray-700 mb-6">Are you sure you want to delete this bell?</p>
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="delete-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="delete-bell-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                <button type="button" id="delete-bell-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="delete-bell-confirm" data-btn="danger">Delete</button>
             </div>
         </div>
     </div>
 
     <!-- **** NEW V4.91: Rename SHARED Schedule Modal (Admin) **** -->
-    <div id="rename-shared-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="rename-shared-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="rename-shared-schedule-modal" data-modal class="hidden">
+        <form id="rename-shared-schedule-form" data-modal-panel class="max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Rename Shared Schedule</h3>
 
             <p class="text-gray-700 mb-4">
@@ -938,15 +944,15 @@
             <p id="rename-shared-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="rename-shared-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Name</button>
+                <button type="button" id="rename-shared-cancel" data-btn="cancel">Cancel</button>
+                <button type="submit" data-btn="primary">Save Name</button>
             </div>
         </form>
     </div>
 
     <!-- **** NEW: Confirm Delete AUDIO Modal **** -->
-    <div id="confirm-delete-audio-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="confirm-delete-audio-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg">
             <h3 class="text-xl font-medium mb-4">Delete Audio File</h3>
             <p id="confirm-delete-audio-text" class="text-gray-700 mb-4">Are you sure you want to delete this audio file?</p>
 
@@ -955,15 +961,15 @@
             </ul>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="delete-audio-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="delete-audio-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete Anyway</button>
+                <button type="button" id="delete-audio-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="delete-audio-confirm" data-btn="danger">Delete Anyway</button>
             </div>
         </div>
     </div>
 
     <!-- **** NEW V4.97: Rename AUDIO Modal **** -->
-    <div id="rename-audio-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="rename-audio-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="rename-audio-modal" data-modal class="hidden">
+        <form id="rename-audio-form" data-modal-panel class="max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Rename Audio File</h3>
             <p class="text-gray-700 mb-2">
                 Original Filename: <strong id="rename-audio-old-name" class="block truncate text-sm bg-gray-100 p-2 rounded">...</strong>
@@ -975,15 +981,15 @@
             </div>
             <p id="rename-audio-status" class="text-blue-600 text-sm mt-4 hidden"></p>
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="rename-audio-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Nickname</button>
+                <button type="button" id="rename-audio-cancel" data-btn="cancel">Cancel</button>
+                <button type="submit" data-btn="primary">Save Nickname</button>
             </div>
         </form>
     </div>
 
     <!-- **** NEW: v5.27 - Rename Visual Modal **** -->
-    <div id="rename-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="rename-visual-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="rename-visual-modal" data-modal class="hidden">
+        <form id="rename-visual-form" data-modal-panel class="max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Rename Visual File</h3>
             <p class="text-gray-700 mb-2">
                 Original Filename: <strong id="rename-visual-old-name" class="block truncate text-sm bg-gray-100 p-2 rounded">...</strong>
@@ -995,15 +1001,15 @@
             </div>
             <p id="rename-visual-status" class="text-blue-600 text-sm mt-4 hidden"></p>
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="rename-visual-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Nickname</button>
+                <button type="button" id="rename-visual-cancel" data-btn="cancel">Cancel</button>
+                <button type="submit" data-btn="primary">Save Nickname</button>
             </div>
         </form>
     </div>
 
     <!-- **** NEW: Nearby Bell Warning Modal (Req 1 - Custom Bells ONLY) **** -->
-    <div id="nearby-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="nearby-bell-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg">
             <h3 class="text-xl font-medium mb-4">Nearby Bell Detected</h3>
             <p class="text-gray-700 mb-6">A bell named "<strong id="nearby-bell-name">...</strong>" is already scheduled for <strong id="nearby-bell-time">...</strong>. This is very close to your new time.</p>
 
@@ -1011,8 +1017,8 @@
 
             <!-- Controls for Custom Bells (Req 1) -->
             <div id="nearby-bell-custom-controls" class="mt-6 flex justify-end gap-3">
-                <button type="button" id="nearby-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="nearby-bell-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirm Action Anyway</button>
+                <button type="button" id="nearby-bell-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="nearby-bell-confirm" data-btn="primary">Confirm Action Anyway</button>
             </div>
 
             <!-- This is now handled by the new v3.02 modals -->
@@ -1020,35 +1026,35 @@
     </div>
 
     <!-- **** NEW: Scenario 1, Step 1: Internal Conflict Warning Modal **** -->
-    <div id="internal-conflict-warning-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="internal-conflict-warning-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg">
             <h3 class="text-xl font-medium mb-4 text-yellow-800">Warning: Confusing Bell Time</h3>
             <p class="text-gray-700 mb-6">The time you selected (<strong id="internal-conflict-new-time">...</strong>) is within 60 seconds of an existing bell (<strong id="internal-conflict-existing-bell">...</strong>) in this *same* schedule. This would be very confusing for end users. We strongly suggest editing the existing bell first.</p>
 
             <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
-                <button type="button" id="internal-conflict-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="internal-conflict-cancel" data-btn="cancel">Cancel</button>
                 <button type="button" id="internal-conflict-edit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Edit Existing Bell</button>
-                <button type="button" id="internal-conflict-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirm New Bell</button>
+                <button type="button" id="internal-conflict-confirm" data-btn="primary">Confirm New Bell</button>
             </div>
         </div>
     </div>
 
     <!-- **** NEW: Scenario 1, Step 2: Internal Conflict Final Confirmation Modal **** -->
-    <div id="internal-conflict-confirm-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="internal-conflict-confirm-modal" data-modal data-modal-z="z-60" class="hidden">
+        <div data-modal-panel class="max-w-lg">
             <h3 class="text-xl font-medium mb-4 text-red-700">Are you sure?</h3>
             <p class="text-gray-700 mb-6">Are you absolutely positive you want to create a new bell at <strong id="internal-conflict-final-new-time">...</strong>, just <strong id="internal-conflict-final-diff">...</strong> seconds apart from the existing <strong id="internal-conflict-final-existing">...</strong> bell?</p>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="internal-conflict-final-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="internal-conflict-final-create" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Yes, Create This Bell</button>
+                <button type="button" id="internal-conflict-final-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="internal-conflict-final-create" data-btn="danger">Yes, Create This Bell</button>
             </div>
         </div>
     </div>
 
     <!-- **** NEW: Scenario 2: External Conflict Resolution Modal **** -->
-    <div id="external-conflict-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl"> <!-- Increased max-w -->
+    <div id="external-conflict-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-2xl"> <!-- Increased max-w -->
             <h3 class="text-xl font-medium mb-4">Similar Bell Found in Other Schedules</h3>
             <p class="text-gray-700 mb-4">One or more other shared schedules have bells with the same name very close to your new time of <strong id="external-conflict-new-time">...</strong>. Please select how you'd like to proceed.</p>
 
@@ -1082,8 +1088,8 @@
     </div>
 
     <!-- MOVED: Personal Schedule Modals (v3.08) -->
-    <div id="create-personal-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="create-personal-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="create-personal-schedule-modal" data-modal class="hidden">
+        <form id="create-personal-schedule-form" data-modal-panel class="max-w-lg">
             <h3 class="text-2xl font-medium mb-6">New Personal Schedule</h3>
 
             <p class="text-gray-700 mb-4">
@@ -1098,15 +1104,15 @@
             <p id="create-personal-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="create-personal-schedule-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="create-personal-schedule-cancel" data-btn="cancel">Cancel</button>
                 <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create</button>
             </div>
         </form>
     </div>
 
     <!-- V5.44: Create Custom Standalone Schedule Modal -->
-    <div id="create-standalone-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="create-standalone-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+    <div id="create-standalone-schedule-modal" data-modal class="hidden">
+        <form id="create-standalone-schedule-form" data-modal-panel class="max-w-md">
             <h3 class="text-2xl font-medium mb-4">Create Custom Standalone Schedule</h3>
             <p class="text-gray-700 mb-6">Create a blank schedule unlinked from any school bells. Perfect for cooking timers, personal routines, or special events.</p>
             
@@ -1119,25 +1125,54 @@
             <p id="create-standalone-status" class="text-red-600 text-sm mt-4 hidden"></p>
             
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="create-standalone-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="create-standalone-cancel" data-btn="cancel">Cancel</button>
                 <button type="submit" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">Create Schedule</button>
             </div>
         </form>
     </div>
 
-    <div id="confirm-delete-personal-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+    <div id="confirm-delete-personal-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-sm">
             <h3 class="text-xl font-medium mb-4">Delete Personal Schedule</h3>
             <p id="confirm-delete-personal-text" class="text-gray-700 mb-6">Are you sure?</p>
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="delete-personal-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="delete-personal-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete</button>
+                <button type="button" id="delete-personal-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="delete-personal-confirm" data-btn="danger">Delete</button>
             </div>
         </div>
     </div>
 
-    <div id="confirm-restore-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+
+    <!-- V5.75.0: Edit History Modal (admin) -->
+    <div id="edit-history-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-medium mb-2">Edit History</h3>
+            <p class="text-sm text-gray-600 mb-4">The last 50 logged changes to the selected shared schedule. Entries are append-only &mdash; nobody, including admins, can alter or remove them.</p>
+            <select id="edit-history-schedule" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm mb-3"></select>
+            <ul id="edit-history-list" class="mb-4 max-h-96 overflow-y-auto"></ul>
+            <div class="mt-4 flex justify-end">
+                <button type="button" id="edit-history-close-btn" data-btn="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V5.79.0: Status / diagnostics modal (opened by tapping the footer version) -->
+    <div id="status-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-medium mb-2">App Status</h3>
+            <p class="text-sm text-gray-600 mb-4">If something's misbehaving, send this whole report along with what you were doing.</p>
+            <ul id="status-list" class="mb-4"></ul>
+            <h4 class="text-sm font-semibold text-gray-800 mb-1 border-t pt-3">File Versions (as a fresh load would get them)</h4>
+            <ul id="status-versions-list" class="mb-4"></ul>
+            <div class="mt-4 flex justify-end gap-3">
+                <button type="button" id="status-copy-btn" data-btn="primary">Copy Report</button>
+                <button type="button" id="status-close-btn" data-btn="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-restore-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-md">
             <h3 class="text-xl font-medium mb-4">Restore Personal Schedule</h3>
             <p id="confirm-restore-text" class="text-gray-700 mb-4">Are you sure?</p>
             <!-- V5.47.3: Add name input for restored schedule -->
@@ -1147,14 +1182,14 @@
                 <p class="text-xs text-gray-500 mt-1">Edit to give your restored schedule a different name</p>
             </div>
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="restore-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="restore-confirm" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Restore</button>
+                <button type="button" id="restore-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="restore-confirm" data-btn="primary">Restore</button>
             </div>
         </div>
     </div>
 
-    <div id="rename-personal-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="rename-personal-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="rename-personal-schedule-modal" data-modal class="hidden">
+        <form id="rename-personal-schedule-form" data-modal-panel class="max-w-lg">
             <h3 class="text-2xl font-medium mb-6">Rename Personal Schedule</h3>
 
             <p class="text-gray-700 mb-4">
@@ -1169,15 +1204,15 @@
             <p id="rename-personal-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="rename-personal-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Name</button>
+                <button type="button" id="rename-personal-cancel" data-btn="cancel">Cancel</button>
+                <button type="submit" data-btn="primary">Save Name</button>
             </div>
         </form>
     </div>
     
     <!-- V5.63.0: Share Schedule Modal -->
-    <div id="share-schedule-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="share-schedule-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg">
             <h3 class="text-2xl font-medium mb-4">Share Schedule</h3>
             
             <p class="text-gray-700 mb-4">
@@ -1210,14 +1245,14 @@
             <p id="share-schedule-status" class="text-blue-600 text-sm mt-4 hidden"></p>
             
             <div class="mt-6 flex justify-end">
-                <button type="button" id="share-schedule-close" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
+                <button type="button" id="share-schedule-close" data-btn="cancel">Close</button>
             </div>
         </div>
     </div>
 
     <!-- V5.63.0: Enter Share Code Modal -->
-    <div id="enter-share-code-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <form id="enter-share-code-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+    <div id="enter-share-code-modal" data-modal class="hidden">
+        <form id="enter-share-code-form" data-modal-panel class="max-w-lg">
             <h3 class="text-2xl font-medium mb-4">Follow a Colleague's Schedule</h3>
             
             <p class="text-gray-600 mb-4">Enter the share code from a colleague to follow their schedule. You'll see their schedule and any updates they make.</p>
@@ -1239,7 +1274,7 @@
             <p id="enter-share-code-status" class="text-blue-600 text-sm mt-4 hidden"></p>
             
             <div class="mt-6 flex justify-end gap-3">
-                <button type="button" id="enter-share-code-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button type="button" id="enter-share-code-cancel" data-btn="cancel">Cancel</button>
                 <button type="submit" id="enter-share-code-submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                     Follow Schedule
                 </button>
@@ -1248,8 +1283,8 @@
     </div>
 
     <!-- V5.63.0: Manage Following Modal -->
-    <div id="manage-following-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+    <div id="manage-following-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg max-h-[80vh] overflow-y-auto">
             <h3 class="text-2xl font-medium mb-4">Following</h3>
             
             <p class="text-gray-600 mb-4">Schedules you're following from colleagues.</p>
@@ -1263,13 +1298,13 @@
                 <button type="button" id="add-share-code-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                     + Add Share Code
                 </button>
-                <button type="button" id="manage-following-close" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
+                <button type="button" id="manage-following-close" data-btn="cancel">Close</button>
             </div>
         </div>
     </div>
     
     <!-- V5.52.0: Countdown Warning Settings Modal -->
-    <div id="warning-settings-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 hidden p-4 overflow-y-auto">
+    <div id="warning-settings-modal" data-modal data-modal-align="start" class="hidden p-4 overflow-y-auto">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md my-8">
             <h3 class="text-2xl font-medium mb-4">Countdown Warning Settings</h3>
             <p class="text-gray-600 mb-6">Get visual alerts as bells approach.</p>
@@ -1360,8 +1395,8 @@
             </div>
             
             <div class="flex justify-end gap-3">
-                <button type="button" id="warning-settings-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button type="button" id="warning-settings-save" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Settings</button>
+                <button type="button" id="warning-settings-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="warning-settings-save" data-btn="primary">Save Settings</button>
             </div>
         </div>
     </div>
@@ -1392,7 +1427,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 class="text-4xl font-bold text-blue-700">Ellis Web Bell 5.69.2</h1>
+            <h1 id="app-banner-title" class="text-4xl font-bold text-blue-700">Ellis Web Bell 6.3.0</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             <!-- V5.44.0: Clock Display Link, V5.47.3: Added Dashboard Link -->
             <div class="mt-2 flex items-center justify-center gap-3 text-sm">
@@ -1400,7 +1435,7 @@
                     🕐 Clock Display
                 </a>
                 <span class="text-gray-400">•</span>
-                <a href="dashboard.html" target="_blank" class="text-gray-500 hover:text-blue-600 transition-colors" title="Open school dashboard with video and slides">
+                <a href="signage/dashboard.html" target="_blank" class="text-gray-500 hover:text-blue-600 transition-colors" title="Open school dashboard with video and slides">
                     📺 School Dashboard
                 </a>
             </div>
@@ -1594,6 +1629,8 @@
                      <button id="expand-all-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Expand All</button>
                      <!-- End Collapse/Expand -->
                      <button id="mute-all-list-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Mute All</button>
+                     <!-- V5.78.0: backup notification toggle (per-device) -->
+                     <button id="bell-notifications-toggle" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 kiosk-hide">🔕 Notifications: Off</button>
                      <button id="unmute-all-list-btn" class="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Unmute All</button>
                      <!-- V5.47.3: Bulk Edit Toggle -->
                      <button id="bulk-edit-toggle-btn" class="px-3 py-1 text-sm bg-sky-100 text-sky-700 rounded-lg hover:bg-sky-200 hidden">Bulk Edit</button>
@@ -1659,8 +1696,32 @@
         <div class="admin-control bg-white p-6 rounded-xl shadow-md mb-8 space-y-6 kiosk-hide">
             <h3 class="text-xl font-semibold text-gray-800 border-b pb-2">Admin Zone</h3>
 
+            <!-- V5.75.0: Edit history viewer -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Edit History</label>
+                <button type="button" id="open-edit-history-btn" class="px-6 py-2 bg-gray-700 text-white font-medium rounded-lg shadow-md hover:bg-gray-800">
+                    View Edit History
+                </button>
+                <p class="text-xs text-gray-500 mt-1">Who changed what, on which shared schedule, and when. Logging began in v5.75.0.</p>
+            </div>
+
+            <!-- V5.74.0: Emergency schedule shift (today only) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Schedule Shift (today only)</label>
+                <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-2">
+                    <select id="emergency-shift-schedule" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                        <option value="__ALL__">All shared schedules</option>
+                    </select>
+                    <input type="number" id="emergency-shift-minutes" placeholder="+/- minutes" step="1" class="w-full sm:w-36 px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                    <button type="button" id="emergency-shift-apply-btn" class="whitespace-nowrap px-6 py-2 bg-orange-600 text-white font-medium rounded-lg shadow-md hover:bg-orange-700">Apply Shift</button>
+                    <button type="button" id="emergency-shift-clear-btn" class="whitespace-nowrap px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Clear All</button>
+                </div>
+                <div id="emergency-shift-status" class="text-sm mb-1"><span class="text-gray-500">No shifts active today.</span></div>
+                <p class="text-xs text-gray-500">Shifts every static bell on the base schedule; relative bells (including teachers' personal bells anchored to it) ripple automatically. Teachers' pinned personal times don't move. Expires by itself at midnight.</p>
+            </div>
+
             <!-- Create New Schedule Form -->
-            <form id="create-schedule-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <form id="create-schedule-form" class="border-t pt-6">
                 <label for="new-schedule-name" class="block text-sm font-medium text-gray-700 mb-1">Create New Schedule</label>
                 <div class="flex flex-col sm:flex-row gap-3">
                     <input type="text" id="new-schedule-name" placeholder="New Schedule Name" required class="flex-grow w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -1672,7 +1733,7 @@
 
             <!-- NEW: Add Bell to THIS Schedule Form -->
             <form id="add-shared-bell-form" class="border-t pt-6">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Add Bell to This Schedule</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Add Bell to This Schedule (<span id="add-bell-target-name" class="font-semibold">no shared schedule selected</span>)</label>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                     <div>
@@ -1858,8 +1919,8 @@
             </div>
         </div>
 
-        <div id="relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+        <div id="relative-bell-modal" data-modal class="hidden">
+            <form id="relative-bell-form" data-modal-panel class="max-w-xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-4">Add Relative Bell</h3>
                 <p class="text-gray-700 mb-6">Create a bell relative to the start or end of the period <strong id="relative-period-name">...</strong>.</p>
 
@@ -1979,15 +2040,15 @@
                 <p id="relative-bell-status" class="text-red-600 text-sm mt-4 hidden"></p>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="relative-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="relative-bell-cancel" data-btn="cancel">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Bell</button>
                 </div>
             </form>
         </div>
 
         <!-- **** NEW: v4.28 - Add Bell Type (Choice) Modal **** -->
-        <div id="add-bell-type-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+        <div id="add-bell-type-modal" data-modal class="hidden">
+            <div data-modal-panel class="max-w-sm">
                 <h3 class="text-xl font-medium mb-4">Add Bell</h3>
                 <p class="text-gray-700 mb-6">What type of bell do you want to add to <strong id="add-bell-type-period-name">...</strong>?</p>
 
@@ -2008,8 +2069,8 @@
         </div>
 
         <!-- **** NEW: v4.28 - Add Static Bell Modal **** -->
-        <div id="add-static-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="add-static-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div id="add-static-bell-modal" data-modal class="hidden">
+            <form id="add-static-bell-form" data-modal-panel class="max-w-lg max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-4">Add Static Bell</h3>
                 <p class="text-gray-700 mb-6">Adding a new bell to the period <strong id="add-static-period-name">...</strong>.</p>
 
@@ -2085,14 +2146,14 @@
                 <p id="add-static-bell-status" class="text-red-600 text-sm mt-4 hidden"></p>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="add-static-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="add-static-bell-cancel" data-btn="cancel">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Bell</button>
                 </div>
             </form>
         </div>
 
         <!-- **** NEW: v4.12.2 - Orphan Bell Handling Modal **** -->
-        <div id="orphan-handling-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <div id="orphan-handling-modal" data-modal data-modal-z="z-60" class="hidden">            <div data-modal-panel class="max-w-lg">
                 <h3 class="text-xl font-medium mb-4 text-red-700">Warning: This is a Parent Bell!</h3>
                 <p class="text-gray-700 mb-4">You are trying to delete "<strong id="orphan-parent-name">...</strong>". This bell is the "parent" for the following child bell(s):</p>
 
@@ -2120,20 +2181,20 @@
         <!-- <div id="rename-period-modal" ...> ... </div> -->
 
         <!-- **** NEW: v4.44 - Confirm Delete VISUAL Modal **** -->
-        <div id="confirm-delete-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <div id="confirm-delete-visual-modal" data-modal class="hidden">
+            <div data-modal-panel class="max-w-lg">
                 <h3 class="text-xl font-medium mb-4">Delete Visual File</h3>
                 <p id="confirm-delete-visual-text" class="text-gray-700 mb-6">Are you sure you want to delete this visual? Any periods using it will revert to the default.</p>
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="delete-visual-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="button" id="delete-visual-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Delete Anyway</button>
+                    <button type="button" id="delete-visual-cancel" data-btn="cancel">Cancel</button>
+                    <button type="button" id="delete-visual-confirm" data-btn="danger">Delete Anyway</button>
                 </div>
             </div>
         </div>
 
         <!-- **** NEW: v4.44 - Edit Period Details Modal (Replaces Rename Modal) **** -->
-        <div id="edit-period-details-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="edit-period-details-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <div id="edit-period-details-modal" data-modal class="hidden">
+            <form id="edit-period-details-form" data-modal-panel class="max-w-lg">
                 <h3 class="text-2xl font-medium mb-6">Edit Period Details</h3>
 
                 <p class="text-gray-700 mb-4">
@@ -2179,16 +2240,16 @@
                         Delete Period
                     </button>
                     <div class="flex gap-3 ml-auto">
-                        <button type="button" id="edit-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+                        <button type="button" id="edit-period-cancel-btn" data-btn="cancel">Cancel</button>
+                        <button type="submit" data-btn="primary">Save Changes</button>
                     </div>
                 </div>
             </form>
         </div>
 
         <!-- **** NEW: v4.57 - New Period Modal (Static/Relative) **** -->
-        <div id="new-period-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="new-period-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+        <div id="new-period-modal" data-modal class="hidden">
+            <form id="new-period-form" data-modal-panel class="max-w-xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-6">Create New Personal Period</h3>
 
                 <!-- Period Name and Visual -->
@@ -2400,38 +2461,38 @@
                 <p id="new-period-status" class="text-red-600 text-sm mt-4 hidden"></p>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="new-period-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="new-period-cancel-btn" data-btn="cancel">Cancel</button>
                     <button type="submit" id="new-period-submit-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create Period</button>
                 </div>
             </form>
         </div>
-        <div id="user-message-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] hidden">
-            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+        <div id="user-message-modal" data-modal data-modal-z="z-[100]" class="hidden">
+            <div data-modal-panel class="max-w-sm">
                 <h3 id="user-message-title" class="text-xl font-medium mb-4">Notification</h3>
                 <p id="user-message-text" class="text-gray-700 mb-6">...</p>
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="user-message-ok" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">OK</button>
+                    <button type="button" id="user-message-ok" data-btn="primary">OK</button>
                 </div>
             </div>
         </div>
 
         <!-- **** NEW: v4.58 - General User Confirmation Modal (For Deletion/Irreversible Actions) **** -->
-        <div id="user-confirmation-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 hidden">
+        <div id="user-confirmation-modal" data-modal data-modal-z="z-60" class="hidden">
             <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
                 <h3 id="user-confirmation-title" class="text-xl font-semibold text-gray-900 mb-3">Confirm Action</h3>
                 <p id="user-confirmation-text" class="text-gray-700 mb-6">Are you sure you want to proceed?</p>
                 <div class="flex justify-end space-x-3">
-                    <button id="user-confirmation-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button id="user-confirmation-ok" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Confirm</button>
+                    <button id="user-confirmation-cancel" data-btn="cancel">Cancel</button>
+                    <button id="user-confirmation-ok" data-btn="danger">Confirm</button>
                 </div>
             </div>
         </div>
 
         <!-- **** NEW: v4.60.7 - Custom Text Visual Modal **** -->
 
-        <div id="custom-text-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden" style="z-index: 90;">
+        <div id="custom-text-visual-modal" data-modal data-modal-z="none" class="hidden" style="z-index: 90;">
 
-            <form id="custom-text-visual-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <form id="custom-text-visual-form" data-modal-panel class="max-w-lg max-h-[90vh] overflow-y-auto">
                 <h3 class="text-xl font-medium mb-4">Custom Text Visual</h3>
                 <p class="text-gray-700 mb-6">Enter custom text (1-3 characters) and choose colors.</p>
 
@@ -2474,15 +2535,15 @@
                 </div>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="custom-text-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="custom-text-cancel-btn" data-btn="cancel">Cancel</button>
                     <button type="submit" id="custom-text-save-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save Visual</button>
                 </div>
             </form>
         </div>
 
         <!-- **** NEW: v4.75 - Reusable Visual Upload Modal **** -->
-        <div id="upload-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-70 hidden">
-            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <div id="upload-visual-modal" data-modal data-modal-z="z-70" class="hidden">
+            <div data-modal-panel class="max-w-lg">
                 <h3 class="text-2xl font-medium mb-6">Upload New Visual</h3>
 
                 <!-- This is the content moved from the visual-manager-panel -->
@@ -2502,15 +2563,15 @@
                 </div>
 
                 <div class="mt-6 flex justify-end">
-                    <button type="button" id="upload-visual-close-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
+                    <button type="button" id="upload-visual-close-btn" data-btn="cancel">Close</button>
                 </div>
             </div>
         </div>
         <!-- **** END: v4.75 Modal **** -->
 
         <!-- **** NEW: v4.76 - Reusable Audio Upload Modal **** -->
-        <div id="upload-audio-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <div id="upload-audio-modal" data-modal class="hidden">
+            <div data-modal-panel class="max-w-lg">
                 <h3 class="text-2xl font-medium mb-6">Upload New Audio</h3>
 
                 <div>
@@ -2533,15 +2594,15 @@
                 </div>
 
                 <div class="mt-6 flex justify-end">
-                    <button type="button" id="upload-audio-close-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
+                    <button type="button" id="upload-audio-close-btn" data-btn="cancel">Close</button>
                 </div>
             </div>
         </div>
         <!-- **** END: v4.76 Modal **** -->
 
         <!-- **** NEW: v4.44 - Multi-Add Relative Bell Modal **** -->
-        <div id="multi-add-relative-bell-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="multi-add-relative-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div id="multi-add-relative-bell-modal" data-modal class="hidden">
+            <form id="multi-add-relative-bell-form" data-modal-panel class="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-6">Add Multi-Period Relative Bell</h3>
 
                 <!-- Bell Name and Sound -->
@@ -2661,15 +2722,15 @@
                 <p id="multi-add-relative-status" class="text-red-600 text-sm mt-4 hidden"></p>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="multi-add-relative-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="multi-add-relative-cancel" data-btn="cancel">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700">Add Bells</button>
                 </div>
             </form>
         </div>
 
         <!-- **** NEW: v5.00 - Custom Quick Bell Manager Modal **** -->
-        <div id="custom-quick-bell-manager-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="custom-quick-bell-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div id="custom-quick-bell-manager-modal" data-modal class="hidden">
+            <form id="custom-quick-bell-form" data-modal-panel class="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-2xl font-medium mb-6">Custom Quick Bells Manager</h3>
                 <p class="text-gray-700 mb-4">Define up to four custom, reusable quick bells.</p>
 
@@ -2681,14 +2742,14 @@
                 <p id="custom-quick-bell-status" class="text-red-600 text-sm mt-4 hidden"></p>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="custom-quick-bell-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save All Custom Bells</button>
+                    <button type="button" id="custom-quick-bell-cancel" data-btn="cancel">Close</button>
+                    <button type="submit" data-btn="primary">Save All Custom Bells</button>
                 </div>
             </form>
         </div>
 
         <!-- NEW V5.55.0: Quick Bell Queue Modal -->
-        <div id="quick-bell-queue-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+        <div id="quick-bell-queue-modal" data-modal class="hidden">
             <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-2xl font-medium">Quick Bell Queue</h3>
@@ -2765,8 +2826,8 @@
         </div>
 
         <!-- NEW V5.29.0 / V5.42.0: Passing Period Visual Modal -->
-        <div id="passing-period-visual-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-            <form id="passing-period-visual-form" class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+        <div id="passing-period-visual-modal" data-modal class="hidden">
+            <form id="passing-period-visual-form" data-modal-panel class="max-w-md">
                 <h3 class="text-2xl font-medium mb-4">Passing Period Visual</h3>
                 <p class="text-gray-700 mb-6">This icon displays between periods (passing time).</p>
 
@@ -2794,15 +2855,15 @@
                 <p id="passing-period-visual-status" class="text-red-600 text-sm mt-4 hidden"></p>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" id="passing-period-visual-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="button" id="passing-period-visual-cancel" data-btn="cancel">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">Save</button>
                 </div>
             </form>
         </div>
 
         <!-- NEW V5.29.0: Visual Background Color Picker Modal -->
-        <div id="visual-bg-color-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] hidden">
-            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <div id="visual-bg-color-modal" data-modal data-modal-z="z-[60]" class="hidden">
+            <div data-modal-panel class="max-w-lg">
                 <h3 class="text-2xl font-medium mb-4">Customize Background Color</h3>
                 <p class="text-gray-700 mb-6">Click on the preview to see how it looks with different backgrounds.</p>
 
@@ -2842,8 +2903,8 @@
                 </div>
 
                 <div class="flex justify-end gap-3">
-                    <button type="button" id="visual-bg-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="button" id="visual-bg-apply" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Apply</button>
+                    <button type="button" id="visual-bg-cancel" data-btn="cancel">Cancel</button>
+                    <button type="button" id="visual-bg-apply" data-btn="primary">Apply</button>
                 </div>
             </div>
         </div>
@@ -2986,7 +3047,7 @@
                                     </div>
                                 </div>
                                 <!-- Title preview -->
-                                <p class="text-center mt-3 text-sm font-bold transition-colors" style="color: var(--theme-accent);">Ellis Web Bell</p>
+                                <p id="branding-preview-title" class="text-center mt-3 text-sm font-bold transition-colors" style="color: var(--theme-accent);">Ellis Web Bell</p>
                             </div>
                         </div>
                     </div>
@@ -3024,11 +3085,14 @@
             <p>
                 <code id="userIdDisplay" class="bg-gray-200 px-2 py-1 rounded">...</code>
             </p>
-			<div class="text-center mt-2 text-xs text-gray-400">
-   		 		App Version: <span id="app-version-display" class="font-bold text-gray-600">Loading...</span>
-   		 		&nbsp;|&nbsp;
-   		 		CSS Version: <span id="css-version-display" class="font-bold text-gray-600">Loading...</span>
-			</div>
+			<div id="version-footer-line" class="text-center mt-2 text-xs text-gray-400 cursor-pointer" title="Tap for full status &amp; every file's version">
+                HTML: <span id="html-version-display" class="font-bold text-gray-600">...</span>
+                &nbsp;|&nbsp;
+                App: <span id="app-version-display" class="font-bold text-gray-600">Loading...</span>
+                &nbsp;|&nbsp;
+                CSS: <span id="css-version-display" class="font-bold text-gray-600">Loading...</span>
+                &nbsp;&mdash; <span class="underline decoration-dotted">status &amp; versions</span>
+            </div>
         </footer>
 
         <input type="file" id="restore-file-input" class="hidden" accept="application/json,.json">
@@ -3036,9 +3100,17 @@
     </div>
 
        	<!-- 5.06 Moving JS out -->
-        <!-- v5.67.0: firebase-config.js must load BEFORE script.js so window.firebaseConfig is populated when the module initializes -->
+        <!-- v6.3.0: school-config.js — one-place branding for other schools (SETUP.md Step 8). Must load before the app module. -->
+        <script src="school-config.js"></script>
+        <!-- v5.67.0: firebase-config.js must load BEFORE the app module so window.firebaseConfig is populated when it initializes -->
         <script src="firebase-config.js"></script>
-		<script type="module" src="script.js"></script>
+        <!-- v5.72.0: Shared bell engine — MUST load before the app module (00-header.js
+             destructures window.BellEngine at its top). Same file is
+             used by clock.html. Tests: node --test tests/ -->
+        <script src="bell-engine.js"></script>
+        <!-- v6.0.0: script.js retired. src/js/ IS production; the browser
+             resolves the module graph starting from main.js. -->
+		<script type="module" src="src/js/main.js"></script>
 </body>
 </html>
 
@@ -3065,4 +3137,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 5.69.2 -->
+<!-- Version 6.3.0 -->

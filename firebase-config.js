@@ -1,9 +1,14 @@
 /**
  * Ellis Web Bell — Shared Firebase Configuration
- * Version: 1.0.0
+ * Version: 1.0.2
+ *
+ * v1.0.2 (2026-07, app 6.0.1): comment-only — version-number correction:
+ * the modularization release was mislabeled 7.0.0; it is 6.0.0. No code change.
+ * v1.0.1 (2026-07, app 6.0.0): comment-only — main-app description updated
+ * (src/js/ ES modules; script.js retired). No code change.
  *
  * This file is loaded as a plain (non-module) script so it works equally well
- * in the module-based main app (script.js, Firebase v11 modules) and in the
+ * in the module-based main app (src/js/ ES modules, Firebase v11) and in the
  * compat-based surfaces (clock.html, dashboard.html, dashboard-config.html,
  * all using Firebase v9 compat). Anything that needs the config reads it
  * from window.firebaseConfig — which is the ONLY place it should be defined.
