@@ -2,6 +2,249 @@
 
 Release history for the main app (src/js / index.html; script.js before 6.0.0). Sibling surfaces (clock.html, old.html, dashboard-config.html, service-worker.js) carry their own version notes in their file headers.
 
+## V6.11.0 — Anchor-strip fix, dedup, firstSeen; Verb B engine (dormant)
+(Bugfix + ride-along release. Verb B's ENGINE lands and is fully tested
+but nothing calls it yet — same pattern as 6.10.0 shipping
+resolveCalendarSchedule before its UI. Wiring is 6.12.0.)
+
+- **bell-engine.js 1.8.0**: Layer 4 VERB B pure functions —
+  resolveCalendarTransforms(cal, date, uid) collects verb:'transform'
+  recipes scoped to a uid (they compose in entry order), and
+  applyRecipeToPeriods(periods, recipe) applies one recipe immutably.
+  Two archetypes: 'shift' (move static bells in a time range) and
+  'shorten' (compress periods after a pivot to extend a named/id'd
+  target, cascading, 60s floor). ONLY shared static bells move;
+  relatives re-derive downstream (Layer 2 overlays survive). +5 tests
+  — 65/65. NOT WIRED: no caller yet, so no behavior change ships.
+- **ANCHOR-STRIP BUGFIX (module 30, the important one)**: the edit-bell
+  anchor select was populated from the DOM-reconstructed bell object
+  (99-init), which never carried buildingBellId — so it always showed
+  "Not anchored", and the save path read that as an explicit unanchor.
+  Any admin all-users time edit of an anchored bell SILENTLY STRIPPED
+  its anchor (I0 field-stripping, reintroduced upstream of 6.5.0's
+  fix). Now populate resolves the true anchor from state.localSchedule-
+  Periods by bellId. Owner should re-run "Anchor matching…" on any bell
+  whose count dropped since 6.5.0 (idempotent, safe on all six).
+- **Designation dedup (module 34)**: saving a designation now strips
+  each uid from existing base entries first (dropping emptied entries)
+  before appending — per-person last-write-wins. Fixes "change my mind"
+  silently losing to a stale earlier entry. Transform entries untouched.
+- **firstSeen (module 28 + 29)**: presence writer stamps firstSeen once
+  (session-guarded single getDoc; existing users get theirs on next
+  sign-in, so for them it reads "since 6.11.0" — only brand-new users
+  get a true first-login date). Dashboard gains a "First seen" column.
+  TVs stay lastSeen-only (clock.html untouched).
+- **Building-bell "0 anchored" nudge (module 30)**: zero-anchor rows now
+  show an amber "0 anchored — use Anchor matching… →" instead of the
+  quiet "no anchored bells yet", teaching the flow at the point of need.
+- **Lock-note redesign (index + module 16/30)**: the edit-bell time note
+  moved BELOW the input (was between label and input, shoving the field
+  out of alignment with Bell Name). Two states: 🔒 locked (non-admin)
+  and 🔓 amber "saving changes this for every user" (admin). When the
+  bell is anchored, the note names the building bell — for everyone,
+  not just admins.
+- **service-worker.js 1.17.0**: no new modules; cache bump to ship the
+  edited files. **NO rules change** (6.9.0's roster publish already
+  covers everything).
+
+## V6.10.0 — The Calendar Wakes: Layer 4 Verb A ships
+(The v5.73.0 parked calendar is REVIVED — its park note demanded a
+per-teacher assignment model, and Layers 2–3 built exactly that.)
+
+- **bell-engine.js 1.7.0**: resolveCalendarSchedule(cal, date, uid) —
+  v2 per-date SCOPED entries ({scope:[uids], verb:'base', scheduleId}),
+  first scope hit wins, resolved PER USER; the v1 shape
+  (exceptions/weekdayDefaults) remains the unscoped fallback and
+  uid-less callers behave exactly as before. Flat/dumb/ES5 (I3).
+  +2 tests — 60/60.
+- **Module 20 REVIVED** (park note preserved as history in the file):
+  the `enabled` flag is retired — presence of calendar data IS the
+  enablement; every guard still fails closed. Manual choice today
+  still wins, but deviation is now BANNERED (I1): amber, "Today you
+  are designated to X", Follow (clears the manual choice, switches),
+  dismiss-per-session. I4: the banner counts personal reminder bells
+  whose recorded home base (6.8.0) differs from the designation.
+- **NEW `src/js/34-day-designation.js`** + "Designate Schedules"
+  (Admin Zone): the I2 day-of modal, and THE LAYER 3 FILTER-PICKER'S
+  FIRST REAL USE — filter roster by tag or name, eyeball, check
+  people; the explicit checked uid list is what's stored in scope.
+  Entries listed per date with remove. Writes config/schedule_calendar
+  (reserved since 5.73.0; covered by config rules — NO rules change).
+- Verb B (transformation recipes on findPeriodEdgeAnchorBell) is the
+  next slice; the entry shape already carries `verb` so recipes drop
+  in additively. Prefill grid + generators follow.
+- **service-worker.js 1.16.0** (38 modules); CSS rebuilt (31,001 B).
+
+## V6.9.0 — Roster & Tags: design Layer 3 ships
+(**FIRST RULES CHANGE of the 6.5–6.9 run — publish firestore.rules!**)
+
+- **NEW Firestore path** `public/data/roster/{uid}`: { displayName,
+  tags, capabilities }. Rules: read = any signed-in user; admins write
+  anything; a user may write their OWN doc only if the capabilities
+  field is absent-and-stays-absent or completely unchanged
+  (request.resource.data is post-write state, so self-serve merge
+  writes pass; self-granting 'may-break-anchors' is mechanically
+  impossible, not just discouraged).
+- **THE LAYER 3 INVARIANT** (owner decision, now carved into rules
+  comments, module header, and admin UI copy): tags are PICKER
+  FILTERS, never runtime targeting. Designation UIs (Layer 4) filter
+  by tag, the admin eyeballs the list, and the EXPLICIT checked uid
+  list is what's stored. CDC needs no special rule as a result.
+- **NEW `src/js/33-roster.js`** + two surfaces: "My Tags" (header
+  button; self-serve chips with one-click suggestions — 6th/7th/8th,
+  subjects, CDC, Office; capabilities shown read-only) and
+  "Roster & Tags" (Admin Zone modal; everyone's tags + amber
+  capability chips, Enter-to-add, remove users, and "Seed from
+  presence" which bootstraps rows for every human the usage dashboard
+  has seen — clock surfaces excluded).
+- **service-worker.js 1.15.0**: module 33 cached (37 modules).
+- **tailwind.css rebuilt** (30,969 bytes) for the chip classes.
+
+## V6.8.0 — The Shape Itself: Layer 2 slice 3
+(The design's identity-anchor shape {baseScheduleId, periodId, edge,
+offsetSeconds} is now fully realized in stored data, and the period-edge
+primitive Layer 4 will stand on is extracted and tested.)
+
+- **bell-engine.js 1.6.0 — `findPeriodEdgeAnchorBell(period, edge)`**:
+  the V5.44.1 anchor-selection heuristic (shared static first/last,
+  else anchorRole, else legacy "Period Start"/"Period End" names)
+  extracted from calculateRelativeBellTime's inline block into a named,
+  exported, tested primitive. Accepts both edge vocabularies ('start'/
+  'end' per the design; 'period_start'/'period_end' as stored).
+  Resolution behavior IDENTICAL — all 56 pre-existing tests passed
+  untouched before the 2 new ones (58 total). This is the "period edge"
+  every Layer 4 transformation recipe will operate on.
+- **Module 16's duplicated inline copy** of the heuristic (edit-modal
+  anchor prefill) now routes through the primitive — and that copy had
+  DRIFTED: with only a wrong-edge anchorRole bell present it selected
+  that bell for the opposite edge; the primitive correctly returns
+  null and the select is left blank (matching resolution behavior).
+  One implementation, one behavior, forever.
+- **`baseScheduleId` recorded on anchors** at all four stamp sites
+  (single relative, multi-add relative, shared backfill, personal
+  migration — both silent and review paths): shared-origin parents
+  record their home base; personal-period parents deliberately omit it
+  (they travel with their owner). Additive as always. The full design
+  shape maps onto stored data as: baseScheduleId ↔
+  relative.baseScheduleId, periodId ↔ relative.parentPeriodId, edge ↔
+  relative.parentAnchorType (deliberately NOT dual-written — the
+  verbose stored vocabulary IS the edge field; duplicating it would
+  invite drift), offsetSeconds ↔ relative.offsetSeconds.
+- **service-worker.js unchanged (1.14.0)**: fetch strategy is
+  network-first (verified), and the convention bumps CACHE_VERSION only
+  when CORE_ASSETS changes — no new module this release.
+- No rules changes; no CSS changes.
+
+## V6.7.0 — Personal Anchor Migration: Layer 2 slice 2
+(The user's own reminder bells go identity-keyed; every period-creation
+site in the codebase now stamps ids at birth.)
+
+- **NEW `src/js/32-personal-anchor-migration.js`**: personal_schedules
+  are OWNER-ONLY writable, so this runs client-side on the user's own
+  doc (the reason the 6.6.0 backfill couldn't touch them). Gentle 30s
+  local classification (28-presence pattern, no reads); a write happens
+  only when there's something to stamp, at most once per personal
+  schedule per session, via read-modify-write of the user's doc.
+- **Unambiguous anchors** (name matches exactly one id-bearing period
+  in the merged view) are stamped SILENTLY; the name stays as the
+  engine's fallback — never destructive.
+- **Ambiguous anchors** (duplicated period names) are NEVER guessed: an
+  amber banner (clock-drift pattern, dismissible per session) opens a
+  review modal — per bell, pick the intended period (shown with its
+  time span and personal/shared origin) or "Decide later (keep
+  name-based)". This is the design doc's migration review modal.
+- **Multi-add relative bells now identity-stamped** (the 6.6.0 IOU):
+  the period checkboxes carry `data-period-id` from the merged
+  calculatedPeriodsList (which preserves periodId), and the save loop
+  stamps `parentPeriodId` when present.
+- **Remaining creation sites stamped** (module 19): personal custom
+  periods and both schedule-import converter sites now get periodId at
+  birth. The import converter rebuilds periods from a name-keyed map,
+  so incoming ids can't survive it by construction — fresh ids +
+  name-fallback + later re-stamping is the correct behavior there.
+- **service-worker.js 1.14.0**: module 32 cached (36 modules).
+- No rules changes; no CSS changes; no engine changes (1.5.0's
+  identity-first resolution already does the work).
+
+## V6.6.0 — Period Identity: Layer 2's foundation ships (slice 1)
+(Identity anchors begin. Periods finally have stable ids; renames stop
+breaking reminder bells.)
+
+- **THE PROBLEM:** periods were `{name, isEnabled, bells}` — no identity.
+  Period-anchored relative bells resolved by NAME string match, so
+  renaming "4th Period" orphaned every reminder bell hanging off it.
+- **NEW optional `periodId`** on shared-schedule periods (additive; old
+  clients ignore it and round-trip it by spread — audit answered).
+  Stamped at period birth (both creation sites) via new
+  `generatePeriodId()` in module 05 (`period_` + random8, bell-id shape).
+- **bell-engine.js 1.5.0**: period-anchored resolution is IDENTITY
+  FIRST — `relative.parentPeriodId` wins when a matching period exists;
+  historical name match remains the fallback (old data keeps working).
+  +2 tests (rename survival; fallback) — suite 56/56.
+- **NEW `src/js/31-period-identity.js`** + "Assign Period IDs" in the
+  Admin Zone: idempotent one-click backfill — every shared period gets
+  an id; shared relative bells whose parentPeriodName matches EXACTLY
+  ONE period get parentPeriodId stamped; ambiguous names (duplicates)
+  are counted and SKIPPED, never guessed. One writeBatch + regenerated
+  legacy bells arrays + per-schedule `period-identity-backfill` audit
+  entries. Safe to run any time.
+- **Single relative-bell creation** now stamps `parentPeriodId` when the
+  anchor period has one. The multi-add relative site only holds period
+  NAMES (merged personal view) — stamping there arrives with the
+  personal-anchor migration slice (which also brings the ambiguity
+  review modal; personal schedules are owner-only writable, so their
+  migration must run client-side per user).
+- **service-worker.js 1.13.0**: module 31 cached (35 modules).
+- No rules changes; no CSS changes.
+
+## V6.5.0 — Building Bells: design build-order step 1 ships
+(The six intercom moments become first-class anchors; plus clock.html
+presence, closing the design doc's deferred open question.)
+
+- **NEW `src/js/30-building-bells.js`** + "Manage Building Bells" in the
+  Admin Zone: define the intercom bells (name + time) in a new
+  `config/building_bells` doc — **no firestore.rules change**, the
+  existing `config/{configId}` block already grants read-everyone /
+  write-admin (world-readable also future-proofs wall-clock
+  follow-along per design I3). Editing a building bell's time shows a
+  per-schedule "this will move N anchored bells" confirmation, then ONE
+  writeBatch updates the config doc plus every affected schedule's
+  `periods` AND regenerated legacy `bells` arrays — old clients render
+  the ordinary times and follow along with zero new code (design: 
+  "Building Bells writes ordinary period times old clients already
+  render"). Per-schedule audit entries: `building-bell-propagate`,
+  `building-bell-anchor`, `building-bell-unanchor`.
+- **Anchoring is explicit, eyeball-then-confirm** (the design doc's
+  tags philosophy): an "Anchor matching…" assist checkbox-lists
+  exact-time unanchored bells across all shared schedules; nothing
+  anchors without confirm. Deleting a building bell strips its anchors
+  (times stay put) so no dangling ids linger.
+- **Edit-bell modal (admin + shared):** new "Anchor to building bell"
+  select. Picking an anchor snaps the time field to the building bell's
+  time (an anchor MEANS "this bell rings at that moment"); saving with
+  a different time detaches the anchor with a visible notice. The fuzzy
+  59-second linked-edit modal REMAINS for unanchored legacy bells (I0:
+  old behavior untouched).
+- **BUG PREVENTED — `updatePeriodsOnEdit` field preservation:** it
+  replaced bells wholesale (preserving only anchorRole), so every
+  ordinary edit would have silently stripped `buildingBellId` — the I0
+  field-stripping failure mode in our own client. It now preserves the
+  field unless an edit explicitly sets (string) or clears (null) it;
+  personal-bell callers pass through untouched.
+- **bell-engine.js 1.4.0**: new pure `applyBuildingBellTimeToPeriods`
+  (never mutates; reference-equal return on no-op; refuses to write a
+  time onto relative bells). +3 tests — suite now 54/54.
+- **clock.html 1.7.0**: presence heartbeat every 5 min, `surface:
+  'clock'`, ANONYMOUS sessions only (a signed-in browser already
+  reports via the app under the same uid; both surfaces writing would
+  flap its census row).
+- **service-worker.js 1.12.0**: module 30 in CORE_ASSETS (34 modules).
+- **tailwind.css rebuilt** (30,876 bytes): module 30 introduced
+  `hover:underline`. Ships pre-built, no build needed on deploy.
+- **build/verify-esm.mjs**: the two 6.3.0-era TDZ warnings
+  (27-school-branding APP_VERSION) reviewed — 00-header is a leaf
+  module, no cycle possible — and whitelisted with reasoning.
+
 ## V6.4.0 — Usage dashboard (presence): design Layer 1 ships
 (First built piece of DESIGN-CALENDAR-V2.md; additive schema per its I0.)
 

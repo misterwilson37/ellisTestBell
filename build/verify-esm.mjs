@@ -39,6 +39,11 @@ let warnings = [];
 // import cycle with 02 is possible — the binding is always initialized.
 const TDZ_WHITELIST = new Set([
   '02-dom-elements.js:573:state',
+  // Reviewed 6.5.0 (round 5, "Bourdon"): 27's eval-time APP_VERSION use is
+  // safe — 00-header is a leaf module (imports nothing from the graph, only
+  // window.BellEngine), so no import cycle can leave the const uninitialized.
+  '27-school-branding.js:22:APP_VERSION',
+  '27-school-branding.js:24:APP_VERSION',
 ]);
 
 const mods = new Map();

@@ -252,3 +252,14 @@ files on next load.
 - [ ] Delete this checklist's completed items or keep the file as a record.
 - [ ] Day-to-day workflow from here on: `build/README-BUILD.md` (the Two
       Build Rules).
+
+## Batch note (round 6, 6.11.0) — SEVEN-release cumulative deploy pending
+
+As of 6.11.0 the last LIVE release is still 6.4.0; **6.5.0→6.11.0 are all
+built + battery-verified but undeployed**. DEPLOY-6.11.0.md is the single
+cumulative deploy doc for the whole batch and includes the ONE required
+firestore.rules publish (6.9.0's roster path). Push the entire `src/js/`
+tree + changed root files in ONE commit (mixed-tree trap — see HANDOFF §2/§9),
+publish rules, then smoke-test each DEPLOY-6.5.0.md → DEPLOY-6.11.0.md in
+order. 6.11.0's own owner TODO: re-run "Anchor matching…" on each building
+bell to recover any anchors the pre-6.11.0 strip bug ate.
