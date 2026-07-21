@@ -1,7 +1,55 @@
 /**
  * Ellis Web Bell — Shared Bell Engine
- * Version: 1.3.3
+ * Version: 1.8.0
  *
+ * v1.8.0 (2026-07, app 6.11.0): Layer 4 VERB B (transformation recipes).
+ * Two new pure functions:
+ *   resolveCalendarTransforms(calendar, date, uid) — collect the v2
+ *     verb:'transform' entries scoped to this uid for this date, in entry
+ *     order (a user can be in several; they compose). Flat, dumb, ES5-
+ *     portable (I3), mirroring resolveCalendarSchedule.
+ *   applyRecipeToPeriods(periods, recipe) — apply ONE recipe to a periods
+ *     array, immutably, touching ONLY shared-side STATIC bells (string
+ *     time, no relative) — relative bells re-derive downstream, which is
+ *     exactly how personal overlays survive (Layer 2). Recipe archetypes:
+ *       { type:'shift', offsetSeconds, from?, until? } — every static
+ *         bell whose ORIGINAL time falls in [from, until] (inclusive;
+ *         missing bound = open) moves by offsetSeconds.
+ *       { type:'shorten', after, perPeriodSeconds, extendPeriodId?,
+ *         extendPeriodName? } — "shorten everything after lunch so flex
+ *         runs long": periods whose ORIGINAL start edge (per
+ *         findPeriodEdgeAnchorBell) is >= `after` and before the extend
+ *         target each lose perPeriodSeconds (clamped so no period drops
+ *         below 60s), cascading earlier; the extend target's START moves
+ *         earlier by the total reclaimed, its END stays put; interior
+ *         static bells ride their period's start delta. Extend target
+ *         resolves IDENTITY-FIRST (extendPeriodId) with name fallback
+ *         (extendPeriodName) — one recipe fits every schedule that has
+ *         a like-named period; schedules without one simply compress.
+ *
+ * v1.7.0 (2026-07, app 6.10.0): resolveCalendarSchedule extended for the
+ * Layer 4 v2 schema — per-date SCOPED entries ({scope:[uids], verb:'base',
+ * scheduleId}) resolved per user, first scope hit wins. The v1 shape
+ * (exceptions / weekdayDefaults) remains the fallback and still works
+ * untouched without a uid (I0). Flat, dumb, ES5-portable (I3).
+ *
+ * v1.6.0 (2026-07, app 6.8.0): the V5.44.1 period-edge anchor-selection
+ * heuristic (shared static first/last, else anchorRole, else legacy
+ * "Period Start"/"Period End" names) is EXTRACTED into the named, exported
+ * findPeriodEdgeAnchorBell(period, edge) — the reusable "period edge"
+ * primitive that Layer 4 transformation recipes will operate on. Accepts
+ * edge as 'start'/'end' (design vocabulary) or 'period_start'/'period_end'
+ * (stored vocabulary). calculateRelativeBellTime now calls it; behavior
+ * identical.
+ *
+ * v1.5.0 (2026-07, app 6.6.0): period-anchored relative bells resolve by
+ * parentPeriodId FIRST (falling back to the historical parentPeriodName
+ * string match) — Layer 2 "identity anchors" foundation: renamed periods
+ * no longer orphan their relative bells once ids are stamped.
+ *
+ * v1.4.0 (2026-07, app 6.5.0): added applyBuildingBellTimeToPeriods for
+ * the Building Bells feature (DESIGN-CALENDAR-V2.md shared concept):
+ * pure propagation of a building bell's new time onto anchored bells.
  * v1.3.3 (2026-07, app 6.0.1): comment-only — version-number correction:
  * the modularization release was mislabeled 7.0.0; it is 6.0.0. No code change.
  * v1.3.2 (2026-07, app 6.0.0): comment-only — load-order note updated to
@@ -168,6 +216,36 @@
         return null; // No unskipped bells after this one
     }
 
+    /**
+     * v1.6.0 (app 6.8.0): THE period-edge primitive. Given a period and an
+     * edge ('start'|'end', or the stored 'period_start'|'period_end'),
+     * return the bell that DEFINES that edge, or null:
+     *   1. LINKED period (has shared static bells): first/last shared
+     *      static bell (V5.44.1 rule).
+     *   2. FLUKE/standalone period: the bell with anchorRole 'start'/'end'.
+     *   3. Legacy fallback: a non-relative bell literally named
+     *      "Period Start"/"Period End".
+     * Pure and defensive; never throws on junk shapes.
+     */
+    function findPeriodEdgeAnchorBell(period, edge) {
+        if (!period || !Array.isArray(period.bells)) return null;
+        const wantStart = edge === 'start' || edge === 'period_start';
+        const sharedStaticBells = period.bells.filter(b =>
+            b && !b.relative && b._originType === 'shared'
+        );
+        if (sharedStaticBells.length > 0) {
+            return wantStart ? sharedStaticBells[0]
+                             : sharedStaticBells[sharedStaticBells.length - 1];
+        }
+        const targetRole = wantStart ? 'start' : 'end';
+        let anchorBell = period.bells.find(b => b && b.anchorRole === targetRole);
+        if (!anchorBell) {
+            const targetName = wantStart ? 'Period Start' : 'Period End';
+            anchorBell = period.bells.find(b => b && b.name === targetName && !b.relative);
+        }
+        return anchorBell || null;
+    }
+
     function calculateRelativeBellTime(bell, bellMap, allPeriods, visited = new Set(), previousBells = []) {
         // 1. If the bell already has a static time, it's an anchor.
         if (bell.time && !bell.relative) {
@@ -236,8 +314,14 @@
             }
             visited.add(bell.bellId);
 
-            // 2b. Find the parent *period*
-            const parentPeriod = allPeriods.find(p => p.name === parentPeriodName);
+            // 2b. Find the parent *period*.
+            // v1.5.0 (Layer 2): IDENTITY FIRST — if the anchor carries a
+            // parentPeriodId and a period with that id exists, it wins;
+            // otherwise fall back to the historical name match (old data,
+            // old clients, and unstamped periods keep working — I0).
+            const parentPeriod = (bell.relative.parentPeriodId
+                    && allPeriods.find(p => p.periodId === bell.relative.parentPeriodId))
+                || allPeriods.find(p => p.name === parentPeriodName);
         
             if (!parentPeriod || !parentPeriod.bells || parentPeriod.bells.length === 0) {
                 console.warn(`Could not find parent period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
@@ -245,34 +329,11 @@
             }
         
             // 2c. Find the anchor bell (start or end) within that period.
-            // Note: We MUST recursively find the time for these, as they could also be relative.
-            let anchorBell;
-            
-            // --- MODIFIED V5.44.1: Use anchorRole for fluke periods, shared bells for linked periods ---
-            // Determine if this is a shared/linked period or a custom/fluke period
-            const sharedStaticBells = parentPeriod.bells.filter(b => 
-                !b.relative && b._originType === 'shared'
-            );
-        
-            if (sharedStaticBells.length > 0) {
-                // LINKED PERIOD: Use first/last shared static bell as anchor
-                if (parentAnchorType === 'period_start') {
-                    anchorBell = sharedStaticBells[0];
-                } else {
-                    anchorBell = sharedStaticBells[sharedStaticBells.length - 1];
-                }
-            } else {
-                // FLUKE/STANDALONE PERIOD: Find bells with explicit anchorRole
-                const targetRole = parentAnchorType === 'period_start' ? 'start' : 'end';
-                anchorBell = parentPeriod.bells.find(b => b.anchorRole === targetRole);
-            
-                // Legacy fallback: look for "Period Start" / "Period End" names
-                if (!anchorBell) {
-                    const targetName = parentAnchorType === 'period_start' ? 'Period Start' : 'Period End';
-                    anchorBell = parentPeriod.bells.find(b => b.name === targetName && !b.relative);
-                }
-            }
-        
+            // v1.6.0: heuristic extracted to findPeriodEdgeAnchorBell above —
+            // one implementation for resolution here, the edit-modal prefill
+            // (module 16), and future Layer 4 recipes. Behavior unchanged.
+            const anchorBell = findPeriodEdgeAnchorBell(parentPeriod, parentAnchorType);
+
             if (!anchorBell) {
                 console.warn(`No anchor bell found in period "${parentPeriodName}" for bell "${bell.name}". It may be orphaned.`);
                 return { ...bell, isOrphan: true, fallbackTime: "00:00:00" };
@@ -333,9 +394,25 @@
      * value ("") means "no designation that day" and suppresses the weekday
      * default (e.g. a holiday). Returns a scheduleId string or null.
      */
-    function resolveCalendarSchedule(calendar, date) {
+    function resolveCalendarSchedule(calendar, date, uid) {
         if (!calendar || !date) return null;
         const dateStr = toLocalDateString(date);
+        // v1.7.0 (Layer 4, v2 schema): per-date scoped entries win when the
+        // caller identifies itself. Scopes are EXPLICIT uid lists (Layer 3
+        // invariant: tags filter pickers; uids are what is stored/resolved).
+        if (uid && calendar.days &&
+            Object.prototype.hasOwnProperty.call(calendar.days, dateStr)) {
+            const entries = calendar.days[dateStr] && calendar.days[dateStr].entries;
+            if (Array.isArray(entries)) {
+                for (let i = 0; i < entries.length; i++) {
+                    const e = entries[i];
+                    if (e && e.verb === 'base' && Array.isArray(e.scope)
+                            && e.scope.indexOf(uid) !== -1 && e.scheduleId) {
+                        return e.scheduleId;
+                    }
+                }
+            }
+        }
         if (calendar.exceptions &&
             Object.prototype.hasOwnProperty.call(calendar.exceptions, dateStr)) {
             return calendar.exceptions[dateStr] || null;
@@ -387,8 +464,245 @@
         return serverMs - (localBeforeMs + localAfterMs) / 2;
     }
 
+    /**
+     * v1.4.0 (app 6.5.0, Building Bells): Given a schedule's periods array,
+     * return a new periods array in which every STATIC bell carrying the
+     * given buildingBellId anchor has its time replaced with newTime.
+     *
+     * Pure and defensive: the input is never mutated; untouched periods and
+     * bells are returned by reference (cheap no-op detection for callers);
+     * bells without a string `time` (relative bells) are never touched even
+     * if they somehow carry the anchor — writing a time onto a relative
+     * bell would corrupt it. Returns { periods, changed } where `changed`
+     * is the number of bells actually rewritten, so callers can skip
+     * no-op Firestore writes entirely (changed === 0 → same reference back).
+     */
+    function applyBuildingBellTimeToPeriods(periods, buildingBellId, newTime) {
+        if (!Array.isArray(periods) || !buildingBellId || typeof newTime !== 'string') {
+            return { periods: periods, changed: 0 };
+        }
+        let changed = 0;
+        const out = periods.map(function (period) {
+            const bells = period && Array.isArray(period.bells) ? period.bells : null;
+            if (!bells) return period;
+            let touched = false;
+            const newBells = bells.map(function (bell) {
+                if (bell && bell.buildingBellId === buildingBellId
+                        && typeof bell.time === 'string' && bell.time !== newTime) {
+                    touched = true;
+                    changed++;
+                    return Object.assign({}, bell, { time: newTime });
+                }
+                return bell;
+            });
+            return touched ? Object.assign({}, period, { bells: newBells }) : period;
+        });
+        return { periods: changed ? out : periods, changed: changed };
+    }
+
+    /**
+     * v1.8.0 (app 6.11.0, Layer 4 Verb B): collect the transformation
+     * recipes that apply to `uid` on `date` from the v2 calendar schema.
+     * Returns an array of recipe objects (possibly empty), in entry order —
+     * a user may sit in several transform scopes and the recipes COMPOSE
+     * (callers apply them sequentially via applyRecipeToPeriods).
+     * Pure and defensive; mirrors resolveCalendarSchedule's v2 walk.
+     */
+    function resolveCalendarTransforms(calendar, date, uid) {
+        const out = [];
+        if (!calendar || !date || !uid || !calendar.days) return out;
+        const dateStr = toLocalDateString(date);
+        if (!Object.prototype.hasOwnProperty.call(calendar.days, dateStr)) return out;
+        const entries = calendar.days[dateStr] && calendar.days[dateStr].entries;
+        if (!Array.isArray(entries)) return out;
+        for (let i = 0; i < entries.length; i++) {
+            const e = entries[i];
+            if (e && e.verb === 'transform' && Array.isArray(e.scope)
+                    && e.scope.indexOf(uid) !== -1
+                    && e.recipe && typeof e.recipe === 'object') {
+                out.push(e.recipe);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * v1.8.0 (app 6.11.0, Layer 4 Verb B): apply ONE transformation recipe
+     * to a periods array. Contract matches applyBuildingBellTimeToPeriods:
+     * pure and defensive; the input is NEVER mutated; untouched periods and
+     * bells come back by reference; returns { periods, changed } where
+     * `changed` counts bells actually rewritten (0 → same array reference
+     * back, so callers can skip work).
+     *
+     * ONLY static bells move (typeof time === 'string' && !relative) — the
+     * same rule as the emergency shift and Building Bells propagation.
+     * Relative bells, shared and personal, re-derive from the moved parents
+     * downstream; that ripple is the whole point (Layer 2 overlays survive).
+     *
+     * Recipe shapes are documented in the file header. All range tests run
+     * against ORIGINAL times, before any movement.
+     */
+    function applyRecipeToPeriods(periods, recipe) {
+        if (!Array.isArray(periods) || !recipe || typeof recipe !== 'object') {
+            return { periods: periods, changed: 0 };
+        }
+
+        // A bell a recipe may move: STATIC (string time, not relative) and
+        // shared-side. On PRISTINE shared-schedule docs (module 34 precompute;
+        // module 14 applies recipes pre-merge) bells carry no _originType —
+        // untagged is shared by definition there. On merged views the
+        // 'custom' tag excludes personal pinned bells, same as the shift.
+        function recipeEligible(bell) {
+            return !!bell && typeof bell.time === 'string' && !bell.relative
+                && (bell._originType === undefined || bell._originType === 'shared');
+        }
+
+        // ---- archetype 1: uniform shift of a time range --------------------
+        if (recipe.type === 'shift') {
+            const offset = Number(recipe.offsetSeconds);
+            if (!Number.isFinite(offset) || Math.trunc(offset) === 0) {
+                return { periods: periods, changed: 0 };
+            }
+            const fromS = (typeof recipe.from === 'string' && recipe.from)
+                ? timeToSeconds(recipe.from) : null;
+            const untilS = (typeof recipe.until === 'string' && recipe.until)
+                ? timeToSeconds(recipe.until) : null;
+            let changed = 0;
+            const out = periods.map(function (period) {
+                const bells = period && Array.isArray(period.bells) ? period.bells : null;
+                if (!bells) return period;
+                let touched = false;
+                const newBells = bells.map(function (bell) {
+                    if (!recipeEligible(bell)) return bell;
+                    const t = timeToSeconds(bell.time);
+                    if (fromS !== null && t < fromS) return bell;
+                    if (untilS !== null && t > untilS) return bell;
+                    touched = true;
+                    changed++;
+                    return Object.assign({}, bell, {
+                        time: shiftTimeString(bell.time, Math.trunc(offset))
+                    });
+                });
+                return touched ? Object.assign({}, period, { bells: newBells }) : period;
+            });
+            return { periods: changed ? out : periods, changed: changed };
+        }
+
+        // ---- archetype 2: shorten periods after a pivot to extend one -----
+        if (recipe.type === 'shorten') {
+            const per = Math.trunc(Number(recipe.perPeriodSeconds));
+            if (!Number.isFinite(per) || per <= 0 || typeof recipe.after !== 'string' || !recipe.after) {
+                return { periods: periods, changed: 0 };
+            }
+            const afterS = timeToSeconds(recipe.after);
+
+            // Survey: original start/end edge bells per period. Prefer the
+            // Layer 2 primitive; when it can't name an eligible bell (its
+            // first rule keys on the merge-time _originType tag, absent on
+            // pristine docs, and pristine bells may lack anchorRole too),
+            // fall back to the first/last ELIGIBLE static bell by time —
+            // which is exactly what rule 1 computes on merged data anyway.
+            // Periods with no eligible static bells at all (e.g. fully
+            // personal periods in a merged view) are left untouched.
+            const info = periods.map(function (period) {
+                const bells = period && Array.isArray(period.bells) ? period.bells : [];
+                const statics = bells.filter(recipeEligible)
+                    .slice().sort(function (a, b) {
+                        return timeToSeconds(a.time) - timeToSeconds(b.time);
+                    });
+                let startBell = findPeriodEdgeAnchorBell(period, 'start');
+                if (!recipeEligible(startBell)) startBell = statics[0] || null;
+                let endBell = findPeriodEdgeAnchorBell(period, 'end');
+                if (!recipeEligible(endBell)) endBell = statics[statics.length - 1] || null;
+                return {
+                    period: period,
+                    startBell: startBell,
+                    endBell: endBell,
+                    startS: startBell ? timeToSeconds(startBell.time) : null,
+                    endS: endBell ? timeToSeconds(endBell.time) : null
+                };
+            });
+
+            // Extend target: identity-first, name fallback (one recipe fits
+            // every schedule that has a like-named period).
+            let target = null;
+            if (recipe.extendPeriodId) {
+                target = info.find(function (x) {
+                    return x.period && x.period.periodId === recipe.extendPeriodId;
+                }) || null;
+            }
+            if (!target && typeof recipe.extendPeriodName === 'string' && recipe.extendPeriodName) {
+                target = info.find(function (x) {
+                    return x.period && x.period.name === recipe.extendPeriodName;
+                }) || null;
+            }
+            const targetStartS = (target && target.startS !== null) ? target.startS : null;
+
+            // Affected set: original start >= pivot, and (if a target with a
+            // known start exists) strictly before the target's start. Sorted
+            // by original start so the cascade accumulates in day order.
+            const affected = info.filter(function (x) {
+                if (x.startS === null) return false;
+                if (x === target) return false;
+                if (x.startS < afterS) return false;
+                if (targetStartS !== null && x.startS >= targetStartS) return false;
+                return true;
+            }).sort(function (a, b) { return a.startS - b.startS; });
+
+            // Per-period deltas: start rides the running total; end rides the
+            // running total PLUS this period's own (clamped) reduction. Every
+            // period keeps at least 60 seconds.
+            const deltas = new Map(); // period object -> {startDelta, endDelta, endBell}
+            let acc = 0;
+            for (let i = 0; i < affected.length; i++) {
+                const x = affected[i];
+                let cut = per;
+                if (x.endS !== null) {
+                    const duration = x.endS - x.startS;
+                    if (duration - cut < 60) cut = Math.max(0, duration - 60);
+                }
+                deltas.set(x.period, { startDelta: -acc, endDelta: -(acc + cut), endBell: x.endBell });
+                acc += cut;
+            }
+            if (target && acc > 0) {
+                deltas.set(target.period, { startDelta: -acc, endDelta: 0, endBell: target.endBell });
+            }
+            if (deltas.size === 0 || acc === 0) return { periods: periods, changed: 0 };
+
+            let changed = 0;
+            const out = periods.map(function (period) {
+                const d = deltas.get(period);
+                const bells = period && Array.isArray(period.bells) ? period.bells : null;
+                if (!d || !bells) return period;
+                let touched = false;
+                const newBells = bells.map(function (bell) {
+                    if (!recipeEligible(bell)) return bell;
+                    // The end-edge bell takes the end delta; every other
+                    // eligible bell (start edge + interior statics) rides
+                    // the START delta — interior bells keep their distance
+                    // from the period's opening, which is what a warning
+                    // bell means. endDelta of 0 (extend target) = no move.
+                    let delta;
+                    if (bell === d.endBell) delta = d.endDelta;
+                    else delta = d.startDelta;
+                    if (!delta) return bell;
+                    touched = true;
+                    changed++;
+                    return Object.assign({}, bell, {
+                        time: shiftTimeString(bell.time, delta)
+                    });
+                });
+                return touched ? Object.assign({}, period, { bells: newBells }) : period;
+            });
+            return { periods: changed ? out : periods, changed: changed };
+        }
+
+        // Unknown recipe type: fail closed, change nothing.
+        return { periods: periods, changed: 0 };
+    }
+
     const BellEngine = {
-        VERSION: '1.3.3', // v1.3.1: exported so the status modal can report it
+        VERSION: '1.8.0', // v1.3.1: exported so the status modal can report it
         escapeHtml,
         getBellId,
         formatTime12Hour,
@@ -402,7 +716,11 @@
         resolveCalendarSchedule,
         shiftTimeString,
         getActiveScheduleShiftSeconds,
-        estimateClockDriftMs
+        estimateClockDriftMs,
+        applyBuildingBellTimeToPeriods,
+        findPeriodEdgeAnchorBell,
+        resolveCalendarTransforms,
+        applyRecipeToPeriods
     };
 
     global.BellEngine = BellEngine;

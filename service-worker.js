@@ -1,7 +1,20 @@
 /**
  * Ellis Web Bell - Service Worker
- * Version: 1.11.0
+ * Version: 1.17.0
  *
+ * v1.17.0 changelog (2026-07, app 6.11.0): no new modules — cache bump
+ *   to ship edited 28/29/30/16/34 + bell-engine 1.8.0 (anchor-strip fix,
+ *   designation dedup, firstSeen, dormant Verb B engine, UI notes).
+ * v1.16.0 changelog (2026-07, app 6.10.0): + 34-day-designation.js
+ *   (Layer 4 Verb A; module 20 revived).
+ * v1.15.0 changelog (2026-07, app 6.9.0): + 33-roster.js (Roster &
+ *   Tags, design Layer 3).
+ * v1.14.0 changelog (2026-07, app 6.7.0): + 32-personal-anchor-
+ *   migration.js (Layer 2 slice 2).
+ * v1.13.0 changelog (2026-07, app 6.6.0): + 31-period-identity.js
+ *   (period-id backfill, Layer 2 slice 1).
+ * v1.12.0 changelog (2026-07, app 6.5.0): + 30-building-bells.js
+ *   (Building Bells — intercom anchors).
  * v1.11.0 changelog (2026-07, app 6.4.0): + 28-presence.js +
  *   29-admin-dashboard.js (usage dashboard, design Layer 1).
  *
@@ -98,7 +111,7 @@
  *   to fetch them).
  */
 
-const CACHE_VERSION = '1.11.0';
+const CACHE_VERSION = '1.17.0';
 // v1.8.0: derived — bumping CACHE_VERSION is the ONLY bump needed; the
 // activate handler evicts every cache whose name differs from this one.
 const CACHE_NAME = 'ellis-web-bell-' + CACHE_VERSION;
@@ -143,7 +156,12 @@ const CORE_ASSETS = [
   '/src/js/26-modal-chrome.js', // v1.9.0 (app 6.2.0, Stage 6b)
   '/src/js/27-school-branding.js', // v1.10.0 (app 6.3.0, schoolification)
   '/src/js/28-presence.js', // v1.11.0 (app 6.4.0, presence)
-  '/src/js/29-admin-dashboard.js', // v1.11.0 (app 6.4.0, presence)
+  '/src/js/29-admin-dashboard.js',
+    '/src/js/30-building-bells.js',
+    '/src/js/31-period-identity.js',
+    '/src/js/32-personal-anchor-migration.js',
+    '/src/js/33-roster.js',
+    '/src/js/34-day-designation.js', // v1.11.0 (app 6.4.0, presence)
   '/src/js/99-init-and-listeners.js',
   '/src/js/main.js',
   '/src/js/state.js',

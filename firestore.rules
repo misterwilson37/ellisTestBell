@@ -92,6 +92,27 @@ service cloud.firestore {
         && (request.auth.uid == uid || isAdmin(appId));
     }
 
+    // --- PUBLIC DATA (Roster & Tags, v6.9.0 — design Layer 3) ---
+    // One doc per user: { displayName, tags: [...], capabilities: [...] }.
+    // tags are SELF-SERVE (grade/subject/CDC/etc); capabilities are
+    // ADMIN-ONLY grants (e.g. 'may-break-anchors') — a user may write their
+    // own doc ONLY if the capabilities field is absent-and-stays-absent or
+    // completely unchanged (request.resource.data is the post-write state,
+    // so merge writes that never mention capabilities pass).
+    // DESIGN INVARIANT (owner decision, Layer 3): tags are picker FILTERS,
+    // never runtime targeting — designation UIs store explicit uid lists.
+    match /artifacts/{appId}/public/data/roster/{uid} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin(appId);
+      allow create: if request.auth != null && request.auth.uid == uid
+        && !('capabilities' in request.resource.data);
+      allow update: if request.auth != null && request.auth.uid == uid
+        && (('capabilities' in request.resource.data)
+            ? ('capabilities' in resource.data
+               && request.resource.data.capabilities == resource.data.capabilities)
+            : !('capabilities' in resource.data));
+    }
+
     // --- PUBLIC DATA (Admins List) ---
     match /artifacts/{appId}/public/data/admins/{adminId} {
       allow read: if request.auth != null;

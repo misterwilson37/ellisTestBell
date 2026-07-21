@@ -19,7 +19,7 @@
 // deliberately deferred; see DESIGN-CALENDAR-V2.md open questions.
 
 import { APP_VERSION } from './00-header.js';
-import { doc, serverTimestamp, setDoc } from './01-firebase-imports.js';
+import { doc, getDoc, serverTimestamp, setDoc } from './01-firebase-imports.js';
 import { safeLog } from './03-memory-management.js';
 import { scheduleSelector } from './02-dom-elements.js';
 import { state } from './state.js';
@@ -29,6 +29,11 @@ const CHECK_MS = 30 * 1000;
 
 let lastWriteAt = 0;
 let lastLabel = null;
+// V6.11.0: firstSeen. null = unknown this session; true = doc already had
+// one (or we just stamped it) so never send it again; false = confirmed
+// absent, stamp on next write. Checked once per session via a single
+// getDoc — a person's genuine first-ever login can't race itself.
+let firstSeenState = null;
 
 function currentLabel() {
     const opt = scheduleSelector && scheduleSelector.selectedOptions
@@ -43,7 +48,20 @@ async function writePresence(reason) {
     lastLabel = label;
     try {
         const ref = doc(state.db, 'artifacts', state.appId, 'public', 'data', 'presence', state.userId);
-        await setDoc(ref, {
+        // V6.11.0: resolve firstSeen once per session before the first write.
+        // If the doc has no firstSeen yet, stamp it now; existing users get
+        // theirs on their next sign-in (so for them it reads "since 6.11.0",
+        // and only brand-new users get a true first-login date — a documented
+        // limitation, not a bug).
+        if (firstSeenState === null) {
+            try {
+                const snap = await getDoc(ref);
+                firstSeenState = (snap.exists() && snap.data() && snap.data().firstSeen) ? true : false;
+            } catch (e) {
+                firstSeenState = true; // read failed: never risk overwriting a real firstSeen
+            }
+        }
+        const payload = {
             lastSeen: serverTimestamp(),
             appVersion: APP_VERSION,
             surface: 'app',
@@ -51,7 +69,12 @@ async function writePresence(reason) {
             baseScheduleId: state.activeBaseScheduleId || null,
             personalScheduleId: state.activePersonalScheduleId || null,
             displayName: state.currentUserDisplayName || 'Anonymous',
-        }, { merge: true });
+        };
+        if (firstSeenState === false) {
+            payload.firstSeen = serverTimestamp();
+            firstSeenState = true; // stamp exactly once
+        }
+        await setDoc(ref, payload, { merge: true });
     } catch (e) {
         // Presence is telemetry; never let it disturb the app.
         safeLog.log('presence write failed (' + reason + '):', e && e.message);

@@ -34,4 +34,9 @@ import './26-modal-chrome.js'; // 6.2.0: expand shared modal chrome BEFORE init 
 import './27-school-branding.js'; // 6.3.0: apply school-config.js branding
 import './28-presence.js'; // 6.4.0: presence heartbeat (design Layer 1)
 import './29-admin-dashboard.js'; // 6.4.0: Who's Online admin panel
+import './30-building-bells.js'; // 6.5.0: Building Bells (intercom anchors)
+import './31-period-identity.js'; // 6.6.0: period-id backfill (Layer 2 slice 1)
+import './32-personal-anchor-migration.js'; // 6.7.0: personal anchors (slice 2)
+import './33-roster.js'; // 6.9.0: Roster & Tags (design Layer 3)
+import './34-day-designation.js'; // 6.10.0: Layer 4 Verb A (day-of modal)
 import './99-init-and-listeners.js';

@@ -31,7 +31,7 @@ import {
 import {
     MAX_FILE_SIZE, getVisualOverrideKey, saveVisualOverrides,
 } from './04-app-state-and-bells.js';
-import { generateBellId, playBell, startAudio } from './05-preferences-cloud-sync.js';
+import { generateBellId, generatePeriodId, playBell, startAudio } from './05-preferences-cloud-sync.js';
 import { updateClock } from './10-clock-engine.js';
 import {
     findNearbyBell, getCustomBellIconHtml, renderCombinedList,
@@ -748,6 +748,7 @@ async function handleNewPeriodSubmit(e) {
 
         // 2. Create the new period object
         const newPeriod = {
+            periodId: generatePeriodId(), // V6.7.0: identity at birth (personal too)
             name: periodName,
             isEnabled: true,
             // NEW in 4.57: Tag custom periods with origin
@@ -1162,6 +1163,11 @@ function reconstructPeriodsFromLegacyBells(legacyBells) {
     const periods = [];
     periodMap.forEach((bells, periodName) => {
         periods.push({
+            // V6.7.0: fresh identity — the import converter rebuilds periods
+            // from a name-keyed map, so incoming periodIds cannot survive it;
+            // any imported parentPeriodId dangles harmlessly (engine falls
+            // back to the name match) until backfill/migration re-stamps.
+            periodId: generatePeriodId(),
             name: periodName,
             isEnabled: true,
             bells: bells
@@ -1171,6 +1177,7 @@ function reconstructPeriodsFromLegacyBells(legacyBells) {
     // If we have unmatched bells, put them in an "Other Bells" period
     if (unmatchedBells.length > 0) {
         periods.push({
+            periodId: generatePeriodId(), // V6.7.0: identity at birth
             name: 'Other Bells',
             isEnabled: true,
             bells: unmatchedBells.map(bell => ({

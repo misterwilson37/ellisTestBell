@@ -3,8 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bell Schedule Clock v1.6.2</title>
-    <!-- Clock Display v1.6.2 -->
+    <title>Bell Schedule Clock v1.7.0</title>
+    <!-- Clock Display v1.7.0 -->
+    <!-- v1.7.0 (2026-07, app 6.5.0): presence reporting for TVs/grids
+         (DESIGN-CALENDAR-V2.md Layer 1 open question, now closed): a 5-min
+         heartbeat to artifacts/{appId}/public/data/presence/{uid} with
+         surface 'clock', ANONYMOUS sessions only — a signed-in browser
+         already reports via the main app under the same uid, and writing
+         from both surfaces would make its census row flap. -->
     <!-- v1.6.2 (2026-07, app 6.0.1): comment-only — version-number correction:
          the modularization release was mislabeled 7.0.0; it is 6.0.0. -->
     <!-- v1.6.1 (2026-07, app 6.0.0): comment-only — engine-sharing note updated
@@ -1792,6 +1798,42 @@
                 updateClock();
                 updateColumns();
                 
+                // v1.7.0: presence heartbeat (see header). Anonymous-only by
+                // design; auth.currentUser is read at write time so a session
+                // change is honored without re-wiring.
+                const CLOCK_PRESENCE_MS = 5 * 60 * 1000;
+                function presenceLabel() {
+                    const parts = [];
+                    for (let i = 1; i <= 9; i++) {
+                        const sId = config[`s${i}`];
+                        const pId = config[`p${i}`];
+                        const key = pId ? `personal-${pId}` : sId;
+                        if (!key) continue;
+                        parts.push(config[`l${i}`] || (scheduleData[key] && scheduleData[key].name) || key);
+                    }
+                    return parts.join(' · ');
+                }
+                async function writeClockPresence() {
+                    try {
+                        const user = auth.currentUser;
+                        if (!user || !user.isAnonymous) return;
+                        await db.collection('artifacts').doc(appId)
+                            .collection('public').doc('data')
+                            .collection('presence').doc(user.uid)
+                            .set({
+                                lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                                appVersion: 'clock 1.7.0',
+                                surface: 'clock',
+                                scheduleLabel: presenceLabel(),
+                                displayName: 'Wall clock',
+                            }, { merge: true });
+                    } catch (e) {
+                        console.log('presence write failed:', e && e.message);
+                    }
+                }
+                writeClockPresence();
+                setInterval(writeClockPresence, CLOCK_PRESENCE_MS);
+
                 // Update clock and check bells every second
                 setInterval(() => {
                     updateClock();

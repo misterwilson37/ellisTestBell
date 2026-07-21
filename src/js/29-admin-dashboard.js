@@ -56,6 +56,10 @@ function render(docs) {
             + escapeHtml(d.displayName || '(unknown)') + '</td>'
             + '<td class="py-2 pr-4">' + escapeHtml(d.scheduleLabel || '—') + '</td>'
             + '<td class="py-2 pr-4 whitespace-nowrap font-mono text-xs">' + escapeHtml(d.appVersion || '?') + '</td>'
+            + '<td class="py-2 pr-4 whitespace-nowrap text-gray-500">'
+                + (d.firstSeen && d.firstSeen.toDate
+                    ? escapeHtml(d.firstSeen.toDate().toLocaleDateString())
+                    : '—') + '</td>'
             + '<td class="py-2 pr-4 whitespace-nowrap text-gray-500">' + (seen ? relTime(age) : 'never') + '</td>'
             + '</tr>'
         );
@@ -63,7 +67,7 @@ function render(docs) {
     summaryEl.textContent = activeNow + ' active now · ' + seenToday
         + ' seen today · ' + docs.length + ' total ever reported';
     tbody.innerHTML = rows.join('')
-        || '<tr><td colspan="4" class="py-6 text-center text-gray-500">'
+        || '<tr><td colspan="5" class="py-6 text-center text-gray-500">'
          + 'No presence reports yet. Only clients on 6.4.0+ report; '
          + 'the census begins when they sign in.</td></tr>';
 }

@@ -250,6 +250,15 @@ const generateBellId = () => { // MODIFIED in 4.18: Changed to const arrow funct
     return `bell_${randomPart}`;
 };
 
+// V6.6.0 (Layer 2, period identity): stable period ids, same shape as bell
+// ids. Stamped at period birth and by the admin backfill (31-period-
+// identity.js); NEVER regenerated for an existing period — the id IS the
+// identity that anchors survive renames by.
+const generatePeriodId = () => {
+    const randomPart = Math.random().toString(36).substring(2, 10);
+    return `period_${randomPart}`;
+};
+
 /**
     * NEW in 5.66.3: Normalizes a time string to HH:MM:SS format.
     * Handles "HH:MM" -> "HH:MM:00" conversion.
@@ -619,6 +628,7 @@ export {
     findBellAfter,
     findNextBell,
     generateBellId,
+    generatePeriodId,
     loadUserPreferencesFromCloud,
     normalizeTimeString,
     playBell,

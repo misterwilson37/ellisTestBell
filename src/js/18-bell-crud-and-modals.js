@@ -27,7 +27,7 @@ import {
     MAX_FILE_SIZE, getPeriodOverrideKey, getVisualOverrideKey, savePeriodNameOverrides,
     saveVisualOverrides,
 } from './04-app-state-and-bells.js';
-import { generateBellId, updateCalculatedTime } from './05-preferences-cloud-sync.js';
+import { generateBellId, generatePeriodId, updateCalculatedTime } from './05-preferences-cloud-sync.js';
 import { updateClock } from './10-clock-engine.js';
 import {
     closeAllConflictModals, findNearbyBell, flattenPeriodsToLegacyBells, renderCombinedList,
@@ -292,6 +292,7 @@ function updatePeriodsWithNewBell(periods, targetPeriodName, newBell) {
     // 2. If period was not found, create it and add the bell
     if (!periodFound) {
         updatedPeriods.push({
+            periodId: generatePeriodId(), // V6.6.0: identity at birth
             name: targetPeriodName,
             isEnabled: true,
             bells: [newBell]
@@ -600,6 +601,13 @@ async function handleRelativeBellSubmit(e) {
                 parentAnchorType: 'period_start',
                 offsetSeconds: totalOffsetSeconds
             };
+            // V6.6.0: identity anchor when the period has one (engine prefers it)
+            if (anchorPeriod.periodId) finalBell.relative.parentPeriodId = anchorPeriod.periodId;
+            // V6.8.0: record the anchor's home base (shared-origin parents only —
+            // personal-period parents travel with their owner, no base to record)
+            if (anchorPeriod.periodId && anchorPeriod.origin !== 'personal' && state.activeBaseScheduleId) {
+                finalBell.relative.baseScheduleId = state.activeBaseScheduleId;
+            }
             safeLog.log(`Saving relative bell with stable 'period_start' anchor to ${anchorPeriod.name}.`);
         } else if (parentBellId === lastBell.bellId) {
             // It's anchored to Period End!
@@ -608,6 +616,10 @@ async function handleRelativeBellSubmit(e) {
                 parentAnchorType: 'period_end',
                 offsetSeconds: totalOffsetSeconds
             };
+            if (anchorPeriod.periodId) finalBell.relative.parentPeriodId = anchorPeriod.periodId; // V6.6.0
+            if (anchorPeriod.periodId && anchorPeriod.origin !== 'personal' && state.activeBaseScheduleId) {
+                finalBell.relative.baseScheduleId = state.activeBaseScheduleId; // V6.8.0
+            }
             safeLog.log(`Saving relative bell with stable 'period_end' anchor to ${anchorPeriod.name}.`);
         } else {
             // It's anchored to a middle bell - keep the parentBellId
@@ -786,7 +798,7 @@ function openMultiAddRelativeModal() {
             const safePeriodName = escapeHtml(period.name);
             return `
             <div class="flex items-center">
-                <input type="checkbox" id="multi-add-check-${period.name}" value="${safePeriodName}" class="multi-add-period-check h-4 w-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
+                <input type="checkbox" id="multi-add-check-${period.name}" value="${safePeriodName}" data-period-id="${period.periodId || ''}" data-period-origin="${period.origin || 'shared'}" class="multi-add-period-check h-4 w-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
                 <label for="multi-add-check-${period.name}" class="ml-2 block text-sm text-gray-900">${period.name}</label>
             </div>
             `;
@@ -819,9 +831,11 @@ async function handleSubmitMultiAddRelativeBell(e) {
     const minutes = parseInt(multiAddRelativeMinutes.value) || 0;
     const seconds = parseInt(multiAddRelativeSeconds.value) || 0;
     
-    // 2. Get all checked period names
+    // 2. Get all checked periods — V6.7.0: name AND periodId (the merged
+    // calculatedPeriodsList preserves periodId, so the renderer carries it)
     const checkedPeriods = Array.from(document.querySelectorAll('.multi-add-period-check:checked'))
-                                    .map(cb => cb.value);
+                                    .map(cb => ({ name: cb.value, periodId: cb.dataset.periodId || null,
+                                                  origin: cb.dataset.periodOrigin || 'shared' }));
     
     if (!bellName) {
         multiAddRelativeStatus.textContent = "Bell Name is required.";
@@ -854,7 +868,7 @@ async function handleSubmitMultiAddRelativeBell(e) {
     let updatedPeriods = [...state.personalBellsPeriods]; // Get a copy of the current state
     let bellsAdded = 0;
     
-    for (const periodName of checkedPeriods) {
+    for (const { name: periodName, periodId: parentPeriodId, origin: parentOrigin } of checkedPeriods) {
         // MODIFIED in 4.47: We no longer need to find the anchor bell here.
         // We will save the *reference* and let the calculation engine find it.
         
@@ -869,9 +883,16 @@ async function handleSubmitMultiAddRelativeBell(e) {
             visualCue,
             bellId: generateBellId(),
             relative: {
+                // V6.7.0: identity stamped when the parent period has one
+                // (checkbox carries data-period-id from the merged view);
+                // name remains the fallback either way.
                 parentPeriodName: periodName,
                 parentAnchorType: parentAnchorType,
-                offsetSeconds: totalOffsetSeconds
+                offsetSeconds: totalOffsetSeconds,
+                ...(parentPeriodId ? { parentPeriodId } : {}),
+                // V6.8.0: home base for shared-origin parents
+                ...(parentPeriodId && parentOrigin !== 'personal' && state.activeBaseScheduleId
+                    ? { baseScheduleId: state.activeBaseScheduleId } : {})
             }
         };
         

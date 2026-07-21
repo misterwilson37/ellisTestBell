@@ -1,5 +1,5 @@
 // ╔══════════════════════════════════════════════════════════════════════╗
-// ║  ELLIS WEB BELL 6.1.0 — NATIVE ES MODULES                              ║
+// ║  ELLIS WEB BELL 6.10.0 — NATIVE ES MODULES                              ║
 // ║                                                                        ║
 // ║  As of 6.0.0 the files in src/js/ ARE production: index.html loads    ║
 // ║  src/js/main.js directly and the browser resolves the import graph.   ║
@@ -10,7 +10,7 @@
 // ║  Import/export blocks marked "6.0.0" were machine-generated during    ║
 // ║  the conversion; maintain them by hand from here on (lint enforces).  ║
 // ╚══════════════════════════════════════════════════════════════════════╝
-const APP_VERSION = "6.4.0"
+const APP_VERSION = "6.11.0"
 // Release history lives in CHANGELOG.md — add new version notes there, not here.
 // (Extracted 2026-07: ~280 lines of V3–V5.69 notes moved out of this file.)
 
@@ -31,7 +31,9 @@ const {
     secondsToTime,
     getDateForBellTime,
     toLocalDateString,
-    shiftTimeString
+    shiftTimeString,
+    applyBuildingBellTimeToPeriods, // v6.5.0: Building Bells propagation (engine 1.4.0)
+    findPeriodEdgeAnchorBell // v6.8.0: period-edge primitive (engine 1.6.0)
 } = window.BellEngine;
 
 // (escapeHtml moved to bell-engine.js in v5.72.0)
@@ -40,7 +42,9 @@ const {
 // ===== module exports (6.0.0) =====
 export {
     APP_VERSION,
+    applyBuildingBellTimeToPeriods,
     escapeHtml,
+    findPeriodEdgeAnchorBell,
     formatTime12Hour,
     getBellId,
     getDateForBellTime,

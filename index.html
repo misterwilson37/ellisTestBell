@@ -7,7 +7,7 @@
          always match — this <title>, the visible <h1> banner, and the comment on
          the last line of this file. Update all three together. (z = fix/tweak,
          y = new feature, x = major shift with the owner's sign-off.) -->
-    <title>Ellis Web Bell 6.4.0</title>
+    <title>Ellis Web Bell 6.11.0</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -258,6 +258,21 @@
     <div id="clock-drift-banner" class="hidden kiosk-hide bg-amber-100 border-b border-amber-300 text-amber-900 px-4 py-2 text-sm flex items-center justify-between gap-4">
         <span id="clock-drift-text" class="flex-grow"></span>
         <button type="button" id="clock-drift-dismiss" class="px-2 py-1 text-amber-900 hover:bg-amber-200 rounded-lg font-bold" title="Dismiss for this session">&times;</button>
+    </div>
+
+    <!-- V6.7.0: Personal anchor review banner (Layer 2 slice 2; shown only
+         when reminder bells anchor to DUPLICATED period names — rare) -->
+    <div id="anchor-review-banner" class="hidden kiosk-hide bg-amber-100 border-b border-amber-300 text-amber-900 px-4 py-2 text-sm flex items-center justify-between gap-4">
+        <span id="anchor-review-text" class="flex-grow"></span>
+        <button type="button" id="anchor-review-open" class="px-2 py-1 text-amber-900 hover:bg-amber-200 rounded-lg font-medium underline">Review</button>
+        <button type="button" id="anchor-review-dismiss" class="px-2 py-1 text-amber-900 hover:bg-amber-200 rounded-lg font-bold" title="Dismiss for this session">&times;</button>
+    </div>
+
+    <!-- V6.10.0: designation deviation banner (design Layer 4, I1) -->
+    <div id="designation-banner" class="hidden kiosk-hide bg-amber-100 border-b border-amber-300 text-amber-900 px-4 py-2 text-sm flex items-center justify-between gap-4">
+        <span id="designation-text" class="flex-grow"></span>
+        <button type="button" id="designation-follow" class="px-2 py-1 text-amber-900 hover:bg-amber-200 rounded-lg font-medium underline">Follow</button>
+        <button type="button" id="designation-dismiss" class="px-2 py-1 text-amber-900 hover:bg-amber-200 rounded-lg font-bold" title="Dismiss for this session">&times;</button>
     </div>
 
 
@@ -621,11 +636,16 @@
 				    <label for="edit-bell-time" class="block text-sm font-medium text-gray-700 mb-1">
 				        Time (HH:MM:SS)
 				    </label>
-				    <!-- Lock message will be inserted here by JS as a separate line -->
-				    <div id="edit-time-lock-message" class="hidden text-xs text-gray-500 mb-1">
-				        🔒 Only admin can change anchor bell times
-				    </div>
 				    <input type="time" id="edit-bell-time" step="1" required class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+				    <!-- V6.11.0: lock/impact note lives BELOW the input so it never
+				         shoves the field out of alignment with Bell Name. JS shows
+				         exactly one of the two state spans; the anchor span appends
+				         when the bell is anchored. -->
+				    <div id="edit-time-lock-message" class="hidden text-xs mt-1">
+				        <span id="edit-time-note-locked" class="hidden text-gray-500">🔒 Only admin can change anchor bell times</span>
+				        <span id="edit-time-note-admin" class="hidden text-amber-600">🔓 Admin: saving a new time changes this bell for every user of this schedule.</span>
+				        <span id="edit-time-note-anchor" class="hidden text-gray-500"></span>
+				    </div>
 				</div>
                 <div>
                     <label for="edit-bell-name" class="block text-sm font-medium text-gray-700">Bell Name</label>
@@ -719,6 +739,17 @@
 			        <span class="text-sm text-gray-700">Override shared visual for all users</span>
 			    </label>
 			</div>
+
+            <!-- V6.5.0: Building Bells anchor (admin + shared bell only; applies
+                 when saving with "override for all users" checked). Populated by
+                 30-building-bells.js; picking an anchor snaps the time field. -->
+            <div id="edit-bell-anchor-container" class="mb-4 hidden">
+                <label for="edit-bell-anchor-select" class="block text-sm font-medium text-gray-700 mb-1">Anchor to building bell</label>
+                <select id="edit-bell-anchor-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                    <option value="">Not anchored</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Anchored bells move automatically when the building bell's time is edited. Saving with a different time detaches the anchor.</p>
+            </div>
 
             <p id="edit-bell-status" class="text-blue-600 text-sm mt-4 hidden"></p>
 
@@ -914,6 +945,7 @@
                         <th class="py-2 pr-4">Who</th>
                         <th class="py-2 pr-4">Running</th>
                         <th class="py-2 pr-4">Version</th>
+                        <th class="py-2 pr-4">First seen</th>
                         <th class="py-2 pr-4">Last seen</th>
                     </tr>
                 </thead>
@@ -921,6 +953,122 @@
             </table>
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" id="presence-dashboard-close" data-btn="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- **** V6.5.0: Building Bells modal (6.2.0 data-modal chrome) **** -->
+    <div id="building-bells-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-2">Building Bells</h3>
+            <p id="building-bells-summary" class="text-sm text-gray-500 mb-4"></p>
+            <div id="building-bells-list"></div>
+
+            <!-- Propagation confirmation (shown when a time edit would move anchored bells) -->
+            <div id="bb-confirm-section" class="hidden mt-4 p-4 border border-gray-300 rounded-lg">
+                <p id="bb-confirm-text" class="text-sm text-gray-700 mb-4"></p>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="bb-confirm-cancel-btn" data-btn="cancel">Cancel</button>
+                    <button type="button" id="bb-confirm-apply-btn" data-btn="primary">Move Anchored Bells</button>
+                </div>
+            </div>
+
+            <!-- Matching assist (anchor exact-time bells, eyeball-then-confirm) -->
+            <div id="bb-match-section" class="hidden mt-4 p-4 border border-gray-300 rounded-lg">
+                <p id="bb-match-title" class="text-sm font-medium text-gray-700 mb-2"></p>
+                <div id="bb-match-list" class="space-y-2 mb-4"></div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="bb-match-cancel-btn" data-btn="cancel">Cancel</button>
+                    <button type="button" id="bb-match-apply-btn" data-btn="primary">Anchor Selected</button>
+                </div>
+            </div>
+
+            <!-- Add / edit form -->
+            <div class="mt-6 pt-4 border-t">
+                <p id="bb-form-title" class="text-sm font-medium text-gray-700 mb-2">Add a building bell</p>
+                <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-2">
+                    <input type="text" id="bb-name-input" placeholder="Name (e.g. End of 3rd)" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                    <input type="time" id="bb-time-input" step="1" class="px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                    <button type="button" id="bb-save-btn" data-btn="primary">Add</button>
+                    <button type="button" id="bb-cancel-edit-btn" data-btn="cancel" class="hidden">Cancel</button>
+                </div>
+            </div>
+
+            <p id="building-bells-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="building-bells-close" data-btn="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- **** V6.7.0: Personal anchor review modal (6.2.0 data-modal chrome) **** -->
+    <div id="anchor-review-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg max-h-[85vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-2">Review Reminder Bell Anchors</h3>
+            <p class="text-sm text-gray-500 mb-4">These reminder bells point at a period name that appears more than once in your schedule, so the exact period can't be chosen automatically. Pick the one you meant — or decide later and they keep working by name.</p>
+            <div id="anchor-review-list"></div>
+            <p id="anchor-review-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="anchor-review-close" data-btn="cancel">Close</button>
+                <button type="button" id="anchor-review-apply" data-btn="primary">Anchor Selected</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- **** V6.9.0: My Tags modal (self-serve, design Layer 3) **** -->
+    <div id="my-tags-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg max-h-[85vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-2">My Tags</h3>
+            <p class="text-sm text-gray-500 mb-4">Tags help admins find you in pickers (grade level, subject, CDC…). They never change which bells ring for you.</p>
+            <div id="my-tags-list" class="mb-4"></div>
+            <div id="my-tags-suggest" class="mb-4"></div>
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <input type="text" id="my-tags-input" placeholder="Add your own tag" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                <button type="button" id="my-tags-add" data-btn="primary">Add</button>
+            </div>
+            <p class="text-sm font-medium text-gray-700 mb-1">Capabilities</p>
+            <div id="my-tags-caps" class="mb-4"></div>
+            <p id="my-tags-status" class="text-blue-600 text-sm mt-2 hidden"></p>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="my-tags-close" data-btn="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- **** V6.9.0: Roster & Tags modal (admin, design Layer 3) **** -->
+    <div id="roster-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-2">Roster &amp; Tags</h3>
+            <p class="text-sm text-gray-500 mb-4">Grey chips are tags (anyone can set their own via My Tags). Amber chips are capabilities — grant narrowly. Press Enter in a field to add.</p>
+            <div class="mb-4">
+                <button type="button" id="roster-seed-btn" data-btn="primary">Seed from presence</button>
+            </div>
+            <div id="roster-list"></div>
+            <p id="roster-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="roster-close" data-btn="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- **** V6.10.0: Day-of designation modal (design Layer 4, I2) **** -->
+    <div id="designation-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-2">Day-of Designation</h3>
+            <p class="text-sm text-gray-500 mb-4">Filter by tag or name, eyeball the list, check the people you mean. What's saved is the checked list — never the tag.</p>
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <input type="date" id="designation-date" class="px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                <select id="designation-schedule" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></select>
+            </div>
+            <div id="designation-entries" class="mb-4"></div>
+            <input type="text" id="designation-filter" placeholder="Filter people by tag or name (e.g. 8th, CDC)" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm mb-2">
+            <div id="designation-people" class="space-y-2 mb-4 max-h-[30vh] overflow-y-auto"></div>
+            <div class="flex justify-end gap-3">
+                <button type="button" id="designation-add" data-btn="primary">Designate Checked People</button>
+            </div>
+            <p id="designation-status" class="text-blue-600 text-sm mt-4 hidden"></p>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="designation-close" data-btn="cancel">Close</button>
             </div>
         </div>
     </div>
@@ -1449,7 +1597,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 id="app-banner-title" class="text-4xl font-bold text-blue-700">Ellis Web Bell 6.4.0</h1>
+            <h1 id="app-banner-title" class="text-4xl font-bold text-blue-700">Ellis Web Bell 6.11.0</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             <!-- V5.44.0: Clock Display Link, V5.47.3: Added Dashboard Link -->
             <div class="mt-2 flex items-center justify-center gap-3 text-sm">
@@ -1465,6 +1613,10 @@
             <div class="mt-4 flex flex-col sm:flex-row justify-center items-center gap-4">
                 <!-- NEW: User display name -->
                 <p id="user-display-name" class="text-gray-700"></p>
+                <!-- V6.9.0: self-serve tags (design Layer 3) -->
+                <button id="my-tags-btn" class="w-full sm:w-auto px-4 py-1 text-sm bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors">
+                    My Tags
+                </button>
                 <button id="signout-btn" class="w-full sm:w-auto px-4 py-1 text-sm bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors hidden">
                     Sign Out
                 </button>
@@ -1734,6 +1886,43 @@
                     View Usage Dashboard
                 </button>
                 <p class="text-xs text-gray-500 mt-1">Who is signed in, running which schedule, on which app version. Only 6.4.0+ clients report.</p>
+            </div>
+
+            <!-- V6.5.0: Building Bells (DESIGN-CALENDAR-V2.md shared concept) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Building Bells (intercom moments)</label>
+                <button type="button" id="building-bells-open-btn" class="px-6 py-2 bg-blue-700 text-white font-medium rounded-lg shadow-md hover:bg-blue-800">
+                    Manage Building Bells
+                </button>
+                <p class="text-xs text-gray-500 mt-1">Name the six intercom bells and anchor schedule bells to them. Editing a building bell's time moves every anchored bell in every schedule at once.</p>
+            </div>
+
+            <!-- V6.6.0: Period identity backfill (DESIGN-CALENDAR-V2.md Layer 2, slice 1) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Period Identity (one-time setup)</label>
+                <button type="button" id="period-identity-run-btn" class="px-6 py-2 bg-blue-700 text-white font-medium rounded-lg shadow-md hover:bg-blue-800">
+                    Assign Period IDs
+                </button>
+                <p class="text-xs text-gray-500 mt-1">Stamps a permanent id on every period in every shared schedule so renaming a period never breaks its reminder bells. Safe to run repeatedly; does nothing when there's nothing to do.</p>
+                <p id="period-identity-status" class="text-blue-600 text-sm mt-1 hidden"></p>
+            </div>
+
+            <!-- V6.9.0: Roster & Tags (DESIGN-CALENDAR-V2.md Layer 3) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Roster &amp; Tags</label>
+                <button type="button" id="roster-open-btn" class="px-6 py-2 bg-blue-700 text-white font-medium rounded-lg shadow-md hover:bg-blue-800">
+                    Manage Roster &amp; Tags
+                </button>
+                <p class="text-xs text-gray-500 mt-1">Everyone's tags (grade, subject, CDC…) and admin-granted capabilities. Tags filter future pickers — designations always store an explicit checked list of people, never a tag.</p>
+            </div>
+
+            <!-- V6.10.0: Day-of designation (design Layer 4 Verb A, I2) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Day-of Designation</label>
+                <button type="button" id="designation-open-btn" class="px-6 py-2 bg-blue-700 text-white font-medium rounded-lg shadow-md hover:bg-blue-800">
+                    Designate Schedules
+                </button>
+                <p class="text-xs text-gray-500 mt-1">"These people run schedule X today (or on a future date)." Their apps auto-follow at day change; anyone who chose a schedule manually today sees a gentle banner instead of being yanked.</p>
             </div>
 
             <!-- V5.74.0: Emergency schedule shift (today only) -->
@@ -3168,4 +3357,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 6.4.0 -->
+<!-- Version 6.11.0 -->
