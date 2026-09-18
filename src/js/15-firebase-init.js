@@ -28,7 +28,7 @@ import { loadAllVisualFiles } from './18-bell-crud-and-modals.js';
 import {
     loadAllAudioFiles, renderAudioFileManager, updateSoundDropdowns,
 } from './19-visual-cues-and-files.js';
-import { applyCalendarSchedule, listenForScheduleCalendar } from './20-schedule-calendar.js';
+import { applyCalendarSchedule, listenForScheduleCalendar, listenForHomeSchedule } from './20-schedule-calendar.js';
 import { renderEmergencyShiftPanel } from './21-emergency-shift.js';
 import { startClockDriftMonitor } from './23-clock-drift.js';
 import { state } from './state.js';
@@ -165,10 +165,13 @@ async function initFirebase() {
                 }
 
                 // NEW: Enable admin toggle *only* if server-side check passed
+                state.isAdmin = isAdmin; // v6.15.0: expose for the untagged nudge (36)
                 if (isAdmin) {
                     adminToggleBtn.disabled = false;
                     adminToggleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     adminToggleBtn.title = "Toggle administrator controls";
+                    // v6.15.0: let the untagged-teacher nudge run its check
+                    document.dispatchEvent(new CustomEvent('ellis-admin-confirmed'));
                 } else {
                     adminToggleBtn.disabled = true;
                     adminToggleBtn.classList.add('opacity-50', 'cursor-not-allowed');
@@ -295,6 +298,7 @@ async function initFirebase() {
                 }
                 
                 document.body.classList.remove('authenticated', 'not-anonymous', 'admin-mode');
+                state.isAdmin = false; // v6.15.0
                 signOutBtn.classList.add('hidden');
                 userIdElement.textContent = "Not signed in.";
                 userDisplayNameElement.textContent = ""; // NEW: Clear header display name
@@ -396,6 +400,7 @@ async function listenForSharedSchedules() {
 
     safeLog.log("Listening for real-time shared schedule updates...");
     listenForScheduleCalendar(); // V5.73.0: day-type calendar rides alongside
+    listenForHomeSchedule();     // V6.14.0: per-teacher home (default) schedule
 
     state.sharedSchedulesListenerUnsubscribe = onSnapshot(state.schedulesCollectionRef, (querySnapshot) => {
         // MODIFIED V4.88: Read the 'periods' array, not the legacy 'bells' array.
@@ -513,6 +518,22 @@ function listenForCustomQuickBells(userId) {
                 visualCue: b.visualCue || `[CUSTOM_TEXT] ${index + 1}|#4B9CD3|#FFFFFF`,
                     
                 sound: b.sound || 'ellisBell.mp3',
+                // V6.24.0: a saved QUEUE. Array of {durationSeconds, sound,
+                // visual}; absent/empty means this is an ordinary one-shot
+                // quick bell. Stored as-is; queueRepeatTimes rides alongside.
+                // THIS MAPPER IS A WHITELIST — it rebuilds each bell field by
+                // field, so ANY field omitted here is silently dropped on the
+                // next reload. Add new quick-bell fields HERE as well as at
+                // their write site.
+                steps: Array.isArray(b.steps) ? b.steps : null,
+                queueRepeatTimes: b.queueRepeatTimes || 1,
+                // V6.24.0 BUGFIX: alwaysBroadcast was missing from this
+                // whitelist since V5.65.0. It is read when rendering the
+                // button (module 13) and when launching (module 99), but it
+                // was never carried back out of Firestore — so ticking
+                // "broadcast to all devices" survived until the next reload
+                // and then silently reverted to off.
+                alwaysBroadcast: b.alwaysBroadcast === true,
                 isActive: b.isActive !== false // 5.19.3 Default to TRUE (active/checked)
             }));
             safeLog.log("Processed bells:", bells);

@@ -1,6 +1,13 @@
 // ===== 33-roster.js (NEW in 6.9.0 — DESIGN-CALENDAR-V2.md Layer 3) =====
 // Roster & Tags: one doc per user at public/data/roster/{uid} —
-// { displayName, tags: [...], capabilities: [...] }.
+// { displayName, tags: [...], capabilities: [...], defaultScheduleId? }.
+//
+// v6.14.0: defaultScheduleId is the user's HOME schedule (their normal day).
+// It is EXPLICIT and per-uid — set by an admin per person, or in bulk via the
+// template panel (filter → pick schedule → set for all matched). This does
+// NOT breach the Layer 3 invariant below: the filter is a picker aid; what is
+// stored is an explicit per-person scheduleId, and NOTHING resolves a tag at
+// ring time. The client reads its OWN default via module 20's home listener.
 //
 // THE LAYER 3 INVARIANT (owner decision, carved into the rules file too):
 // tags are PICKER FILTERS, never runtime targeting. Future designation UIs
@@ -53,10 +60,22 @@ const rosterClose = document.getElementById('roster-close');
 const rosterList = document.getElementById('roster-list');
 const rosterSeedBtn = document.getElementById('roster-seed-btn');
 const rosterStatus = document.getElementById('roster-status');
+// v6.14.0: bulk "home schedule" template panel
+const tmplFilter = document.getElementById('roster-template-filter');
+const tmplSchedule = document.getElementById('roster-template-schedule');
+const tmplApply = document.getElementById('roster-template-apply');
 
 let myDoc = null;          // my roster doc data (or null)
 let rosterUnsub = null;    // admin modal snapshot
 let rosterRows = [];       // [{uid, data}]
+// v6.22.0: non-clock presence, read once per roster-modal open. PRESENCE AND
+// ROSTER ARE DIFFERENT COLLECTIONS — signing in writes presence/{uid}, it does
+// NOT create roster/{uid}. So someone can be counted by the untagged nudge
+// (which reads presence) and be absent from this list (which reads roster),
+// which is exactly what an admin sees as "the banner named Torres but Torres
+// isn't here." We surface the gap instead of leaving it to be deduced.
+let presenceRows = [];     // [{uid, displayName}]
+let presenceLoaded = false;
 
 function rosterRef(uid) {
     return doc(state.db, 'artifacts', state.appId, 'public', 'data', 'roster', uid);
@@ -148,6 +167,8 @@ function openRoster() {
     rosterModal.classList.remove('hidden');
     setStatus(rosterStatus, '');
     rosterList.innerHTML = '<p class="text-sm text-gray-500">Loading…</p>';
+    if (tmplSchedule) tmplSchedule.innerHTML = scheduleOptions('');
+    if (tmplFilter) tmplFilter.value = '';
     const col = collection(state.db, 'artifacts', state.appId, 'public', 'data', 'roster');
     rosterUnsub = onSnapshot(col, (snap) => {
         rosterRows = snap.docs.map((d) => ({ uid: d.id, data: d.data() }))
@@ -156,6 +177,63 @@ function openRoster() {
     }, (err) => {
         setStatus(rosterStatus, 'Error: ' + err.message + ' (admin only)', true);
     });
+    loadPresenceForRoster(); // v6.22.0: fire-and-forget; re-renders when it lands
+}
+
+/**
+ * v6.22.0 — one-shot presence read so the modal can name who has signed in but
+ * has no roster row yet. Deliberately NOT a listener: this is a rarely-opened
+ * admin modal and presence is one small doc per person, so a live subscription
+ * would cost reads all session for information that changes when someone signs
+ * in for the first time. Failure is silent — the roster list is the feature,
+ * this is the signpost.
+ */
+async function loadPresenceForRoster() {
+    presenceLoaded = false;
+    try {
+        const col = collection(state.db, 'artifacts', state.appId, 'public', 'data', 'presence');
+        const snap = await getDocs(col);
+        presenceRows = snap.docs
+            .filter((d) => (d.data() || {}).surface !== 'clock') // TVs are not staff
+            .map((d) => ({ uid: d.id, displayName: (d.data() || {}).displayName || 'Unknown' }));
+        presenceLoaded = true;
+        renderRoster();
+    } catch (e) {
+        safeLog.log('[Roster] presence check skipped:', e && e.message);
+    }
+}
+
+/**
+ * v6.22.0 — people with a presence doc and no roster doc. These are invisible
+ * in the roster list until "Seed from presence" creates rows for them.
+ */
+function unrosteredFromPresence() {
+    if (!presenceLoaded) return [];
+    const have = new Set(rosterRows.map((r) => r.uid));
+    return presenceRows.filter((p) => !have.has(p.uid));
+}
+
+function unrosteredNoticeHtml() {
+    const missing = unrosteredFromPresence();
+    if (!missing.length) return '';
+    const names = missing.map((p) => p.displayName);
+    const shown = names.slice(0, 6).map(escapeHtml).join(', ');
+    const extra = names.length > 6 ? ' and ' + (names.length - 6) + ' more' : '';
+    // v6.22.0 CONTRAST: bg-amber-100 / border-amber-300 / text-amber-900 are all
+    // present in the compiled tailwind.css (bg-amber-50 is NOT — it would have
+    // rendered as a transparent box with near-black text on the dark modal, the
+    // exact failure V6.21.0 fixed in the three banners). The id carries the
+    // dark-theme override in styles.css; see the banner block there.
+    return '<div id="roster-unrostered-banner" class="mb-4 rounded-lg border border-amber-300 bg-amber-100 p-3">'
+        + '<p class="text-sm font-medium text-amber-900">'
+        + missing.length + (missing.length === 1 ? ' person has' : ' people have')
+        + ' signed in but ' + (missing.length === 1 ? 'is' : 'are') + ' not on the roster yet</p>'
+        + '<p class="text-xs text-amber-900 mt-1">' + shown + extra + '</p>'
+        + '<p class="text-xs text-amber-900 mt-1">Signing in records usage, but it does not create a'
+        + ' roster entry. Press <strong>Seed from presence</strong> above to add'
+        + ' ' + (missing.length === 1 ? 'them' : 'them all') + ', then tag'
+        + ' ' + (missing.length === 1 ? 'them' : 'each of them') + ' below.</p>'
+        + '</div>';
 }
 
 function closeRoster() {
@@ -163,12 +241,24 @@ function closeRoster() {
     if (rosterUnsub) { rosterUnsub(); rosterUnsub = null; }
 }
 
+// v6.14.0: <option> list of shared schedules for a home-schedule picker.
+function scheduleOptions(selectedId) {
+    const opts = ['<option value="">(no home schedule)</option>'];
+    (state.allSchedules || []).forEach((s) => {
+        opts.push('<option value="' + s.id + '"' + (s.id === selectedId ? ' selected' : '') + '>'
+            + escapeHtml(s.name) + '</option>');
+    });
+    return opts.join('');
+}
+
 function renderRoster() {
+    const notice = unrosteredNoticeHtml(); // v6.22.0
     if (!rosterRows.length) {
-        rosterList.innerHTML = '<p class="text-sm text-gray-500 mb-4">No roster entries yet. "Seed from presence" creates a row for everyone the usage dashboard has seen, or users add themselves via My Tags.</p>';
+        rosterList.innerHTML = notice
+            + '<p class="text-sm text-gray-500 mb-4">No roster entries yet. "Seed from presence" creates a row for everyone the usage dashboard has seen, or users add themselves via My Tags.</p>';
         return;
     }
-    rosterList.innerHTML = rosterRows.map(({ uid, data }) => {
+    rosterList.innerHTML = notice + rosterRows.map(({ uid, data }) => {
         const tags = (data.tags || []).map((t) =>
             chip(t, 'data-r-tag-del="' + escapeHtml(t) + '" data-r-uid="' + uid + '"',
                 'bg-gray-200 text-gray-700')).join(' ');
@@ -182,6 +272,9 @@ function renderRoster() {
             + '</div>'
             + '<div class="mb-2">' + (tags || '<span class="text-xs text-gray-500">no tags</span>') + '</div>'
             + '<div class="mb-2">' + (caps || '<span class="text-xs text-gray-500">no capabilities</span>') + '</div>'
+            + '<label class="block text-xs text-gray-600 mb-2">Home schedule (their normal day)'
+            + '<select data-r-default="' + uid + '" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm">'
+            + scheduleOptions(data.defaultScheduleId || '') + '</select></label>'
             + '<div class="flex flex-col sm:flex-row gap-3">'
             + '<input type="text" data-r-tag-input="' + uid + '" placeholder="Add tag" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm">'
             + '<input type="text" data-r-cap-input="' + uid + '" placeholder="Grant capability (narrowly!)" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm">'
@@ -201,6 +294,46 @@ async function adminWrite(uid, patch, label) {
 function rowData(uid) {
     const row = rosterRows.find((r) => r.uid === uid);
     return row ? row.data : { tags: [], capabilities: [] };
+}
+
+// v6.14.0: BULK home-schedule template. Filter the roster by tag or name
+// (the Layer 3 way — a FILTER, never runtime targeting), eyeball the count,
+// and set defaultScheduleId on each MATCHED person explicitly. This is the
+// "6th-grade teachers run the 6th-grade schedule" one-click, re-runnable when
+// new people are tagged. Stored per-uid; no tag is ever resolved at ring time.
+function matchesFilter(data, q) {
+    if (!q) return true;
+    if ((data.displayName || '').toLowerCase().includes(q)) return true;
+    return (data.tags || []).some((t) => t.toLowerCase().includes(q));
+}
+
+async function applyTemplate() {
+    const scheduleId = tmplSchedule ? tmplSchedule.value : '';
+    const q = (tmplFilter ? tmplFilter.value : '').trim().toLowerCase();
+    if (!scheduleId) { setStatus(rosterStatus, 'Pick a schedule to set as the home default first.', true); return; }
+    const matched = rosterRows.filter((r) => matchesFilter(r.data, q));
+    if (!matched.length) { setStatus(rosterStatus, 'No roster entries match that filter.', true); return; }
+    const sched = (state.allSchedules || []).find((s) => s.id === scheduleId);
+    const names = matched.map((r) => r.data.displayName || r.uid);
+    const preview = names.slice(0, 8).join(', ') + (names.length > 8 ? ', …' : '');
+    if (!window.confirm('Set home schedule "' + (sched ? sched.name : scheduleId) + '" for '
+            + matched.length + ' person/people?\n\n' + preview
+            + '\n\n(This sets an explicit default per person — no tag is resolved later.)')) return;
+    tmplApply.disabled = true;
+    setStatus(rosterStatus, 'Applying to ' + matched.length + '…');
+    try {
+        let n = 0;
+        for (const r of matched) {
+            await setDoc(rosterRef(r.uid), { defaultScheduleId: scheduleId }, { merge: true });
+            n++;
+        }
+        setStatus(rosterStatus, 'Home schedule set for ' + n + ' person/people.');
+        safeLog.log('[Roster] template: set default ' + scheduleId + ' for ' + n + ' (filter "' + q + '").');
+    } catch (e) {
+        setStatus(rosterStatus, 'Error applying template: ' + (e && e.message), true);
+    } finally {
+        tmplApply.disabled = false;
+    }
 }
 
 async function seedFromPresence() {
@@ -251,7 +384,16 @@ if (myModal) myModal.addEventListener('click', (e) => {
 if (rosterOpenBtn) rosterOpenBtn.addEventListener('click', openRoster);
 if (rosterClose) rosterClose.addEventListener('click', closeRoster);
 if (rosterSeedBtn) rosterSeedBtn.addEventListener('click', seedFromPresence);
+if (tmplApply) tmplApply.addEventListener('click', applyTemplate); // v6.14.0
 if (rosterList) {
+    // v6.14.0: per-person home schedule picker
+    rosterList.addEventListener('change', (e) => {
+        const t = e.target;
+        if (!(t instanceof HTMLElement)) return;
+        const uid = t.dataset.rDefault;
+        if (uid) adminWrite(uid, { defaultScheduleId: t.value || '' },
+            t.value ? 'Home schedule set.' : 'Home schedule cleared.');
+    });
     rosterList.addEventListener('click', (e) => {
         const t = e.target;
         if (!(t instanceof HTMLElement)) return;

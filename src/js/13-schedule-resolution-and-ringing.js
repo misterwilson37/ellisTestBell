@@ -7,7 +7,7 @@ import {
 } from './02-dom-elements.js';
 import { playBell } from './05-preferences-cloud-sync.js';
 import { updatePipCustomQuickBells } from './09-picture-in-picture.js';
-import { getCustomBellIconHtml } from './14-render-schedule-list.js';
+import { getCustomBellIconHtml, getQueueSplitIconSvg } from './14-render-schedule-list.js';
 import { getVisualHtml } from './18-bell-crud-and-modals.js';
 import { parseVisualBgColor } from './19-visual-cues-and-files.js';
 import { maybeNotifyBell } from './24-notifications.js';
@@ -106,7 +106,7 @@ function renderCustomQuickBells() {
         const fullPreviewHtml = getVisualHtml(rawVisualCue, name || 'Preview');
         
         // V5.43.1: Generate button preview HTML  
-        const buttonPreviewHtml = getCustomBellIconHtml(rawVisualCue, rawIconText, iconColor, textColor);
+        const buttonPreviewHtml = getCustomBellIconHtml(rawVisualCue, rawIconText, iconColor, textColor, bell.steps);
 
         return `
             <div class="p-4 border rounded-xl shadow-md ${hasData ? 'border-indigo-300 bg-white' : 'border-dashed border-gray-300 bg-gray-50'} space-y-4">
@@ -268,7 +268,12 @@ function renderCustomQuickBells() {
             const visualCue = bell.visualCue || `[CUSTOM_TEXT] ${bell.iconText}|${bell.iconBgColor}|${bell.iconFgColor}`;
             let visualContent = '';
             
-            if (visualCue.startsWith('http')) {
+            // V6.24.0: a saved queue draws as a diagonal split of its steps —
+            // half a hamburger, half a Beethoven — because one graphic cannot
+            // describe a sequence. Checked FIRST: the sentinel is not a URL.
+            if (visualCue === '[QUEUE_SPLIT]' && Array.isArray(bell.steps) && bell.steps.length > 1) {
+                visualContent = getQueueSplitIconSvg(bell.steps, bell.iconBgColor, bell.iconFgColor);
+            } else if (visualCue.startsWith('http')) {
                 // It's an image URL
                 // Constantly updating in 5.25 to get the appearance right.
                 visualContent = `<img src="${visualCue}" alt="${escapeHtml(bell.name)}" class="absolute inset-0 w-full h-full object-contain p-1">`;
@@ -296,6 +301,19 @@ function renderCustomQuickBells() {
 
             // V5.44.8: Add hours data attribute
             // V5.65.0: Add broadcast data attribute and indicator
+            // V6.24.0: a saved QUEUE gets a step-count badge, and its hover
+            // label reads "N steps / total" instead of a bare duration — the
+            // button runs a sequence, so a single time would understate it.
+            const stepCount = Array.isArray(bell.steps) ? bell.steps.length : 0;
+            const queueIndicator = stepCount > 0 ? `
+                <span class="absolute px-1 bg-black bg-opacity-60 text-white" style="bottom:0;left:0;border-top-right-radius:0.25rem;font-size:9px;line-height:12px;" title="${stepCount}-step queue">
+                    ${stepCount}&#9835;
+                </span>
+            ` : '';
+            if (stepCount > 0) {
+                formattedTime = `${stepCount} steps / ${formattedTime}`;
+            }
+            
             const broadcastIndicator = bell.alwaysBroadcast ? `
                 <span class="absolute top-0 right-0 w-3 h-3 text-white" title="Broadcasts to all devices">
                     <svg class="w-full h-full drop-shadow" fill="currentColor" viewBox="0 0 24 24">
@@ -316,6 +334,7 @@ function renderCustomQuickBells() {
                     style="background-color: ${bell.iconBgColor}; color: ${bell.iconFgColor};">
                     ${visualContent}
                     ${broadcastIndicator}
+                    ${queueIndicator}
                     <span class="absolute inset-0 bg-black bg-opacity-75 text-white text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             ${formattedTime}
                     </span>

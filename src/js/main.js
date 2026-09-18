@@ -39,4 +39,7 @@ import './31-period-identity.js'; // 6.6.0: period-id backfill (Layer 2 slice 1)
 import './32-personal-anchor-migration.js'; // 6.7.0: personal anchors (slice 2)
 import './33-roster.js'; // 6.9.0: Roster & Tags (design Layer 3)
 import './34-day-designation.js'; // 6.10.0: Layer 4 Verb A (day-of modal)
+import './35-schedule-grid.js'; // 6.13.0: Layer 4 prefill grid (plan weeks ahead)
+import './36-untagged-nudge.js'; // 6.15.0: nudge admins about untagged signed-in staff
+import './37-overlap-warning.js'; // 6.16.0: read-only period overrun warning (editor)
 import './99-init-and-listeners.js';

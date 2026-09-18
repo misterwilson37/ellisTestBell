@@ -23,7 +23,7 @@ import {
     deleteBellCancelBtn, deleteBellConfirmBtn, deleteCancelBtn, deleteConfirmBtn,
     deletePersonalCancelBtn, deletePersonalConfirmBtn, deletePersonalScheduleBtn,
     deleteScheduleBtn, deleteVisualCancelBtn, deleteVisualConfirmBtn, editBellCancelBtn,
-    editBellForm, editBellModal, editBellOverrideCheckbox, editBellSoundInput,
+    editBellForm, editBellModal, editBellSoundInput,
     editPeriodCancelBtn, editPeriodForm, editPeriodImageSelect, editPeriodModal,
     enterShareCodeCancel, enterShareCodeForm, enterShareCodeInput, enterShareCodeModal,
     exportCurrentScheduleBtn, exportSchedulesBtn, externalConflictCancelBtn,
@@ -44,13 +44,14 @@ import {
     newPersonalScheduleNameInput, orphanHandlingModal, periodCollapsePreference,
     periodSelectAllBtn, periodSelectNoneBtn, previewAddStaticSoundBtn, previewChangeSoundBtn,
     previewSharedSoundBtn, queueAddTimerBtn, queueCancelBtn, queueIgnoreSharedCheckbox,
-    queueIgnoreSharedWarning, queueModalCloseBtn, queueStartBtn, quickBellControls,
+    queueIgnoreSharedWarning, queueModalCloseBtn, queueSaveBtn, queueStartBtn, quickBellControls,
     quickBellQueueBtn, quickBellQueueModal, quickBellSoundSelect, quickBellVisualSelect,
     relativeAnchorBellSelect, relativeBellCancelBtn, relativeBellForm, relativeBellModal,
     relativeBellSoundSelect, relativeDirection, relativeHoursInput, relativeMinutesInput,
     relativeSecondsInput, renameAudioCancelBtn, renameAudioForm, renameAudioModal,
     renamePersonalCancelBtn, renamePersonalScheduleBtn, renamePersonalScheduleForm,
-    renamePersonalScheduleModal, renamePersonalScheduleStatus, renameScheduleBtn,
+    duplicateScheduleBtn, renamePersonalScheduleModal, renamePersonalScheduleStatus,
+    renameScheduleBtn,
     renameSharedCancelBtn, renameSharedScheduleForm, renameSharedScheduleModal,
     renameVisualCancelBtn, renameVisualForm, renameVisualModal, restoreCancelBtn,
     restoreConfirmBtn, restoreFileInput, restorePersonalScheduleBtn, revokeShareCodeBtn,
@@ -62,8 +63,9 @@ import {
     userMessageModal, userMessageOkBtn, visualUploadStatus,
 } from './02-dom-elements.js';
 import {
-    bulkSelectedBells, getBellOverrideKey, getNextSkippedBell, getVisualOverrideKey,
-    saveBellVisualOverrides, saveMutedBells, saveSoundOverrides, skipNextBell, unskipBell,
+    bulkSelectedBells, closeBellManagerModal, getBellOverrideKey, getVisualOverrideKey,
+    handleBellManagerToggle, openBellManagerModal,
+    saveBellVisualOverrides, saveMutedBells, saveSoundOverrides,
     updateMainPageSkipButtons, updateMuteButtonsUI,
 } from './04-app-state-and-bells.js';
 import {
@@ -82,7 +84,9 @@ import { startQuickBell, updateClock } from './10-clock-engine.js';
 import { broadcastQuickBell, toggleBroadcastMode } from './11-quick-bell-broadcast.js';
 import {
     addQueueTimerRow, cancelQueue, closeQuickBellQueueModal, openQuickBellQueueModal,
+    saveQueueAsQuickBell,
     startQueue,
+    startSavedQueue,
 } from './12-quick-bell-queue.js';
 import {
     renderCustomQuickBells, syncCustomBellFormToArray,
@@ -98,7 +102,8 @@ import { initFirebase } from './15-firebase-init.js';
 import {
     closeLinkedEditModal, confirmDeleteBell, confirmDeleteSchedule,
     confirmRestorePersonalSchedule, handleBackupPersonalSchedule, handleCreateSchedule,
-    handleDeleteBellClick, handleDeleteSchedule, handleEditBellClick, handleEditBellSubmit,
+    handleDeleteBellClick, handleDeleteSchedule, handleDuplicateSchedule, handleEditBellClick,
+    handleEditBellSubmit,
     handleInlineRenameScheduleClick, handleLinkedEdit, handleMultiAddPeriodSubmit,
     handleRenamePersonalSchedule, handleRenamePersonalScheduleSubmit,
     handleRenameSharedScheduleSubmit, handleRestoreFileSelect,
@@ -164,23 +169,32 @@ function init() {
     
     // V5.51.0: Register Service Worker for PWA support
     if ('serviceWorker' in navigator) {
+        // V6.15.0 BUGFIX: only surface the "new version" toast when this page
+        // V6.20.1: this app is mostly an unattended CLOCK/display, so the old
+        // "New version available! Refresh to update." popup was pure noise —
+        // nobody's there to tap OK, and it covered the time (reported twice).
+        // The service worker already skipWaiting()s + clients.claim()s, so a new
+        // version takes control on its own; we just RELOAD ONCE, silently, when
+        // it does — so a long-running clock actually runs the new code without
+        // anyone touching it. Guards: (1) wasControlledAtLoad — only reload on a
+        // genuine update, never a first install or a hard refresh (which already
+        // has fresh code); (2) skip while a modal/editor is open, so we never
+        // yank the rug out from under an admin mid-edit (they get it next load).
+        const wasControlledAtLoad = !!navigator.serviceWorker.controller;
+        let reloadingForUpdate = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (reloadingForUpdate || !wasControlledAtLoad) return;
+            if (document.querySelector('[data-modal]:not(.hidden)')) {
+                safeLog.log('[PWA] Update ready, but a modal is open — deferring reload.');
+                return;
+            }
+            reloadingForUpdate = true;
+            safeLog.log('[PWA] New version active — reloading to apply.');
+            window.location.reload();
+        });
         navigator.serviceWorker.register('/service-worker.js')
             .then((registration) => {
                 safeLog.log('[PWA] Service Worker registered:', registration.scope);
-                
-                // Check for updates
-                registration.addEventListener('updatefound', () => {
-                    const newWorker = registration.installing;
-                    safeLog.log('[PWA] New Service Worker installing...');
-                    
-                    newWorker.addEventListener('statechange', () => {
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // New content available, show update notification
-                            safeLog.log('[PWA] New version available!');
-                            showUserMessage('New version available! Refresh to update.');
-                        }
-                    });
-                });
             })
             .catch((error) => {
                 console.warn('[PWA] Service Worker registration failed:', error);
@@ -254,6 +268,9 @@ function init() {
 
     // NEW V4.91: Modals (Rename Shared Schedule)
     renameScheduleBtn.addEventListener('click', openRenameSharedScheduleModal);
+    // V6.21.0: duplicate the selected shared schedule (admin-only; the handler
+    // re-checks admin-mode itself, the disabled state is only the affordance).
+    duplicateScheduleBtn?.addEventListener('click', handleDuplicateSchedule);
     renameSharedScheduleForm.addEventListener('submit', handleRenameSharedScheduleSubmit);
     renameSharedCancelBtn.addEventListener('click', () => {
         renameSharedScheduleModal.classList.add('hidden');
@@ -742,6 +759,18 @@ function init() {
     quickBellControls.addEventListener('click', (e) => {
         const customBtn = e.target.closest('.custom-quick-launch-btn');
         if (customBtn) {
+            // V6.24.0: a quick bell carrying `steps` is a SAVED QUEUE — run the
+            // whole sequence instead of one timer. Read from the array rather
+            // than a data-* attribute: steps are objects, and the round-9
+            // lesson about rebuilding state from rendered DOM applies here too.
+            const customId = parseInt(customBtn.dataset.customId, 10);
+            const bellData = state.customQuickBells.find(b => b && b.id === customId);
+            
+            if (bellData && Array.isArray(bellData.steps) && bellData.steps.length > 0) {
+                startSavedQueue(bellData.steps, bellData.queueRepeatTimes);
+                return;
+            }
+            
             const hours = parseInt(customBtn.dataset.hours, 10) || 0;
             const minutes = parseInt(customBtn.dataset.minutes, 10) || 0;
             const seconds = parseInt(customBtn.dataset.seconds, 10) || 0;
@@ -1135,12 +1164,14 @@ function init() {
     editBellCancelBtn.addEventListener('click', closeEditBellModal);
     // NEW V4.95: Add listener for preview button
     document.getElementById('preview-edit-sound').addEventListener('click', () => playBell(editBellSoundInput.value));
-    // NEW V4.95: Add listener for override checkbox to enable/disable sound select
-    editBellOverrideCheckbox?.addEventListener('change', function() {
-        if (state.currentEditingBell && state.currentEditingBell.type === 'shared') {
-            editBellSoundInput.disabled = !this.checked; // Use 'this' instead of 'e.target'
-        }
-    });
+    // V6.20.4: REMOVED a V4.95 listener that disabled the sound dropdown
+    // whenever the override checkbox was unticked. V5.66.2 made personal sound
+    // overrides available to EVERYONE ("Sound dropdown enabled by default"), and
+    // handleEditBellClick sets editBellSoundInput.disabled = false — but this
+    // listener still fired on every change event, so an admin who ticked the box
+    // and then thought better of it silently lost the ability to edit the sound
+    // at all until they closed and reopened the modal. The checkbox chooses WHO a
+    // change reaches; it must not decide WHETHER a field is editable.
     
     // V5.49.0: Sound Preview Buttons - Added to all sound dropdowns
     document.getElementById('preview-quick-bell-sound')?.addEventListener('click', () => {
@@ -1616,6 +1647,10 @@ function init() {
         queueAddTimerBtn.addEventListener('click', addQueueTimerRow);
     }
     
+    if (queueSaveBtn) {
+        // V6.24.0
+        queueSaveBtn.addEventListener('click', saveQueueAsQuickBell);
+    }
     if (queueStartBtn) {
         queueStartBtn.addEventListener('click', startQueue);
     }
@@ -1640,20 +1675,29 @@ function init() {
         });
     }
     
-    // V5.47.13: Skip Bell button handler
+    // V6.25.0: the Skip button now OPENS THE BELL MODAL instead of blindly
+    // skipping whatever is next. The old one-click behaviour is what made it
+    // impossible to tell which bell you had just cancelled.
     document.getElementById('skip-bell-btn').addEventListener('click', () => {
-        skipNextBell();
-        updateMainPageSkipButtons();
+        openBellManagerModal();
     });
     
-    // V5.47.13: Unskip Bell button handler
-    document.getElementById('unskip-bell-btn').addEventListener('click', () => {
-        const skippedBell = getNextSkippedBell();
-        if (skippedBell) {
-            unskipBell(skippedBell);
+    // V6.25.0: bell modal — per-row Skip/Unskip, close, backdrop click.
+    const bellManagerModal = document.getElementById('bell-manager-modal');
+    if (bellManagerModal) {
+        document.getElementById('bell-manager-list').addEventListener('click', (e) => {
+            const btn = e.target.closest('.bell-manager-toggle');
+            if (!btn) return;
+            handleBellManagerToggle(parseInt(btn.dataset.bellIndex, 10));
             updateMainPageSkipButtons();
-        }
-    });
+        });
+        document.getElementById('bell-manager-close-btn').addEventListener('click', () => {
+            closeBellManagerModal();
+        });
+        bellManagerModal.addEventListener('click', (e) => {
+            if (e.target === bellManagerModal) closeBellManagerModal();
+        });
+    }
     
     // V5.47.0: Picture-in-Picture toggle button
     const pipToggleBtn = document.getElementById('pip-toggle-btn');

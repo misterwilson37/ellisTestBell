@@ -453,6 +453,26 @@ async function playBell(soundName) {
 
     const now = Tone.now();
 
+    // --- Case 0: SILENT (V6.25.1 BUGFIX) ---
+    // The sound dropdowns have offered "Silent / None" since 5.32/5.33 (module
+    // 19 injects `[SILENT]` into every Default Sounds optgroup), but playBell
+    // never had a case for it. So a bell marked silent fell all the way through
+    // to Case 3, which treats an unrecognised soundName as a Firebase Storage
+    // path: `ref(state.storage, '[SILENT]')` 404s, the catch fires, and the
+    // handler's "revert to default" rings ellisBell.mp3. A bell explicitly set
+    // to silent therefore rang the DEFAULT bell, every time, which is worse
+    // than either intended outcome.
+    //
+    // Note the asymmetry below, which is deliberate: an EMPTY soundName still
+    // falls back to the default (that is longstanding behaviour for a bell
+    // whose sound was never set, and a bell that makes no noise because a field
+    // is blank is a silent failure). `[SILENT]` is an explicit choice and is
+    // honoured as one.
+    if (soundName === '[SILENT]') {
+        safeLog.log('Bell is set to Silent / None — no audio played.');
+        return; // Handled: intentionally no sound.
+    }
+
     // --- Case 1: Handle built-in synths ---
     if (soundName === 'Bell' || soundName === 'Chime' || soundName === 'Beep' || soundName === 'Alarm') {
         const synth = synths[soundName];

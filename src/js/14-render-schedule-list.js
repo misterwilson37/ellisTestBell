@@ -582,8 +582,23 @@ function calculateRelativeBellTime(bell, bellMap, allPeriods, visited = new Set(
     * flatBellList: Flat list of all calculated bells for the clock
     * }
     */
-function resolveAllBellTimes() {
+function resolveAllBellTimes(options = {}) {
     // MODIFIED in 4.29: MERGE shared and personal periods instead of just concatenating
+    //
+    // V6.22.0: `options.pristine` resolves the schedule in BASE SPACE — the
+    // emergency shift and the day's Verb B transforms are both skipped, so the
+    // returned times are the ones actually STORED in Firestore. Everything else
+    // (merge, relative resolution, overlays) is identical, which is the point:
+    // relative bells still resolve, so a caller gets exact base-space times for
+    // relatives too, not just statics.
+    //
+    // WHY IT EXISTS: the edit modal writes to the BASE schedule document, so
+    // every value it reasons about must be in base space. Before 6.22.0 it read
+    // the rendered (shifted/transformed) time and wrote it straight back — see
+    // the header of handleEditBellClick in 16-schedule-management.js. Default is
+    // false; the one pre-existing caller (module 18's recalculateAndRenderAll)
+    // is unaffected.
+    const pristine = options.pristine === true;
     const mergedPeriodsMap = new Map();
 
     // V5.74.0: EMERGENCY SCHEDULE SHIFT. If the active shared schedule carries
@@ -594,11 +609,38 @@ function resolveAllBellTimes() {
     // that's the ripple. Personal static bells (pinned clock times) do not
     // move. The date check runs on every recalculation, so the shift
     // self-expires at the midnight recalc without any cleanup write.
-    const activeShiftSeconds = window.BellEngine.getActiveScheduleShiftSeconds(
+    // V6.22.0: pristine mode reports base-space times, so no shift.
+    const activeShiftSeconds = pristine ? 0 : window.BellEngine.getActiveScheduleShiftSeconds(
         state.activeSharedScheduleShift, new Date());
 
+    // V6.12.0: LAYER 4 VERB B — transformation recipes. If the school
+    // calendar transforms this user's base TODAY (resolved into
+    // state.activeCalendarTransforms by module 20), apply the recipe(s) to
+    // COPIES of the base periods HERE, before the merge — the same
+    // pristine-copy discipline as the shift above, so localSchedulePeriods
+    // stays untouched and edit modals never see (or save back) transformed
+    // times. Recipes compose in resolution order; each is a pure
+    // period->period transform touching shared-side STATIC bells only.
+    // Relative bells (shared AND personal) re-derive from the moved parents
+    // downstream — that ripple is how Layer 2 overlays survive for free. The
+    // emergency shift then rides on top of the transformed static times
+    // (recipe = planned structure; shift = day-of blanket nudge). On these
+    // pristine base periods bells carry no _originType, so the engine's
+    // recipeEligible treats them as shared (its documented pre-merge case).
+    let basePeriods = state.localSchedulePeriods;
+    // V6.22.0: pristine mode reports base-space times, so no transforms either.
+    const activeTransforms = (!pristine && Array.isArray(state.activeCalendarTransforms))
+        ? state.activeCalendarTransforms : [];
+    for (let i = 0; i < activeTransforms.length; i++) {
+        // applyRecipeToPeriods is immutable and returns the SAME array
+        // reference when a recipe changes nothing (changed === 0), so a
+        // no-op transform costs nothing and the pristine base is preserved.
+        basePeriods = window.BellEngine.applyRecipeToPeriods(
+            basePeriods, activeTransforms[i]).periods;
+    }
+
     // 1. Add all base shared periods
-    state.localSchedulePeriods.forEach(period => {
+    basePeriods.forEach(period => {
         mergedPeriodsMap.set(period.name, { 
             ...period, 
             // MODIFIED in 4.37: Tag bells with their origin
@@ -845,7 +887,72 @@ function resolveAllBellTimes() {
     * @param {string} fgColor - Foreground color hex
     * @returns {string} HTML content for the button (Icon or Text)
     */
-function getCustomBellIconHtml(visualCue, iconText, bgColor, fgColor) {
+/**
+ * V6.24.0 — DIAGONAL SPLIT ICON for a saved queue.
+ *
+ * A saved queue runs several bells, so a single graphic under-describes it.
+ * This slices the 44px button into one diagonal band per step, in order, so
+ * the owner's "typing then Beethoven" button shows half a hamburger and half
+ * a Beethoven rather than picking one.
+ *
+ * HOW: bands are axis-aligned rects in a clipPath rotated -45deg about the
+ * centre. The square's diagonal is 100*sqrt(2) ~= 141.42, so a band of width
+ * 141.42/n starting at -20.71 covers the square exactly. This generalises to
+ * any n without per-case polygon maths — at n=2 it is precisely half and half.
+ *
+ * HONEST LIMIT: past 3 steps the bands are thinner than the button is
+ * forgiving. Legibility is capped by deliberately splitting at most the first
+ * MAX_BANDS steps and marking the remainder with a count badge (drawn by the
+ * caller), rather than shaving the icon into confetti.
+ *
+ * Non-image steps (the default "Q", custom text) fill their band with the
+ * bell's colours and the step number — never a broken <image>.
+ */
+const QUEUE_ICON_MAX_BANDS = 3;
+
+function getQueueSplitIconSvg(steps, bgColor, fgColor) {
+    const bands = steps.slice(0, QUEUE_ICON_MAX_BANDS);
+    const n = bands.length;
+    if (n === 0) return '';
+    
+    const DIAG = 141.42;      // 100 * sqrt(2)
+    const OFFSET = -20.71;    // (DIAG - 100) / 2
+    const bandW = DIAG / n;
+    const uid = `qs${Math.random().toString(36).slice(2, 8)}`;
+    
+    let defs = '';
+    let body = '';
+    
+    bands.forEach((step, i) => {
+        const clipId = `${uid}-${i}`;
+        defs += `<clipPath id="${clipId}"><rect x="${(OFFSET + bandW * i).toFixed(2)}" y="${OFFSET}" width="${bandW.toFixed(2)}" height="${DIAG}" transform="rotate(-45 50 50)"/></clipPath>`;
+        
+        const visual = step && step.visual;
+        if (visual && visual.startsWith('http')) {
+            // preserveAspectRatio="slice" fills the band; the graphic is
+            // cropped rather than letterboxed, which reads better this small.
+            body += `<image href="${escapeHtml(visual)}" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"/>`;
+        } else {
+            body += `<g clip-path="url(#${clipId})"><rect x="0" y="0" width="100" height="100" fill="${bgColor}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="46" font-weight="bold" fill="${fgColor}" font-family="'Century Gothic', 'Questrial', sans-serif">${i + 1}</text></g>`;
+        }
+        
+        // Divider between bands, so two dark graphics still read as two.
+        if (i > 0) {
+            const c = 200 * (i / n); // the line x + y = c
+            const x1 = Math.max(0, c - 100), y1 = Math.min(100, c);
+            const x2 = Math.min(100, c), y2 = Math.max(0, c - 100);
+            body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${fgColor}" stroke-width="3" stroke-opacity="0.9"/>`;
+        }
+    });
+    
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="absolute inset-0 w-full h-full"><defs>${defs}</defs><rect x="0" y="0" width="100" height="100" fill="${bgColor}"/>${body}</svg>`;
+}
+
+function getCustomBellIconHtml(visualCue, iconText, bgColor, fgColor, steps) {
+    // V6.24.0: a saved queue draws as a diagonal split of its steps.
+    if (visualCue === '[QUEUE_SPLIT]' && Array.isArray(steps) && steps.length > 1) {
+        return `<div class="w-full h-full relative overflow-hidden">${getQueueSplitIconSvg(steps, bgColor || '#4B9CD3', fgColor || '#FFFFFF')}</div>`;
+    }
     // V5.43.2: Extract background color from [BG:...] prefix if present
     let customBgColor = null;
     let baseVisualCue = visualCue;
@@ -1428,6 +1535,7 @@ export {
     findNearbyBell,
     flattenPeriodsToLegacyBells,
     getCustomBellIconHtml,
+    getQueueSplitIconSvg,
     handleChangeSoundSubmit,
     migrateLegacyBellsToPeriods,
     openChangeSoundModal,

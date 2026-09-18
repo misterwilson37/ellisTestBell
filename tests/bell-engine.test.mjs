@@ -543,3 +543,280 @@ test('applyRecipeToPeriods shorten: name fallback finds the extend target; missi
     assert.equal(E.applyRecipeToPeriods(mk(), { type: 'shorten', after: '12:00', perPeriodSeconds: 0 }).changed, 0);
     assert.equal(E.applyRecipeToPeriods(mk(), { type: 'shorten', perPeriodSeconds: 300 }).changed, 0);
 });
+
+// v6.12.0 (Verb B WIRING): the compose pipeline module 14 runs — resolve the
+// day's recipes for a uid, then fold them onto the base periods in order.
+// This pins the behavior resolveAllBellTimes depends on: recipes COMPOSE, a
+// no-op recipe returns the SAME reference (so pristine base survives), and
+// the second recipe sees the first recipe's output.
+test('Verb B pipeline: resolveCalendarTransforms + sequential applyRecipeToPeriods compose in order; no-op preserves base reference', () => {
+    const base = [
+        { name: 'AM', bells: [{ bellId: 'a', name: 'Start', time: '08:00:00' }] },
+        { name: 'PM', bells: [{ bellId: 'p', name: 'Start', time: '12:00:00' }] },
+    ];
+    const cal = { days: { '2026-09-14': { entries: [
+        { scope: ['u1'], verb: 'transform', recipe: { type: 'shift', offsetSeconds: 300, from: '12:00' } },
+        { scope: ['u1'], verb: 'transform', recipe: { type: 'shift', offsetSeconds: 120, from: '12:00' } },
+    ] } } };
+    const day = new Date(2026, 8, 14);
+    const recipes = E.resolveCalendarTransforms(cal, day, 'u1');
+    assert.equal(recipes.length, 2);
+
+    // Fold exactly as module 14's resolveAllBellTimes does.
+    let periods = base;
+    for (let i = 0; i < recipes.length; i++) {
+        periods = E.applyRecipeToPeriods(periods, recipes[i]).periods;
+    }
+    assert.equal(periods[0].bells[0].time, '08:00:00');  // AM untouched (out of range)
+    assert.equal(periods[0], base[0]);                   // untouched period by reference
+    assert.equal(periods[1].bells[0].time, '12:07:00');  // 12:00 + 5m + 2m composed
+    assert.equal(JSON.stringify(base[1].bells[0].time), '"12:00:00"'); // base pristine
+
+    // Empty recipe set (the common case) leaves the base array by reference.
+    let none = base;
+    E.resolveCalendarTransforms(cal, day, 'nobody').forEach((r) => {
+        none = E.applyRecipeToPeriods(none, r).periods;
+    });
+    assert.equal(none, base);
+});
+
+// v6.13.0: mergeCalendarEntry — the base-dedup / transform-append rule.
+test('mergeCalendarEntry: base is per-person last-write-wins; transforms append; input never mutated', () => {
+    const entries = [
+        { scope: ['a', 'b'], verb: 'base', scheduleId: 'x' },
+        { scope: ['c'], verb: 'base', scheduleId: 'y' },
+        { scope: ['a'], verb: 'transform', recipe: { type: 'shift', offsetSeconds: 300 } },
+    ];
+    const snap = JSON.stringify(entries);
+
+    // Re-designating 'a' strips a from the {a,b} base (leaving {b}); the
+    // transform on 'a' is untouched; the new base is appended.
+    const r = E.mergeCalendarEntry(entries, { scope: ['a'], verb: 'base', scheduleId: 'z' });
+    assert.equal(JSON.stringify(entries), snap);                 // pristine input
+    assert.deepEqual(r, [
+        { scope: ['b'], verb: 'base', scheduleId: 'x' },
+        { scope: ['c'], verb: 'base', scheduleId: 'y' },
+        { scope: ['a'], verb: 'transform', recipe: { type: 'shift', offsetSeconds: 300 } },
+        { scope: ['a'], verb: 'base', scheduleId: 'z' },
+    ]);
+
+    // A base entry that empties completely is dropped.
+    const r2 = E.mergeCalendarEntry(entries, { scope: ['c'], verb: 'base', scheduleId: 'z' });
+    assert.equal(r2.some((e) => e.scheduleId === 'y'), false);   // {c}->y emptied, gone
+    assert.equal(r2[r2.length - 1].scheduleId, 'z');
+
+    // Transforms only ever append (compose) — no dedup against base or each other.
+    const r3 = E.mergeCalendarEntry(entries, { scope: ['a'], verb: 'transform', recipe: { type: 'shorten', after: '12:00', perPeriodSeconds: 600 } });
+    assert.equal(r3.length, 4);
+    assert.equal(r3[0].scope.length, 2);                         // {a,b} base untouched by a transform add
+
+    // Defensive: null/garbage entry returns a copy; empty base seeds cleanly.
+    assert.deepEqual(E.mergeCalendarEntry([], { scope: ['a'], verb: 'base', scheduleId: 'x' }),
+        [{ scope: ['a'], verb: 'base', scheduleId: 'x' }]);
+    assert.deepEqual(E.mergeCalendarEntry(entries, null), entries);
+    assert.notEqual(E.mergeCalendarEntry(entries, null), entries); // copy, not same ref
+});
+
+// v6.14.0: resolveScopedDesignation — the mandate half, split out for the
+// home-schedule feature. resolveCalendarSchedule must stay behavior-identical.
+test('resolveScopedDesignation: scoped uid hit only; exceptions/weekdayDefaults are NOT its job', () => {
+    const cal = {
+        days: { '2026-09-14': { entries: [
+            { scope: ['u-a'], verb: 'base', scheduleId: 'scoped-a' },
+            { scope: ['u-b'], verb: 'transform', recipe: { type: 'shift', offsetSeconds: 60 } },
+        ] } },
+        exceptions: { '2026-09-14': 'exception-sched' },
+        weekdayDefaults: { '1': 'monday-sched' },
+    };
+    const mon = new Date(2026, 8, 14); // a Monday
+    // scoped resolver: only sees the scoped base hit, ignores exception/weekday
+    assert.equal(E.resolveScopedDesignation(cal, mon, 'u-a'), 'scoped-a');
+    assert.equal(E.resolveScopedDesignation(cal, mon, 'u-b'), null); // transform ≠ base
+    assert.equal(E.resolveScopedDesignation(cal, mon, 'u-c'), null); // no scope hit
+    assert.equal(E.resolveScopedDesignation(cal, mon), null);        // no uid
+    // resolveCalendarSchedule unchanged: scoped wins, else exception, else weekday
+    assert.equal(E.resolveCalendarSchedule(cal, mon, 'u-a'), 'scoped-a');
+    assert.equal(E.resolveCalendarSchedule(cal, mon, 'u-c'), 'exception-sched'); // falls to exception
+    assert.equal(E.resolveCalendarSchedule(cal, mon), 'exception-sched');        // no uid -> exception
+    const tue = new Date(2026, 8, 15);
+    assert.equal(E.resolveCalendarSchedule(cal, tue), null); // no exception that day, no Tue default
+});
+
+// v6.16.0: detectPeriodOverlaps — the read-only overrun detector.
+test('detectPeriodOverlaps: flags a period whose last bell passes the next period start; ignores gaps, back-to-back, and single-bell markers', () => {
+    const P = (name, times) => ({ name, bells: times.map((t, i) => ({ bellId: name + i, time: t })) });
+    // 3rd ends 10:44, 4th begins 10:38 -> 6-min (360s) overrun. Announce is a
+    // single-bell marker (skipped). 5th is back-to-back with 4th end (not flagged).
+    const clean = [
+        P('3rd Period', ['10:00:00', '10:34:00']),
+        P('4th Period', ['10:38:00', '11:20:00']),
+        { name: 'Announcements', bells: [{ bellId: 'a', time: '08:15:00' }] }, // single -> skipped
+    ];
+    assert.deepEqual(E.detectPeriodOverlaps(clean), []); // 10:34 < 10:38 gap, all good
+
+    const overrun = [
+        P('3rd Period', ['10:00:00', '10:44:00']), // stretched past 4th's start
+        P('4th Period', ['10:38:00', '11:20:00']),
+    ];
+    const r = E.detectPeriodOverlaps(overrun);
+    assert.equal(r.length, 1);
+    assert.equal(r[0].name, '3rd Period');
+    assert.equal(r[0].nextName, '4th Period');
+    assert.equal(r[0].endsAt, '10:44:00');
+    assert.equal(r[0].startsAt, '10:38:00');
+    assert.equal(r[0].overlapSeconds, 360);
+
+    // back-to-back (end == next start) is NOT an overrun
+    const touching = [P('A', ['09:00:00', '09:50:00']), P('B', ['09:50:00', '10:40:00'])];
+    assert.deepEqual(E.detectPeriodOverlaps(touching), []);
+
+    // disabled periods and non-arrays are ignored safely
+    assert.deepEqual(E.detectPeriodOverlaps(null), []);
+    const withDisabled = [
+        P('X', ['08:00:00', '09:30:00']),
+        { name: 'Y', isEnabled: false, bells: [{ time: '08:30:00' }, { time: '10:00:00' }] },
+    ];
+    assert.deepEqual(E.detectPeriodOverlaps(withDisabled), []); // Y skipped, X alone -> no pair
+});
+
+// v6.17.0: planOverlapResolution — resolve an overrun three ways, static bells only.
+test('planOverlapResolution: shrink / push / spread; never moves relative bells', () => {
+    // 3rd 10:00–10:44 overruns 4th (begins 10:38); then 5th 11:24–12:00.
+    const periods = [
+        { name: '3rd', bells: [{ bellId: 'b3s', time: '10:00:00' }, { bellId: 'b3e', time: '10:44:00' }] },
+        { name: '4th', bells: [
+            { bellId: 'b4s', time: '10:38:00' },
+            { bellId: 'b4rel', time: '10:40:00', relative: { parentBellId: 'b4s', offsetSeconds: 120 } }, // relative: never moved
+            { bellId: 'b4e', time: '11:20:00' },
+        ] },
+        { name: '5th', bells: [{ bellId: 'b5s', time: '11:24:00' }, { bellId: 'b5e', time: '12:00:00' }] },
+    ];
+
+    // shrink (protect default ON, v6.18.1): 4th's start moves to 3rd.end PLUS a
+    // passing period (reuses 4th's own outgoing gap, 4th->5th = 4 min) = 10:48
+    const shrink = E.planOverlapResolution(periods, '3rd', 'shrink');
+    assert.equal(shrink.moves.length, 1);
+    assert.equal(shrink.moves[0].bellId, 'b4s');
+    assert.equal(shrink.moves[0].to, '10:48:00'); // 10:44 + 4-min passing period preserved
+    assert.equal(shrink.dayEndDeltaSeconds, 0);
+    assert.ok(!shrink.moves.some((m) => m.bellId === 'b4rel')); // relative never moved
+    // protect OFF: butt them together at 3rd.end (no passing period)
+    const shrinkRaw = E.planOverlapResolution(periods, '3rd', 'shrink', null, false);
+    assert.equal(shrinkRaw.moves[0].to, '10:44:00');
+
+    // push: 4th + 5th all shift +6min (360s); day ends 6 min later
+    const push = E.planOverlapResolution(periods, '3rd', 'push');
+    assert.equal(push.dayEndDeltaSeconds, 360);
+    const b5sPush = push.moves.find((m) => m.bellId === 'b5s');
+    assert.equal(b5sPush.to, '11:30:00'); // 11:24 + 6
+    assert.ok(!push.moves.some((m) => m.bellId === 'b4rel')); // still no relative
+
+    // spread across 4th only: rigid +6 shift of 4th's statics; 5th steps back to net 0 at day-end
+    const spread = E.planOverlapResolution(periods, '3rd', 'spread', ['4th']);
+    assert.equal(spread.dayEndDeltaSeconds, 0);       // day-end preserved
+    const b4s = spread.moves.find((m) => m.bellId === 'b4s');
+    assert.equal(b4s.to, '10:44:00');                 // 4th start +6 (clears overlap)
+    assert.ok(!spread.moves.some((m) => m.bellId === 'b5s')); // 5th nets 0 -> no move
+    assert.ok(!spread.moves.some((m) => m.bellId === 'b4rel'));
+
+    // spread with nothing checked -> guidance, no moves
+    assert.equal(E.planOverlapResolution(periods, '3rd', 'spread', []).moves.length, 0);
+    // no overlap -> no moves
+    const clean = [
+        { name: 'A', bells: [{ bellId: 'a', time: '09:00:00' }, { bellId: 'a2', time: '09:50:00' }] },
+        { name: 'B', bells: [{ bellId: 'b', time: '10:00:00' }, { bellId: 'b2', time: '10:50:00' }] },
+    ];
+    assert.deepEqual(E.planOverlapResolution(clean, 'A', 'shrink').moves, []);
+});
+
+// v6.17.1: spread now DEFAULTS to protecting passing periods — the overlap
+// comes out of the CHECKED periods' own length. Unsetting protectGaps reverts
+// to gap-tightening. Case: A overruns B by 10 min; absorb in C (not B).
+test('planOverlapResolution spread: protectGaps shortens the checked period and preserves gaps; day-end pinned', () => {
+    const P = (name, s, e) => ({ name, bells: [{ bellId: name + 'S', time: s }, { bellId: name + 'E', time: e }] });
+    const periods = [
+        P('A', '09:00:00', '10:10:00'), // A stretched to 10:10, overruns B (begins 10:00) by 10 min
+        P('B', '10:00:00', '10:50:00'),
+        P('C', '11:00:00', '11:50:00'), // gap B->C = 10 min (passing period to protect)
+    ];
+    // protectGaps default (true): shorten C by 10; B shifts right rigidly; gap B->C preserved; day ends 11:50
+    const prot = E.planOverlapResolution(periods, 'A', 'spread', ['C']);
+    assert.equal(prot.dayEndDeltaSeconds, 0);
+    const bS = prot.moves.find((m) => m.bellId === 'BS');
+    const bE = prot.moves.find((m) => m.bellId === 'BE');
+    const cS = prot.moves.find((m) => m.bellId === 'CS');
+    const cE = prot.moves.find((m) => m.bellId === 'CE');
+    assert.equal(bS.to, '10:10:00'); assert.equal(bE.to, '11:00:00'); // B shifted +10, same length
+    assert.equal(cS.to, '11:10:00');                                   // C start +10
+    assert.ok(!cE);                                                    // C end unchanged -> C is 10 min shorter
+    // gap B->C after: C.start 11:10 - B.end 11:00 = 10 min, preserved. day-end (C.end) 11:50 unchanged.
+
+    // protectGaps=false: rigid shift, tightens the gap after C (the checked one)
+    const tight = E.planOverlapResolution(periods, 'A', 'spread', ['C'], false);
+    const cEt = tight.moves.find((m) => m.bellId === 'CE');
+    assert.ok(cEt); // C's end DOES move in gap-tighten mode (period keeps length, shifts whole)
+});
+
+// v6.18.0: reclaim — remove a period, give its time (incl. the INCOMING
+// passing period) back to the survivors, dismissal pinned.
+test('applyRecipeToPeriods reclaim: last period (FLEX) — every survivor grows, day ends the same', () => {
+    const periods = [
+        { name: 'P1', bells: [{ bellId: 'p1s', time: '08:00:00' }, { bellId: 'p1e', time: '09:00:00' }] },
+        { name: 'P2', bells: [{ bellId: 'p2s', time: '09:04:00' }, { bellId: 'p2e', time: '10:00:00' }] },
+        { name: 'FLEX', bells: [{ bellId: 'fs', time: '10:04:00' }, { bellId: 'fe', time: '10:26:00' }] },
+    ];
+    // freed = FLEX.end(10:26) - P2.end(10:00) = 26 min (22 FLEX + 4 passing); /2 = 13 each
+    const r = E.applyRecipeToPeriods(periods, { type: 'reclaim', periodName: 'FLEX' });
+    assert.ok(!r.periods.some((p) => p.name === 'FLEX')); // FLEX gone
+    const p1 = r.periods.find((p) => p.name === 'P1');
+    const p2 = r.periods.find((p) => p.name === 'P2');
+    assert.equal(p1.bells.find((b) => b.bellId === 'p1s').time, '08:00:00'); // unchanged
+    assert.equal(p1.bells.find((b) => b.bellId === 'p1e').time, '09:13:00'); // +13
+    assert.equal(p2.bells.find((b) => b.bellId === 'p2s').time, '09:17:00'); // +13; P1->P2 gap still 4
+    assert.equal(p2.bells.find((b) => b.bellId === 'p2e').time, '10:26:00'); // == original day end (pinned)
+    // input untouched
+    assert.equal(periods[0].bells[1].time, '09:00:00');
+});
+
+test('applyRecipeToPeriods reclaim: middle period preserves the OUTGOING passing period', () => {
+    const periods = [
+        { name: 'P1', bells: [{ bellId: 'a', time: '08:00:00' }, { bellId: 'b', time: '09:00:00' }] },
+        { name: 'P2', bells: [{ bellId: 'c', time: '09:04:00' }, { bellId: 'd', time: '10:00:00' }] },
+        { name: 'P3', bells: [{ bellId: 'e', time: '10:04:00' }, { bellId: 'f', time: '11:00:00' }] },
+    ];
+    // reclaim P2: freed = P2.end(10:00) - P1.end(09:00) = 60 min; survivors P1,P3 -> +30 each
+    const r = E.applyRecipeToPeriods(periods, { type: 'reclaim', periodName: 'P2' });
+    assert.ok(!r.periods.some((p) => p.name === 'P2'));
+    const p1 = r.periods.find((p) => p.name === 'P1');
+    const p3 = r.periods.find((p) => p.name === 'P3');
+    assert.equal(p1.bells.find((b) => b.bellId === 'b').time, '09:30:00'); // +30
+    assert.equal(p3.bells.find((b) => b.bellId === 'e').time, '09:34:00'); // P3 start pulled early; P1->P3 gap = 4 (P2's OUTGOING gap, preserved)
+    assert.equal(p3.bells.find((b) => b.bellId === 'f').time, '11:00:00'); // day end pinned
+    // no-op if the named period isn't there
+    assert.equal(E.applyRecipeToPeriods(periods, { type: 'reclaim', periodName: 'Nope' }).changed, 0);
+});
+
+// v6.20.2 REGRESSION: lunch waves live INSIDE 4th period at this school. Nested
+// periods are legitimate and must NEVER be reported as overlaps.
+test('detectPeriodOverlaps: nested periods (lunch inside 4th) are not collisions', () => {
+    const P = (name, s2, e) => ({ name, bells: [{ bellId: name + 'S', time: s2 }, { bellId: name + 'E', time: e }] });
+    const nested = [
+        P('4th Period', '11:10:00', '12:08:00'),
+        P('Lunch A', '11:36:00', '12:01:00'), // fully inside 4th
+        P('Lunch B', '12:03:00', '12:07:00'), // also inside 4th
+        P('5th Period', '12:12:00', '13:05:00'),
+    ];
+    assert.deepEqual(E.detectPeriodOverlaps(nested), []); // the reported false positive
+    // moving lunch earlier (the edit that triggered the bug) is still fine
+    const moved = [
+        P('4th Period', '11:10:00', '12:08:00'),
+        P('Lunch A', '10:40:00', '11:05:00'), // now BEFORE 4th, no overlap
+        P('5th Period', '12:12:00', '13:05:00'),
+    ];
+    assert.deepEqual(E.detectPeriodOverlaps(moved), []);
+    // a genuine PARTIAL overrun is still caught
+    const real = [P('A', '09:00:00', '10:10:00'), P('B', '10:00:00', '10:50:00')];
+    const r = E.detectPeriodOverlaps(real);
+    assert.equal(r.length, 1);
+    assert.equal(r[0].overlapSeconds, 600);
+});

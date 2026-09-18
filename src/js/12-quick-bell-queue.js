@@ -3,9 +3,12 @@ import { safeLog } from './03-memory-management.js';
 import { formatTime12Hour } from './00-header.js';
 import {
     queueIgnorePersonalCheckbox, queueIgnoreSharedCheckbox, queueIgnoreSharedWarning,
-    queueRepeatTimesInput, queueTimersContainer, queueUntilBellSelect, queueVisualSelect,
+    queueRepeatTimesInput, queueSaveNameInput, queueTimersContainer, queueUntilBellSelect,
     quickBellQueueModal,
 } from './02-dom-elements.js';
+import { renderCustomQuickBells } from './13-schedule-resolution-and-ringing.js';
+import { saveCustomQuickBells } from './14-render-schedule-list.js';
+import { showUserMessage } from './19-visual-cues-and-files.js';
 import { playBell } from './05-preferences-cloud-sync.js';
 import { updateClock } from './10-clock-engine.js';
 import { state } from './state.js';
@@ -13,6 +16,35 @@ import { state } from './state.js';
 // ============================================================
 // NEW V5.55.0: Quick Bell Queue Functions
 // ============================================================
+//
+// V6.23.0 — PER-TIMER GRAPHICS.
+// Until now a queue could vary its SOUND per step but showed ONE graphic for
+// the whole run (a single queue-level `queue-visual-select`, stashed in
+// state.queueVisual). That made "2 min warning" -> "line up" -> "go"
+// impossible as one queue: the countdown was right, the picture never changed.
+//
+// Now every timer row carries its OWN graphic alongside its own sound, so a
+// queue entry is a complete little bell: {durationSeconds, sound, visual}.
+// The queue-level control is GONE (index.html 6.23.0, and the
+// queueVisualSelect const is removed from module 02) — two controls setting
+// the same thing was the real confusion. state.queueVisual survives ONLY as
+// the fallback for an entry with no visual of its own; nothing writes it.
+//
+// Semantics of the graphic are "before", matching the rest of the app: a
+// row's graphic is on screen WHILE that row counts down, and swaps the moment
+// the row rings and the next one starts. Module 10 needed no change — its
+// visual key was already `queue:<index>:<repeat>`, so it re-renders on every
+// advance; it just asks getQueueVisualHtml() what to draw now.
+//
+// The row's graphic dropdown deliberately offers NO "Upload..." option, which
+// matches the old queue-level control. Upload lives in the visual library;
+// a queue row picks from what is already there.
+
+// V6.25.0 — PER-STEP LABELS. A queue step can carry a name, shown on the
+// countdown line as "Hamburger time! (Queue 1/2)" instead of a bare
+// "Queue (1/2)". That line is the same wide row that normally reads
+// "until <bell name>!", so there is room. Optional: an empty label falls back
+// to the old bare form, so nothing changes for a queue that does not use it.
 
 let queueTimerRowId = 0; // Unique ID for timer rows
 
@@ -25,7 +57,8 @@ function openQuickBellQueueModal() {
     addQueueTimerRow();
     
     // Populate dropdowns
-    populateQueueVisualDropdown();
+    // V6.23.0: the graphic dropdown is per-row now, populated by
+    // addQueueTimerRow above — there is no queue-level visual control left.
     populateQueueUntilBellDropdown();
     
     // Reset form to defaults
@@ -34,7 +67,7 @@ function openQuickBellQueueModal() {
     queueIgnorePersonalCheckbox.checked = false;
     queueIgnoreSharedCheckbox.checked = false;
     queueIgnoreSharedWarning.classList.add('hidden');
-    queueVisualSelect.value = '[DEFAULT_Q]';
+    queueSaveNameInput.value = '';
     
     // Show modal
     quickBellQueueModal.classList.remove('hidden');
@@ -50,28 +83,61 @@ function addQueueTimerRow() {
     row.className = 'queue-timer-row flex flex-wrap items-center gap-2 p-3 bg-gray-50 rounded-lg';
     row.dataset.rowId = rowId;
     
+    // V6.23.0: three stacked lines (length / sound / graphic) instead of one
+    // wrapping line. The label column is a single fixed w-16 on all three and
+    // the trailing control is a single fixed w-8 h-8 on all three (preview
+    // button, thumbnail, and a same-size spacer on the length line), so every
+    // field starts and ends on the same two vertical lines.
     row.innerHTML = `
-        <span class="text-sm font-medium text-gray-600 w-16">Timer ${rowId + 1}:</span>
-        <div class="flex items-center gap-1">
-            <input type="number" class="queue-hours w-14 px-2 py-1 border border-gray-300 rounded text-center text-sm" value="0" min="0" max="23">
-            <span class="text-gray-500 text-sm">h</span>
-            <input type="number" class="queue-minutes w-14 px-2 py-1 border border-gray-300 rounded text-center text-sm" value="5" min="0" max="59">
-            <span class="text-gray-500 text-sm">m</span>
-            <input type="number" class="queue-seconds w-14 px-2 py-1 border border-gray-300 rounded text-center text-sm" value="0" min="0" max="59">
-            <span class="text-gray-500 text-sm">s</span>
+        <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="queue-timer-label text-sm font-semibold text-gray-700">Timer ${rowId + 1}</span>
+            <button type="button" class="queue-delete-btn w-8 h-8 flex-shrink-0 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 rounded text-sm" title="Remove timer">🗑</button>
         </div>
-        <div class="flex items-center gap-1 flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-2">
+            <label class="text-sm text-gray-600 w-16 flex-shrink-0">Label</label>
+            <input type="text" class="queue-label flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-sm" maxlength="40" placeholder="optional, e.g. Hamburger time!">
+            <div class="w-8 h-8 flex-shrink-0" aria-hidden="true"></div>
+        </div>
+        <div class="flex items-center gap-2 mb-2">
+            <label class="text-sm text-gray-600 w-16 flex-shrink-0">Length</label>
+            <div class="flex items-center gap-1 flex-1 min-w-0">
+                <input type="number" class="queue-hours w-14 px-2 py-1 border border-gray-300 rounded text-center text-sm" value="0" min="0" max="23">
+                <span class="text-gray-500 text-sm">h</span>
+                <input type="number" class="queue-minutes w-14 px-2 py-1 border border-gray-300 rounded text-center text-sm" value="5" min="0" max="59">
+                <span class="text-gray-500 text-sm">m</span>
+                <input type="number" class="queue-seconds w-14 px-2 py-1 border border-gray-300 rounded text-center text-sm" value="0" min="0" max="59">
+                <span class="text-gray-500 text-sm">s</span>
+            </div>
+            <div class="w-8 h-8 flex-shrink-0" aria-hidden="true"></div>
+        </div>
+        <div class="flex items-center gap-2 mb-2">
+            <label class="text-sm text-gray-600 w-16 flex-shrink-0">Sound</label>
             <select class="queue-sound flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-sm">
                 <!-- Populated by JS -->
             </select>
             <button type="button" class="queue-preview-btn w-8 h-8 flex-shrink-0 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-sm" title="Preview sound">▶</button>
-            <button type="button" class="queue-delete-btn w-8 h-8 flex-shrink-0 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 rounded text-sm" title="Remove timer">🗑</button>
+        </div>
+        <div class="flex items-center gap-2">
+            <label class="text-sm text-gray-600 w-16 flex-shrink-0">Graphic</label>
+            <select class="queue-visual flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-sm">
+                <!-- Populated by JS -->
+            </select>
+            <div class="queue-visual-thumb w-8 h-8 flex-shrink-0 rounded overflow-hidden border border-gray-300 bg-white" title="This timer's graphic"></div>
         </div>
     `;
     
     // Populate sound dropdown
     const soundSelect = row.querySelector('.queue-sound');
     populateQueueSoundDropdown(soundSelect);
+    
+    // V6.23.0: populate this row's graphic dropdown + live thumbnail
+    const visualSelect = row.querySelector('.queue-visual');
+    const visualThumb = row.querySelector('.queue-visual-thumb');
+    populateQueueVisualDropdown(visualSelect);
+    renderQueueVisualThumb(visualThumb, visualSelect.value);
+    visualSelect.addEventListener('change', () => {
+        renderQueueVisualThumb(visualThumb, visualSelect.value);
+    });
     
     // Add event listeners
     row.querySelector('.queue-preview-btn').addEventListener('click', () => {
@@ -97,8 +163,11 @@ function addQueueTimerRow() {
 function renumberQueueTimerRows() {
     const rows = queueTimersContainer.querySelectorAll('.queue-timer-row');
     rows.forEach((row, index) => {
-        const label = row.querySelector('span');
-        if (label) label.textContent = `Timer ${index + 1}:`;
+        // V6.23.0: target the label by class. The row now opens with a header
+        // line and contains several spans (the h/m/s units), so the old
+        // querySelector('span') would be fragile as the row grows.
+        const label = row.querySelector('.queue-timer-label');
+        if (label) label.textContent = `Timer ${index + 1}`;
     });
 }
 
@@ -166,14 +235,17 @@ function populateQueueSoundDropdown(selectElement) {
     }
 }
 
-function populateQueueVisualDropdown() {
-    queueVisualSelect.innerHTML = '';
+// V6.23.0: takes the target <select> (one per timer row), mirroring
+// populateQueueSoundDropdown's signature. Same option set as the old
+// queue-level control — default Q, shared visuals, my visuals, no upload.
+function populateQueueVisualDropdown(selectElement) {
+    selectElement.innerHTML = '';
     
     // Default Q visual
     const defaultOpt = document.createElement('option');
     defaultOpt.value = '[DEFAULT_Q]';
     defaultOpt.textContent = 'Default "Q" (Queue)';
-    queueVisualSelect.appendChild(defaultOpt);
+    selectElement.appendChild(defaultOpt);
     
     // Shared visual files
     if (state.sharedVisualFiles && state.sharedVisualFiles.length > 0) {
@@ -185,7 +257,7 @@ function populateQueueVisualDropdown() {
             opt.textContent = file.nickname || file.name.replace(/\.[^/.]+$/, '');
             sharedGroup.appendChild(opt);
         });
-        queueVisualSelect.appendChild(sharedGroup);
+        selectElement.appendChild(sharedGroup);
     }
     
     // User visual files
@@ -198,8 +270,29 @@ function populateQueueVisualDropdown() {
             opt.textContent = file.nickname || file.name.replace(/\.[^/.]+$/, '');
             userGroup.appendChild(opt);
         });
-        queueVisualSelect.appendChild(userGroup);
+        selectElement.appendChild(userGroup);
     }
+}
+
+// V6.23.0: 32x32 preview of a row's chosen graphic, so a queue of five rows
+// is readable at a glance instead of five identical dropdown labels. Kept
+// deliberately dumb — it mirrors getQueueVisualHtml's two cases and nothing
+// more. Uploaded visuals are image URLs; [DEFAULT_Q] is the built-in Q.
+function renderQueueVisualThumb(thumbElement, visualValue) {
+    if (!thumbElement) return;
+    
+    if (visualValue && visualValue.startsWith('http')) {
+        const img = document.createElement('img');
+        img.src = visualValue;
+        img.alt = '';
+        img.className = 'w-full h-full object-contain';
+        thumbElement.innerHTML = '';
+        thumbElement.appendChild(img);
+        return;
+    }
+    
+    // Default "Q"
+    thumbElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-sky-600 text-white text-sm font-bold">Q</div>';
 }
 
 function populateQueueUntilBellDropdown() {
@@ -243,23 +336,8 @@ function populateQueueUntilBellDropdown() {
 
 function startQueue() {
     // Collect timer data from rows
-    const rows = queueTimersContainer.querySelectorAll('.queue-timer-row');
-    state.quickBellQueue = [];
-    
-    rows.forEach(row => {
-        const hours = parseInt(row.querySelector('.queue-hours').value) || 0;
-        const minutes = parseInt(row.querySelector('.queue-minutes').value) || 0;
-        const seconds = parseInt(row.querySelector('.queue-seconds').value) || 0;
-        const sound = row.querySelector('.queue-sound').value;
-        const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
-        
-        if (totalSeconds > 0) {
-            state.quickBellQueue.push({
-                durationSeconds: totalSeconds,
-                sound: sound
-            });
-        }
-    });
+    // V6.24.0: via the shared collector, so Start and Save agree exactly.
+    state.quickBellQueue = collectQueueStepsFromRows();
     
     if (state.quickBellQueue.length === 0) {
         alert('Please add at least one timer with a duration greater than 0.');
@@ -277,8 +355,9 @@ function startQueue() {
     state.queueIgnorePersonal = queueIgnorePersonalCheckbox.checked;
     state.queueIgnoreShared = queueIgnoreSharedCheckbox.checked;
     
-    // Collect visual
-    state.queueVisual = queueVisualSelect.value;
+    // V6.23.0: no queue-level visual to collect — each entry pushed above
+    // already carries its own. state.queueVisual stays at its default and is
+    // only ever read as a fallback in getQueueVisualHtml.
     
     // Start queue
     state.queueActive = true;
@@ -354,16 +433,172 @@ function cancelQueue() {
     updateClock();
 }
 
+// V6.24.0: shared by startQueue() and saveQueueAsQuickBell() so the thing you
+// save is byte-for-byte the thing you would have started.
+function collectQueueStepsFromRows() {
+    const rows = queueTimersContainer.querySelectorAll('.queue-timer-row');
+    const steps = [];
+    
+    rows.forEach(row => {
+        const hours = parseInt(row.querySelector('.queue-hours').value) || 0;
+        const minutes = parseInt(row.querySelector('.queue-minutes').value) || 0;
+        const seconds = parseInt(row.querySelector('.queue-seconds').value) || 0;
+        const sound = row.querySelector('.queue-sound').value;
+        // V6.23.0: each row carries its own graphic
+        const visual = row.querySelector('.queue-visual').value;
+        // V6.25.0: and its own optional label, shown on the countdown line
+        const label = (row.querySelector('.queue-label').value || '').trim();
+        const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+        
+        if (totalSeconds > 0) {
+            steps.push({
+                durationSeconds: totalSeconds,
+                sound: sound,
+                visual: visual,
+                label: label
+            });
+        }
+    });
+    
+    return steps;
+}
+
+// V6.24.0 — SAVE A QUEUE AS A QUICK BELL.
+// The owner's actual routine: 15 minutes of typing under one icon with one
+// end sound, then 2.5 minutes of Beethoven with another. Both halves were
+// already saved as separate quick bells; what was missing was ONE button that
+// runs the pair, so a delayed start means one click instead of two (and no
+// chance of forgetting the second).
+//
+// A saved queue is just a normal custom quick bell carrying a `steps` array.
+// Everything else about it — the four slots, the icon, the colours, the
+// broadcast tick, the manager UI — is the EXISTING quick bell machinery,
+// untouched. That is deliberate: no parallel "saved queues" list to manage,
+// back up, or keep in sync.
+//
+// Two deliberate limits:
+//  - The icon defaults to the FIRST step's graphic (for the owner's routine
+//    that is the hamburger), and the name comes from the modal. Both are then
+//    editable in the ordinary Quick Bell manager — no second icon picker here.
+//  - "Until a bell rings" repeat mode is NOT saved. It targets a bellId from
+//    today's resolved schedule, which is meaningless tomorrow. A saved queue
+//    always uses the numeric repeat count; the modal says so.
+async function saveQueueAsQuickBell() {
+    const steps = collectQueueStepsFromRows();
+    
+    if (steps.length === 0) {
+        showUserMessage('Add at least one timer with a duration above zero before saving.');
+        return;
+    }
+    
+    const name = (queueSaveNameInput.value || '').trim();
+    if (!name) {
+        showUserMessage('Give this queue a name so it can be saved as a Quick Bell.');
+        queueSaveNameInput.focus();
+        return;
+    }
+    
+    // Find a free slot. Quick bells are capped at 4 by the manager, the
+    // renderer and the Firestore loader alike — respect that here rather than
+    // creating a 5th that silently vanishes on reload.
+    const used = state.customQuickBells.filter(b => b).map(b => b.id);
+    let newId = 1;
+    while (used.includes(newId) && newId <= 4) newId++;
+    if (newId > 4) {
+        showUserMessage('All 4 Quick Bell slots are full. Clear one in Manage Quick Bells first.');
+        return;
+    }
+    
+    const firstVisual = steps[0].visual;
+    const isImage = firstVisual && firstVisual.startsWith('http');
+    const iconText = name.substring(0, 3);
+    
+    // V6.24.0: if the queue has more than one step, the button icon is a
+    // DIAGONAL SPLIT of them (module 14's getQueueSplitIconSvg) rather than
+    // whichever single graphic happened to be first. The sentinel keeps the
+    // steps as the source of truth, so editing a step's graphic later updates
+    // the icon automatically instead of baking it in at save time.
+    const useSplit = steps.length > 1;
+    
+    const totalSeconds = steps.reduce((sum, s) => sum + s.durationSeconds, 0);
+    
+    const newBell = {
+        id: newId,
+        name: name,
+        // The button's hover tooltip reads these; make them the WHOLE run so
+        // the label matches what pressing it actually does.
+        hours: Math.floor(totalSeconds / 3600),
+        minutes: Math.floor((totalSeconds % 3600) / 60),
+        seconds: totalSeconds % 60,
+        // A queue's sound lives per-step. This is the fallback the ordinary
+        // quick-bell paths read, so point it at the LAST step's sound — the
+        // one that ends the run.
+        sound: steps[steps.length - 1].sound,
+        iconText: iconText,
+        iconBgColor: '#4B9CD3',
+        iconFgColor: '#FFFFFF',
+        visualCue: useSplit ? '[QUEUE_SPLIT]' : (isImage ? firstVisual : `[CUSTOM_TEXT] ${iconText}|#4B9CD3|#FFFFFF`),
+        steps: steps,
+        queueRepeatTimes: parseInt(queueRepeatTimesInput.value) || 1,
+        alwaysBroadcast: false,
+        isActive: true
+    };
+    
+    state.customQuickBells.push(newBell);
+    renderCustomQuickBells();
+    await saveCustomQuickBells(state.customQuickBells);
+    
+    closeQuickBellQueueModal();
+    showUserMessage(`Saved "${name}" as a Quick Bell (${steps.length} steps). Edit its icon in Manage Quick Bells.`);
+    safeLog.log(`Queue saved as quick bell slot ${newId}: ${steps.length} steps, ${totalSeconds}s total`);
+}
+
+// V6.24.0: launch a queue that was saved on a quick bell button. Mirrors the
+// tail of startQuickBell() — same state fields, same cancel button — but feeds
+// state.quickBellQueue from the stored steps instead of the modal's rows.
+function startSavedQueue(steps, repeatTimes = 1) {
+    if (!Array.isArray(steps) || steps.length === 0) return;
+    
+    state.quickBellQueue = steps.map(s => ({
+        durationSeconds: s.durationSeconds,
+        sound: s.sound,
+        visual: s.visual,
+        label: s.label || ''
+    }));
+    
+    // Saved queues always repeat by COUNT — see the note on saveQueueAsQuickBell.
+    state.queueRepeatMode = 'times';
+    state.queueRepeatTimes = repeatTimes || 1;
+    state.queueUntilBellId = null;
+    state.queueCurrentRepeat = 0;
+    state.queueIgnorePersonal = false;
+    state.queueIgnoreShared = false;
+    
+    state.queueActive = true;
+    state.queueIndex = 0;
+    
+    startNextQueueTimer();
+    document.getElementById('cancel-quick-bell-btn').classList.remove('hidden');
+    
+    safeLog.log(`Saved queue started: ${state.quickBellQueue.length} steps, repeat ${state.queueRepeatTimes}`);
+}
+
 function getQueueVisualHtml() {
-    if (state.queueVisual === '[DEFAULT_Q]') {
-        // Default Q visual - a simple styled Q
-        return `<div class="w-full h-full flex items-center justify-center bg-sky-600 text-white text-6xl font-bold">Q</div>`;
-    }
+    // V6.23.0: the graphic now belongs to the timer that is COUNTING DOWN
+    // right now, not to the queue as a whole. advanceQueue() increments
+    // queueIndex BEFORE starting the next timer, so queueIndex always points
+    // at the running entry — the picture swaps exactly when the bell rings.
+    // Falls back to state.queueVisual (then the built-in Q) for a queue built
+    // before this version, or any entry somehow missing a visual.
+    const currentEntry = state.quickBellQueue?.[state.queueIndex];
+    const visual = currentEntry?.visual || state.queueVisual;
+    
     // Custom visual URL
-    if (state.queueVisual && state.queueVisual.startsWith('http')) {
-        return `<img src="${state.queueVisual}" alt="Queue Visual" class="w-full h-full object-contain">`;
+    if (visual && visual.startsWith('http')) {
+        return `<img src="${visual}" alt="Queue Visual" class="w-full h-full object-contain">`;
     }
-    // Fallback
+    // Default Q visual - a simple styled Q ([DEFAULT_Q], empty, or anything
+    // unrecognized all land here)
     return `<div class="w-full h-full flex items-center justify-center bg-sky-600 text-white text-6xl font-bold">Q</div>`;
 }
 
@@ -379,5 +614,7 @@ export {
     closeQuickBellQueueModal,
     getQueueVisualHtml,
     openQuickBellQueueModal,
+    saveQueueAsQuickBell,
     startQueue,
+    startSavedQueue,
 };

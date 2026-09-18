@@ -83,6 +83,8 @@ export const state = {
     calculatedPeriodsList: [],
     appId: undefined,
     isAudioReady: false,
+    // V6.20.3: handle for the load-latch watchdog (see 16-schedule-management)
+    loadLatchWatchdogId: null,
     isBaseScheduleLoaded: false,
     isPersonalScheduleLoaded: false,
     isScheduleReady: false,
@@ -127,6 +129,26 @@ export const state = {
 
     // ---- originally declared in 21-emergency-shift.js ----
     activeSharedScheduleShift: null,
+
+    // ---- v6.12.0: Layer 4 Verb B — the day's transformation recipes for
+    //   THIS user, resolved from config/schedule_calendar by module 20 and
+    //   applied to base-period COPIES in module 14's resolveAllBellTimes
+    //   (same pristine-copy discipline as activeSharedScheduleShift above).
+    //   Array of recipe objects, composed in order; [] = no transform today.
+    activeCalendarTransforms: [],
+
+    // ---- v6.14.0: Layer 4 home schedule (per-teacher standing default) ----
+    //   The teacher's normal shared schedule, read from their own
+    //   roster/{uid}.defaultScheduleId by module 20's home listener. Applied
+    //   SILENTLY (no banner) when no scoped calendar designation and no
+    //   same-day manual choice override it, and never over a personal
+    //   schedule. null = no home set (behaves exactly as pre-6.14.0).
+    homeScheduleId: null,
+
+    // ---- v6.15.0: server-confirmed admin flag (admins/{uid} exists). Set by
+    //   module 15's auth handler; read by the untagged-teacher nudge (36).
+    //   Distinct from the 'admin-mode' body class, which is a manual toggle.
+    isAdmin: false,
 
     // ---- originally declared in 22-audit-log.js ----
     currentUserDisplayName: null,

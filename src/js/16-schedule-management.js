@@ -8,7 +8,8 @@ import {
     addBellModal, addPeriodModal, addSharedBellForm, backupPersonalScheduleBtn,
     confirmDeleteBellModal, confirmDeleteBellText, confirmDeleteModal, confirmDeleteText,
     confirmLinkedEditModal, confirmRestoreModal, confirmRestoreText, createPersonalScheduleBtn,
-    deletePersonalScheduleBtn, editBellModal, editBellNameInput, editBellOverrideCheckbox,
+    deletePersonalScheduleBtn, duplicateScheduleBtn, editBellModal, editBellNameInput,
+    editBellOverrideCheckbox,
     editBellOverrideContainer, editBellSoundInput, editBellStatus, editBellTimeInput,
     exportCurrentScheduleBtn, importCurrentScheduleBtn, inlineRenameScheduleBtn,
     linkedEditStatus, linkedScheduleList, multiAddSubmitBtn, multiPeriodEndSoundInput,
@@ -33,7 +34,8 @@ import {
 } from './05-preferences-cloud-sync.js';
 import {
     closeEditBellModal, findBellChildren, findNearbyBell, flattenPeriodsToLegacyBells,
-    migrateLegacyBellsToPeriods, renderCombinedList, saveCustomQuickBells,
+    migrateLegacyBellsToPeriods, renderCombinedList, resolveAllBellTimes,
+    saveCustomQuickBells,
 } from './14-render-schedule-list.js';
 import { populatePeriodSelectors } from './15-firebase-init.js';
 import {
@@ -56,6 +58,26 @@ function setActiveSchedule(prefixedId) {
     // NEW in 4.32: Reset loading flags
     state.isBaseScheduleLoaded = false;
     state.isPersonalScheduleLoaded = false;
+
+    // V6.20.3 WATCHDOG (fail-open). The load latch in recalculateAndRenderAll
+    // waits for BOTH listeners before rendering. If one never reports — a
+    // listener that errors, a personal schedule doc that never resolves, a
+    // stale activePersonalScheduleId pointing at a deleted schedule — the app
+    // renders NOTHING and bell times cannot be edited, with no console error.
+    // That silent freeze was reported 2026-08 across every version. Rendering a
+    // possibly-incomplete schedule is far better than a dead editor, so after a
+    // grace period we force the latch open and recalculate.
+    if (state.loadLatchWatchdogId) clearTimeout(state.loadLatchWatchdogId);
+    state.loadLatchWatchdogId = setTimeout(() => {
+        if (!state.isBaseScheduleLoaded || !state.isPersonalScheduleLoaded) {
+            console.warn('[Watchdog] A schedule listener never reported (base='
+                + state.isBaseScheduleLoaded + ', personal=' + state.isPersonalScheduleLoaded
+                + '). Forcing render so the editor stays usable.');
+            state.isBaseScheduleLoaded = true;
+            state.isPersonalScheduleLoaded = true;
+            recalculateAndRenderAll();
+        }
+    }, 6000);
     
     // Unsubscribe from *both* listeners
     if (state.activeScheduleListenerUnsubscribe) {
@@ -98,6 +120,7 @@ function setActiveSchedule(prefixedId) {
 
     // NEW V4.91: Disable admin rename button
     renameScheduleBtn.disabled = true;
+    if (duplicateScheduleBtn) duplicateScheduleBtn.disabled = true; // V6.21.0
     updateInlineRenameScheduleBtn(); // v5.68.0: mirror state to inline pencil button
     
     // v3.03: Disable personal schedule buttons
@@ -132,6 +155,17 @@ function setActiveSchedule(prefixedId) {
         safeLog.log("Setting active SHARED schedule:", scheduleId);
         state.activeBaseScheduleId = scheduleId;
         state.activePersonalScheduleId = null;
+
+        // V6.20.4: a shared schedule attaches NO personal listener, so nothing
+        // ever set this flag and the 6.20.3 watchdog fired its scary
+        // "a schedule listener never reported (base=true, personal=false)" line
+        // on EVERY shared selection — twice per admin toggle, since
+        // toggleAdminMode re-enters setActiveSchedule. Harmless (the latch in
+        // recalculateAndRenderAll short-circuits on activePersonalScheduleId, so
+        // it could never block a shared render) but it was crying wolf in the one
+        // log a future debugger will read. There is no personal schedule to wait
+        // for here; say so.
+        state.isPersonalScheduleLoaded = true;
         
         // V5.44: Hide standalone badge for shared schedules
         if (standaloneScheduleBadge) {
@@ -153,6 +187,13 @@ function setActiveSchedule(prefixedId) {
                 importCurrentScheduleBtn.disabled = false;
                 // NEW V4.91: Enable shared rename button
                 renameScheduleBtn.disabled = false;
+                // V6.21.0: and the plainly-labelled "Rename Schedule" button in
+                // the schedule panel, which now routes to the same admin flow.
+                // Without this it stays greyed on shared schedules and an admin
+                // has no idea why. See handleRenamePersonalSchedule().
+                renamePersonalScheduleBtn.disabled = false;
+                // V6.21.0: duplicating the selected shared schedule is admin-only.
+                if (duplicateScheduleBtn) duplicateScheduleBtn.disabled = false;
                 updateInlineRenameScheduleBtn(); // v5.68.0: mirror to inline pencil
             }
         }
@@ -358,6 +399,13 @@ function setActiveSchedule(prefixedId) {
                     state.personalBellOverrides = {};
                 }
                 recalculateAndRenderAll();
+            }, (error) => {
+                // V6.20.4: a listener that errors used to fail SILENTLY — no
+                // callback meant the load flag never got set and the latch stuck
+                // shut with nothing in the console. Fail loud, then fail open.
+                console.error("Error on standalone personal schedule snapshot:", error);
+                state.isPersonalScheduleLoaded = true;
+                recalculateAndRenderAll();
             });
             
         } else {
@@ -429,6 +477,11 @@ function setActiveSchedule(prefixedId) {
                     state.localSchedule = [];
                 }
                 // NEW: v4.10.3 - Run the master calculation engine
+                recalculateAndRenderAll();
+            }, (error) => {
+                // V6.20.4: see the standalone listener above — fail loud, fail open.
+                console.error("Error on base schedule snapshot (linked personal):", error);
+                state.isBaseScheduleLoaded = true;
                 recalculateAndRenderAll();
             });
             
@@ -543,6 +596,11 @@ function setActiveSchedule(prefixedId) {
                 }
                 // NEW: v4.10.3 - Run the master calculation engine
                 recalculateAndRenderAll();
+            }, (error) => {
+                // V6.20.4: see the standalone listener above — fail loud, fail open.
+                console.error("Error on personal schedule snapshot:", error);
+                state.isPersonalScheduleLoaded = true;
+                recalculateAndRenderAll();
             });
         }
     } else if (type === 'following') {
@@ -653,6 +711,93 @@ async function handleCreateSchedule(e) {
         
     } catch (error) {
         console.error("Error creating schedule:", error);
+    }
+}
+
+// --- V6.21.0: DUPLICATE THE SELECTED SHARED SCHEDULE (admin only) ---
+/**
+ * Creates a new shared schedule containing a deep copy of the selected one's
+ * periods. The owner builds near-identical variants constantly (six schedules
+ * run simultaneously, differing mainly by lunch wave), and the only way to do
+ * this before 6.21.0 was export-to-JSON and re-import.
+ *
+ * DESIGN DECISION — IDENTITIES ARE REGENERATED, ANCHORS ARE NOT.
+ * Every bellId and periodId in the copy is NEW. They must be: bellId is the key
+ * a teacher's personal overrides, mutes and skips are stored under
+ * (bellOverrides[bell.bellId] in their personal schedule doc). If the duplicate
+ * reused the original's ids, one teacher's nickname or muted bell on "6th Grade
+ * Lunch A" would silently reappear on "6th Grade Lunch B" — a cross-schedule
+ * bleed that would be miserable to diagnose later. A duplicate is a NEW
+ * schedule whose bells merely start at the same times.
+ * buildingBellId anchors ARE preserved: an anchor means "this bell IS that
+ * intercom moment," and the copy genuinely shares those moments (§7 Building
+ * Bells). temporaryShift is deliberately NOT copied — an emergency shift is a
+ * fact about one schedule on one day, never an inherited property.
+ */
+async function handleDuplicateSchedule() {
+    if (!document.body.classList.contains('admin-mode')) return;
+    if (!state.activeBaseScheduleId || state.activePersonalScheduleId) return;
+
+    const source = state.allSchedules.find(s => s.id === state.activeBaseScheduleId);
+    if (!source) {
+        showUserMessage('Could not find the selected schedule to duplicate.');
+        return;
+    }
+
+    const proposed = `${source.name} (copy)`;
+    const name = (window.prompt('Name for the duplicate schedule:', proposed) || '').trim();
+    if (!name) return; // cancelled or blank — do nothing
+
+    try {
+        // Deep copy via JSON round-trip: periods are plain data (no Dates, no
+        // Firestore sentinels), which is the same assumption the export feature
+        // has relied on since V4.90.
+        const copiedPeriods = JSON.parse(JSON.stringify(source.periods || []));
+
+        copiedPeriods.forEach((period) => {
+            period.periodId = generatePeriodId();       // 6.6.0 period identity
+            (period.bells || []).forEach((bell) => {
+                bell.bellId = generateBellId();         // see DESIGN DECISION above
+            });
+        });
+
+        // Relative bells reference their anchor by parentBellId, which we just
+        // rewrote — repoint them at the copy's ids so chains survive. Bells whose
+        // parent is not in this schedule are left alone (the engine already
+        // falls back safely for unresolvable anchors).
+        const idMap = {};
+        (source.periods || []).forEach((p, pi) => {
+            (p.bells || []).forEach((b, bi) => {
+                if (b.bellId) idMap[b.bellId] = copiedPeriods[pi].bells[bi].bellId;
+            });
+        });
+        copiedPeriods.forEach((period) => {
+            (period.bells || []).forEach((bell) => {
+                if (bell.parentBellId && idMap[bell.parentBellId]) {
+                    bell.parentBellId = idMap[bell.parentBellId];
+                }
+            });
+        });
+
+        const newDocRef = await addDoc(state.schedulesCollectionRef, {
+            name,
+            periods: copiedPeriods,
+            bells: flattenPeriodsToLegacyBells(copiedPeriods), // legacy readers
+        });
+
+        logScheduleEdit(newDocRef.id, 'duplicate-schedule', { // V5.75.0
+            name,
+            copiedFrom: source.name,
+            copiedFromId: source.id,
+            periodCount: copiedPeriods.length,
+        });
+
+        showUserMessage(`Created "${name}" as a copy of "${source.name}".`);
+        scheduleSelector.value = `shared-${newDocRef.id}`;
+        setActiveSchedule(scheduleSelector.value);
+    } catch (error) {
+        console.error('Error duplicating schedule:', error);
+        showUserMessage('Could not duplicate the schedule. See the console for details.');
     }
 }
 
@@ -1118,6 +1263,59 @@ function openEditRelativeModal(bell) {
     * MODIFIED: v4.31 - Router function to open the correct edit modal.
     * @param {object} bell - The bell object from the list click.
     */
+/**
+ * V6.22.0 — find a bell as it is actually STORED in the shared schedule.
+ *
+ * state.localSchedulePeriods is the pristine base (§4.6): no emergency shift,
+ * no Verb B transform. The rendered list is NOT — module 14 applies both to
+ * merged copies, so a bell showing 8:15 on a +15 shift day is stored as 8:00.
+ * Anything that will be WRITTEN BACK to the schedule document has to start
+ * here, not from the DOM.
+ *
+ * Returns the stored bell object (never a copy — callers must not mutate it),
+ * or null when the bell is personal, legacy-without-bellId, or simply absent.
+ */
+function findStoredSharedBell(bellId) {
+    if (!bellId) return null;
+    const periods = state.localSchedulePeriods || [];
+    for (let i = 0; i < periods.length; i++) {
+        const bells = periods[i].bells || [];
+        for (let j = 0; j < bells.length; j++) {
+            if (bells[j].bellId === bellId) return bells[j];
+        }
+    }
+    return null;
+}
+
+/**
+ * V6.22.0 — THE EDIT MODAL EDITS THE BASE SCHEDULE. Read this before changing
+ * how the time field is populated; it is the sibling of the V6.20.4 fix and
+ * has the same shape (a save path quietly operating on the wrong thing).
+ *
+ * The bell handed to this function is reconstructed from the rendered row's
+ * data-* attributes, and module 14 renders CALCULATED times — base times with
+ * the emergency shift and today's calendar transforms already folded in. The
+ * shared save path, meanwhile, writes into currentSchedule.periods, which is
+ * the pristine Firestore document. So before 6.22.0, an admin who saved ANY
+ * shared-bell change (a rename, a sound, an anchor) while a shift or transform
+ * was active wrote the ADJUSTED time into the BASE schedule — permanently
+ * rebasing that bell for every user of the schedule, with no message and no
+ * way to notice until the shift expired and the bell rang at the wrong time.
+ * V6.20.4 made this MORE reachable, not less: its refusal message tells admins
+ * to tick the confirm and save again, which is precisely the path that writes.
+ *
+ * §4.6 claimed this could not happen ("edit modals never see, or save back,
+ * shifted times"). That was true of the VARIABLE — localSchedulePeriods really
+ * does stay pristine — and false of the MODAL, which reaches the same numbers
+ * by a different route. An invariant about a variable is not an invariant about
+ * a screen.
+ *
+ * Fix: for shared bells, populate the time input from the STORED bell and tell
+ * the admin when today's clocks disagree. Editing stays possible on a shift day
+ * (a name or sound fix should not have to wait); what changes is that the value
+ * in the box, the value compared for "did the time change", and the value
+ * written are all the same base-space number.
+ */
 function handleEditBellClick(bell) {
     // 1. Check if it's a relative bell
     if (bell.isRelative && bell.type === 'custom') {
@@ -1125,10 +1323,31 @@ function handleEditBellClick(bell) {
         openEditRelativeModal(bell);
     } else {
         // It's a static bell, open the static editor
-        state.currentEditingBell = { ...bell }; // Store state
-        
+
+        // V6.22.0: rebase to stored (base-space) time for SHARED bells — see the
+        // function header. Personal bells are untouched: the shift and the
+        // transforms only ever move shared-side statics, so a custom bell's
+        // rendered time IS its stored time.
+        const storedBell = bell.type === 'shared' ? findStoredSharedBell(bell.bellId) : null;
+        // A shared bell whose stored form is RELATIVE has no static time to edit;
+        // its time is derived from its parent. Handled further down.
+        const storedIsRelative = !!(storedBell && storedBell.relative);
+        const storedTime = (storedBell && storedBell.time && !storedIsRelative)
+            ? storedBell.time : null;
+        // Fall back to the rendered time when the bell is not in the base doc
+        // (personal bell, or a shared bell mid-listener-refresh). Falling back is
+        // safe for display; the save path re-reads the document anyway.
+        const baseTime = storedTime || bell.time;
+        const timeWasRebased = !!storedTime
+            && normalizeTimeString(storedTime) !== normalizeTimeString(bell.time);
+
+        // currentEditingBell is the `oldBell` of the save path. It MUST carry the
+        // base time: it is what the "did the time actually change" comparison
+        // comes from and what the audit log records as the before-value.
+        state.currentEditingBell = { ...bell, time: baseTime };
+
         // Set fields
-        editBellTimeInput.value = bell.time;
+        editBellTimeInput.value = baseTime;
         editBellNameInput.value = bell.name;
         
         // NEW 5.31: Set the visual mode radio button
@@ -1189,8 +1408,35 @@ function handleEditBellClick(bell) {
             if (lockedSpan) lockedSpan.classList.toggle('hidden', isAdmin);
             if (adminSpan) adminSpan.classList.toggle('hidden', !isAdmin);
 
-            // Lock time for non-admins
-            if (isAdmin) {
+            // V6.22.0: say out loud that the box holds the BASE time whenever
+            // today's clocks show something else. Without this the admin sees
+            // 8:00 in a modal opened from a row reading 8:15 and reasonably
+            // concludes the app has lost the shift.
+            const rebasedSpan = document.getElementById('edit-time-note-rebased');
+            if (rebasedSpan) {
+                rebasedSpan.classList.toggle('hidden', !timeWasRebased);
+                if (timeWasRebased) {
+                    rebasedSpan.textContent =
+                        `📅 Editing the base schedule time. Today this bell rings at `
+                        + `${formatTime12Hour(bell.time, true)} because of an active `
+                        + `shift or schedule change — that adjustment is not being edited here.`;
+                }
+            }
+
+            // V6.22.0: a stored-RELATIVE shared bell has no time of its own. It
+            // reaches this static editor because the router above only sends
+            // CUSTOM relatives to the relative modal, and the row's Edit button
+            // is rendered for every bell. Before now, saving one for everyone
+            // replaced the stored bell wholesale and stripped `relative`,
+            // silently converting a derived bell into a fixed one. The write
+            // side is fixed in updatePeriodsOnEdit; this is the UI half — do not
+            // offer a field whose value cannot be honoured.
+            const relativeSpan = document.getElementById('edit-time-note-relative');
+            if (relativeSpan) relativeSpan.classList.toggle('hidden', !storedIsRelative);
+
+            // Lock time for non-admins, and for derived (relative) bells at any
+            // permission level.
+            if (isAdmin && !storedIsRelative) {
                 editBellTimeInput.disabled = false;
                 editBellTimeInput.style.opacity = '1';
                 editBellTimeInput.style.cursor = 'text';
@@ -1207,7 +1453,12 @@ function handleEditBellClick(bell) {
             // Non-admin doesn't see it (their changes are always personal)
             if (isAdmin) {
                 editBellOverrideContainer.classList.remove('hidden');
-                document.getElementById('edit-bell-visual-override-container')?.classList.remove('hidden');
+                // V6.20.4: 'edit-bell-visual-override-container' is GONE from
+                // index.html. That second checkbox was shown to admins but its
+                // .checked was never read by any code — a dead control sitting
+                // next to a live one, in a modal where the live one's meaning was
+                // already wrong. One honest confirm now covers name, sound,
+                // visual and time together.
                 // Default unchecked = personal override only
                 if (editBellOverrideCheckbox) editBellOverrideCheckbox.checked = false;
                 // V6.5.0 (Building Bells): show + fill the anchor select (async fill;
@@ -1215,7 +1466,6 @@ function handleEditBellClick(bell) {
                 populateEditBellAnchorSelect(bell);
             } else {
                 editBellOverrideContainer.classList.add('hidden');
-                document.getElementById('edit-bell-visual-override-container')?.classList.add('hidden');
                 hideEditBellAnchorSelect(); // V6.5.0
                 // V6.11.0: no select for non-admins, but still name the anchor
                 // in the note (async; resolves from pristine state).
@@ -1235,7 +1485,6 @@ function handleEditBellClick(bell) {
             
             // Hide override containers - not applicable to custom bells
             editBellOverrideContainer.classList.add('hidden');
-            document.getElementById('edit-bell-visual-override-container')?.classList.add('hidden');
             hideEditBellAnchorSelect(); // V6.5.0: anchors are for shared bells only
             
             // Enable sound editing
@@ -1505,7 +1754,19 @@ async function handleEditBellSubmit(e) {
     }
     
     // Check for nearby bell (excluding the bell we are currently editing)
-    const allBells = [...state.localSchedule, ...state.personalBells];
+    //
+    // V6.22.0: compare LIKE WITH LIKE. state.localSchedule holds today's
+    // CALCULATED shared times (shift + transforms folded in), but a shared edit
+    // now carries a BASE-space time, so on a shift day the old comparison was
+    // off by the shift in both directions — inventing collisions against bells
+    // that are nowhere near, and missing real ones. A pristine resolution gives
+    // base-space times for relatives as well as statics, so nothing drops out of
+    // the check. Personal bells are pinned clock times either way and are
+    // compared unchanged, exactly as before.
+    const sharedBellsForProximity = oldBell.type === 'shared'
+        ? resolveAllBellTimes({ pristine: true }).flatBellList.filter(b => b.type === 'shared')
+        : state.localSchedule;
+    const allBells = [...sharedBellsForProximity, ...state.personalBells];
     const nearbyBell = findNearbyBell(newBell.time, allBells, oldBell);
     
     if (nearbyBell) {
@@ -1526,7 +1787,50 @@ async function handleEditBellSubmit(e) {
         if (oldBell.type === 'shared') {
             const isAdmin = document.body.classList.contains('admin-mode');
             const wantsToOverrideForAll = isAdmin && editBellOverrideCheckbox?.checked;
-            
+
+            // V6.20.4 — THE SILENT TIME-DROP FIX. Read this before touching the
+            // branch below; it cost four debugging rounds.
+            //
+            // A personal override can express nickname / sound / visual and
+            // NOTHING ELSE — there is no `time` field in the override object,
+            // because a personal time change is meaningless (the bell rings off
+            // the SHARED document for everybody). So a time edit that lands on
+            // the personal path is not saved anywhere; it is discarded.
+            //
+            // From V5.66.2 until now this branch swallowed exactly that. The
+            // checkbox was added as a SOUND escalation ("Override shared sound
+            // for all users") but was placed at the top of the whole shared-bell
+            // save path, so it silently gated time and name too. An admin typed a
+            // new time, hit Save, the modal closed, and nothing changed — no
+            // error, no toast (closeEditBellModal clears editBellStatus on the way
+            // out). Reported on all three channels because 5.66.2 predates all of
+            // them. V6.11.0 made it worse by printing "saving a new time changes
+            // this bell for every user" under an input whose value was being
+            // thrown away.
+            //
+            // Fix: never let a time change reach a path that cannot store it.
+            // Refuse the save, say why, and point at the confirm. We do NOT
+            // auto-escalate — pushing a bell change to ~50 people must stay an
+            // explicit, deliberate act.
+            // Compare NORMALIZED forms. The input is type="time" step="1", which
+            // should always yield HH:MM:SS — but a browser that hands back "11:30"
+            // for a whole minute would make every unchanged time look changed and
+            // would block personal-only saves outright. normalizeTimeString is
+            // already how this file reconciles HH:MM vs HH:MM:SS everywhere else.
+            const timeChanged = normalizeTimeString(newBell.time) !== normalizeTimeString(oldBell.time);
+            if (timeChanged && !wantsToOverrideForAll) {
+                editBellStatus.textContent = isAdmin
+                    ? 'Bell times are shared. Tick "Change this bell for everyone on this schedule" below, then Save again.'
+                    : 'Only an admin can change a shared bell time. Your other changes can still be saved.';
+                editBellStatus.classList.remove('hidden');
+                if (isAdmin && editBellOverrideCheckbox) {
+                    // Draw the eye to the control the message names.
+                    editBellOverrideContainer.classList.remove('hidden');
+                    editBellOverrideCheckbox.focus();
+                }
+                return; // modal STAYS OPEN; the typed time is preserved
+            }
+
             // FIX V5.66.2: Admin with checkbox UNCHECKED saves personal override (same as non-admin)
             // Admin with checkbox CHECKED edits the actual shared bell for everyone
             if (!wantsToOverrideForAll) {
@@ -1607,7 +1911,13 @@ async function handleEditBellSubmit(e) {
                 
                 // Trigger re-render to show updated bell
                 recalculateAndRenderAll();
-                
+
+                // V6.20.4: closeEditBellModal() hides editBellStatus, so the
+                // messages just set above were never actually readable — a save
+                // looked identical to a no-op. Say it somewhere that outlives the
+                // modal, and say WHOSE change it was.
+                showUserMessage('Saved for you only — this bell is unchanged for everyone else.');
+
                 closeEditBellModal();
                 return;
             }
@@ -1683,6 +1993,14 @@ async function handleEditBellSubmit(e) {
         editBellStatus.textContent = "Changes saved." + anchorNote; // V6.5.0: anchor detach notice
         // MODIFIED V4.92: Check the correct state variable
         if (!state.linkedEditData) { // If not waiting on linked edit modal
+            // V6.20.4: same reason as the personal path — the status line dies
+            // with the modal. A shared write hits every user of this schedule,
+            // so it is the one that most deserves an out-loud confirmation.
+            showUserMessage(
+                (oldBell.type === 'shared'
+                    ? 'Saved for everyone on this schedule.'
+                    : 'Changes saved.') + anchorNote
+            );
             closeEditBellModal();
         }
 
@@ -1858,6 +2176,23 @@ function updatePeriodsOnEdit(periods, oldBell, newBell) {
             // field-stripping failure mode I0 warns about, in our own client.
             if (!('buildingBellId' in updatedBell) && period.bells[bellIndex].buildingBellId) {
                 updatedBell.buildingBellId = period.bells[bellIndex].buildingBellId;
+            }
+            // V6.22.0: preserve `relative` on the same terms, and for the same
+            // reason. This function REPLACES the stored bell with newBell rather
+            // than merging into it, so any field the edit modal does not know
+            // about is dropped. The static editor does not know about `relative`
+            // — and it is reachable for shared relative bells, because the router
+            // in handleEditBellClick only diverts CUSTOM relatives to the
+            // relative modal while module 14 renders an Edit button on every row.
+            // The result was a derived bell silently flattened into a fixed one
+            // at whatever time it happened to resolve to that day, breaking the
+            // link to its parent for everybody. The engine reads `relative` in
+            // preference to `time` (calculateRelativeBellTime step 1), so a
+            // preserved anchor keeps winning and a stale time field is inert.
+            // An edit that MEANS to change the anchor passes `relative`
+            // explicitly and still overrides this.
+            if (!('relative' in updatedBell) && period.bells[bellIndex].relative) {
+                updatedBell.relative = period.bells[bellIndex].relative;
             }
             if (updatedBell.buildingBellId === null || updatedBell.buildingBellId === undefined) {
                 delete updatedBell.buildingBellId; // Firestore rejects undefined; null means "cleared"
@@ -2289,7 +2624,21 @@ function findAllNearbySharedBells(time) {
 
 // MODIFIED: v3.26 - Replaced prompt() with custom modal
 function handleRenamePersonalSchedule() {
-    if (!state.activePersonalScheduleId) return;
+    // V6.21.0: This button is labelled plainly "Rename Schedule", so it must
+    // rename whatever schedule is actually selected. It used to bail whenever
+    // activePersonalScheduleId was null — i.e. on every SHARED schedule — which
+    // left an admin staring at a greyed "Rename Schedule" button while looking
+    // at a schedule they are fully entitled to rename (owner report, 2026-08).
+    // The Admin Zone's openRenameSharedScheduleModal() already handles BOTH
+    // types (V5.45.1) and re-checks admin-mode itself, and the inline pencil has
+    // routed this way since v5.68.0. Same routing, same permission model, no new
+    // authority — this button simply stops being the odd one out.
+    if (!state.activePersonalScheduleId) {
+        if (document.body.classList.contains('admin-mode')) {
+            openRenameSharedScheduleModal();
+        }
+        return;
+    }
     const schedule = state.allPersonalSchedules.find(s => s.id === state.activePersonalScheduleId);
     if (!schedule) return;
 
@@ -2663,6 +3012,7 @@ export {
     handleDeleteBellClick,
     handleDeleteSchedule,
     handleEditBellClick,
+    handleDuplicateSchedule,
     handleEditBellSubmit,
     handleInlineRenameScheduleClick,
     handleLinkedEdit,

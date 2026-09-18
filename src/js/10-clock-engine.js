@@ -91,8 +91,15 @@ function updateClock() {
             // V5.55.0: Queue timer active - show queue position
             const pos = state.queueTimerEndTime.queuePosition || (state.queueIndex + 1);
             const total = state.queueTimerEndTime.queueTotal || state.quickBellQueue.length;
-            activeTimerLabel = `Queue (${pos}/${total})`;
-            nextBellInfoString = `Timer ${pos} of ${total} in queue.`;
+            // V6.25.0: if this step carries a label, lead with it — the
+            // countdown row is the same wide line that normally reads
+            // "until <bell name>!", so "Hamburger time! (Queue 1/2)" fits and
+            // says something. Empty label falls back to the bare old form.
+            const stepLabel = (state.quickBellQueue[state.queueIndex]?.label || '').trim();
+            activeTimerLabel = stepLabel ? `${stepLabel} (Queue ${pos}/${total})` : `Queue (${pos}/${total})`;
+            nextBellInfoString = stepLabel
+                ? `${stepLabel} — timer ${pos} of ${total} in queue.`
+                : `Timer ${pos} of ${total} in queue.`;
             if (state.queueRepeatMode === 'times' && state.queueRepeatTimes > 1) {
                 nextBellInfoString += ` Repeat ${state.queueCurrentRepeat + 1}/${state.queueRepeatTimes}.`;
             }
