@@ -1,6 +1,41 @@
 /**
  * Ellis Web Bell — Shared Bell Engine
- * Version: 1.8.0
+ * Version: 1.16.0
+ *
+ * v1.16.0 (2026-08, app 6.20.2): detectPeriodOverlaps ignores NESTED periods
+ *   (lunch waves inside 4th period are legitimate, not collisions).
+ *
+ * v1.15.0 (2026-07, app 6.18.1): planOverlapResolution 'shrink' now honors
+ *   protectGaps (default TRUE) — the next period keeps a passing period after
+ *   the overrun instead of butting right against it.
+ *
+ * v1.14.0 (2026-07, app 6.18.0): applyRecipeToPeriods gains the 'reclaim'
+ *   archetype — remove a period for the day and redistribute its time (incl.
+ *   the incoming passing period) across the survivors, dismissal pinned.
+ *
+ * v1.13.0 (2026-07, app 6.17.1): planOverlapResolution gains a protectGaps
+ *   flag (default TRUE) — spread now takes the overlap out of the CHECKED
+ *   PERIODS length, leaving passing periods intact; unset it for the old
+ *   gap-tightening behavior.
+ *
+ * v1.12.0 (2026-07, app 6.17.0): + planOverlapResolution (computes the bell
+ *   moves that resolve a period overrun — shrink/push/spread; static bells
+ *   only, relatives re-derive). Detection (1.11.0) now has an actor.
+ *
+ * v1.11.0 (2026-07, app 6.16.0): + detectPeriodOverlaps (read-only period
+ *   overrun detector for the schedule editor). Also FIXED the VERSION
+ *   constant, which had silently stuck at 1.8.0 since the 1.9.0/1.10.0
+ *   header bumps never updated it (nothing in the battery checks it).
+ *
+ * v1.10.0 (2026-07, app 6.14.0): + resolveScopedDesignation (the scoped
+ *   per-date designation split out of resolveCalendarSchedule, so callers
+ *   can distinguish a mandate from the school-wide/home fallback). Behavior
+ *   of resolveCalendarSchedule is unchanged (it now calls the extraction).
+ *
+ * v1.9.0 (2026-07, app 6.13.0, Layer 4 prefill grid): + mergeCalendarEntry
+ *   — the base-dedup / transform-append rule extracted from module 34 into
+ *   one pure, tested place; the day-of modal and the grid copy-forward share
+ *   it. No behavior change to existing callers.
  *
  * v1.8.0 (2026-07, app 6.11.0): Layer 4 VERB B (transformation recipes).
  * Two new pure functions:
@@ -17,6 +52,8 @@
  *         missing bound = open) moves by offsetSeconds.
  *       { type:'shorten', after, perPeriodSeconds, extendPeriodId?,
  *         extendPeriodName? } — "shorten everything after lunch so flex
+ *       { type:'reclaim', periodName } — "remove FLEX today; give its time
+ *         (from the previous period's end through FLEX's end) back to the rest"
  *         runs long": periods whose ORIGINAL start edge (per
  *         findPeriodEdgeAnchorBell) is >= `after` and before the extend
  *         target each lose perPeriodSeconds (clamped so no period drops
@@ -394,24 +431,40 @@
      * value ("") means "no designation that day" and suppresses the weekday
      * default (e.g. a holiday). Returns a scheduleId string or null.
      */
+    /**
+     * v1.10.0 (app 6.14.0): the SCOPED per-date designation only — the first
+     * verb:'base' entry whose explicit uid scope contains this user on this
+     * date. Returns a scheduleId or null. This is the "mandate" half of
+     * resolveCalendarSchedule, split out so callers (module 20) can tell a
+     * scoped designation (building wins — bannered) apart from the school-wide
+     * exception/weekday fallback and the per-teacher home default (silent).
+     * Layer 3 invariant intact: scopes are EXPLICIT uid lists; no tag math.
+     */
+    function resolveScopedDesignation(calendar, date, uid) {
+        if (!calendar || !date || !uid || !calendar.days) return null;
+        const dateStr = toLocalDateString(date);
+        if (!Object.prototype.hasOwnProperty.call(calendar.days, dateStr)) return null;
+        const entries = calendar.days[dateStr] && calendar.days[dateStr].entries;
+        if (!Array.isArray(entries)) return null;
+        for (let i = 0; i < entries.length; i++) {
+            const e = entries[i];
+            if (e && e.verb === 'base' && Array.isArray(e.scope)
+                    && e.scope.indexOf(uid) !== -1 && e.scheduleId) {
+                return e.scheduleId;
+            }
+        }
+        return null;
+    }
+
     function resolveCalendarSchedule(calendar, date, uid) {
         if (!calendar || !date) return null;
         const dateStr = toLocalDateString(date);
         // v1.7.0 (Layer 4, v2 schema): per-date scoped entries win when the
         // caller identifies itself. Scopes are EXPLICIT uid lists (Layer 3
-        // invariant: tags filter pickers; uids are what is stored/resolved).
-        if (uid && calendar.days &&
-            Object.prototype.hasOwnProperty.call(calendar.days, dateStr)) {
-            const entries = calendar.days[dateStr] && calendar.days[dateStr].entries;
-            if (Array.isArray(entries)) {
-                for (let i = 0; i < entries.length; i++) {
-                    const e = entries[i];
-                    if (e && e.verb === 'base' && Array.isArray(e.scope)
-                            && e.scope.indexOf(uid) !== -1 && e.scheduleId) {
-                        return e.scheduleId;
-                    }
-                }
-            }
+        // invariant). v1.10.0: the scoped walk is now resolveScopedDesignation.
+        if (uid) {
+            const scoped = resolveScopedDesignation(calendar, date, uid);
+            if (scoped) return scoped;
         }
         if (calendar.exceptions &&
             Object.prototype.hasOwnProperty.call(calendar.exceptions, dateStr)) {
@@ -697,12 +750,402 @@
             return { periods: changed ? out : periods, changed: changed };
         }
 
+        // ---- archetype 3: reclaim (remove) a period; give its time back ----
+        // v1.14.0 (app 6.18.0): drop `periodName` for the day and redistribute
+        // the time it occupied across the surviving periods, DISMISSAL PINNED.
+        // Freed span = [previous period's END -> reclaimed period's END] — this
+        // SACRIFICES the incoming passing period and PRESERVES the outgoing one,
+        // so the two periods that become adjacent still get a passing period.
+        // Freed = incoming gap + reclaimed duration; handed out as extra length
+        // to the survivors (all of them, evenly), which is why the day can come
+        // out net-longer per class while ending at the same time. Static bells
+        // only; relatives re-derive (and any anchored INTO the reclaimed period
+        // will orphan to their fallback — a known v1 edge, see HANDOFF §7).
+        if (recipe.type === 'reclaim') {
+            const targetName = recipe.periodName;
+            if (typeof targetName !== 'string' || !targetName) return { periods: periods, changed: 0 };
+
+            // Static extent per period (only movable bells anchor the timeline).
+            const spans = [];
+            for (let i = 0; i < periods.length; i++) {
+                const p = periods[i];
+                if (!p || p.isEnabled === false || !Array.isArray(p.bells)) continue;
+                let min = null;
+                let max = null;
+                for (let j = 0; j < p.bells.length; j++) {
+                    const b = p.bells[j];
+                    if (!recipeEligible(b)) continue;
+                    const s = timeToSeconds(b.time);
+                    if (s === null || s === undefined) continue;
+                    if (min === null || s < min) min = s;
+                    if (max === null || s > max) max = s;
+                }
+                if (min === null) continue;
+                spans.push({ name: p.name, start: min, end: max });
+            }
+            spans.sort(function (a, b) { return a.start - b.start; });
+            let ri = -1;
+            for (let i = 0; i < spans.length; i++) { if (spans[i].name === targetName) { ri = i; break; } }
+            if (ri < 0) return { periods: periods, changed: 0 }; // target not present/movable
+
+            const R = spans[ri];
+            const prev = ri > 0 ? spans[ri - 1] : null;
+            const leftBound = prev ? prev.end : R.start;
+            const freed = R.end - leftBound;
+            if (freed <= 0) return { periods: periods, changed: 0 };
+
+            const survivors = spans.filter(function (s) { return s.name !== targetName; });
+            // Absorbers grow evenly (last gets remainder). Every survivor with a
+            // real extent can grow (move its end bell out).
+            const absorbers = survivors.filter(function (s) { return s.end > s.start; });
+            if (!absorbers.length) return { periods: periods, changed: 0 };
+            const shareOf = {};
+            const baseShare = Math.floor(freed / absorbers.length);
+            let acc = 0;
+            absorbers.forEach(function (s, i) {
+                shareOf[s.name] = (i === absorbers.length - 1) ? (freed - acc) : baseShare;
+                acc += shareOf[s.name];
+            });
+
+            // Rebuild the survivor timeline: preserve each survivor's original
+            // gap-before (the period that ORIGINALLY preceded it — so the period
+            // that followed R keeps R's OUTGOING gap), grow absorbers by share.
+            const newStart = {};
+            const newEnd = {};
+            let prevSpan = null;
+            for (let i = 0; i < survivors.length; i++) {
+                const s = survivors[i];
+                // original predecessor of s in the full sorted list:
+                const fullIdx = spans.indexOf(s);
+                const origPred = fullIdx > 0 ? spans[fullIdx - 1] : null;
+                if (!prevSpan) {
+                    newStart[s.name] = s.start; // first survivor anchors where it always did
+                } else {
+                    const gapBefore = origPred ? (s.start - origPred.end) : 0;
+                    newStart[s.name] = newEnd[prevSpan.name] + gapBefore;
+                }
+                const grow = shareOf[s.name] || 0;
+                newEnd[s.name] = newStart[s.name] + (s.end - s.start) + grow;
+                prevSpan = s;
+            }
+
+            // Map to bell moves + drop the reclaimed period's bells.
+            let changed = 0;
+            const out = [];
+            for (let i = 0; i < periods.length; i++) {
+                const p = periods[i];
+                if (!p || !Array.isArray(p.bells)) { out.push(p); continue; }
+                if (p.name === targetName) {
+                    // Remove the reclaimed period entirely (it's gone for the
+                    // day). Its own relatives go with it; relatives in OTHER
+                    // periods that anchored into it will orphan-fallback during
+                    // resolution (documented v1 behavior — HANDOFF §7).
+                    changed += p.bells.length;
+                    continue; // drop the period
+                }
+                if (!(p.name in newStart)) { out.push(p); continue; }
+                const startDelta = newStart[p.name] - spanStart(spans, p.name);
+                const grow = shareOf[p.name] || 0;
+                const endSec = spanEnd(spans, p.name);
+                let touched = false;
+                const newBells = p.bells.map(function (bell) {
+                    if (!recipeEligible(bell)) return bell;
+                    const t = timeToSeconds(bell.time);
+                    const d = (grow && t === endSec) ? (startDelta + grow) : startDelta;
+                    if (d === 0) return bell;
+                    touched = true;
+                    changed++;
+                    return Object.assign({}, bell, { time: secondsToTime(t + d) });
+                });
+                out.push(touched ? Object.assign({}, p, { bells: newBells }) : p);
+            }
+            return { periods: changed ? out : periods, changed: changed };
+        }
+
         // Unknown recipe type: fail closed, change nothing.
         return { periods: periods, changed: 0 };
     }
 
+    // small helpers for the reclaim archetype (span lookups by name)
+    function spanStart(spans, name) {
+        for (let i = 0; i < spans.length; i++) if (spans[i].name === name) return spans[i].start;
+        return 0;
+    }
+    function spanEnd(spans, name) {
+        for (let i = 0; i < spans.length; i++) if (spans[i].name === name) return spans[i].end;
+        return 0;
+    }
+
+    /**
+     * v1.9.0 (app 6.13.0, Layer 4 prefill grid): merge ONE calendar entry into
+     * a date's entries array, applying the standing designation rules in ONE
+     * place (previously inline in module 34, untested):
+     *   - verb 'base': per-person last-write-wins. The resolver is first-hit,
+     *     so strip each incoming uid from every existing base entry first
+     *     (dropping any entry whose scope empties), THEN append the new one.
+     *   - verb 'transform' (and anything else): append — transforms compose,
+     *     and a base entry can coexist with a person's transforms.
+     * Pure; never mutates its input; returns a NEW array. Both the day-of
+     * modal (module 34) and the prefill grid's copy-forward (module 35) route
+     * through this, so the dedup rule can never drift between the two.
+     */
+    function mergeCalendarEntry(entries, entry) {
+        const base = Array.isArray(entries) ? entries : [];
+        if (!entry || typeof entry !== 'object') return base.slice();
+        if (entry.verb === 'base' && Array.isArray(entry.scope)) {
+            const incoming = entry.scope;
+            const out = [];
+            for (let i = 0; i < base.length; i++) {
+                const e = base[i];
+                if (e && e.verb === 'base' && Array.isArray(e.scope)) {
+                    const kept = e.scope.filter(function (u) { return incoming.indexOf(u) === -1; });
+                    if (kept.length === 0) continue;               // whole entry emptied
+                    if (kept.length !== e.scope.length) { out.push(Object.assign({}, e, { scope: kept })); continue; }
+                }
+                out.push(e);
+            }
+            out.push(entry);
+            return out;
+        }
+        const out2 = base.slice();
+        out2.push(entry);
+        return out2;
+    }
+
+    /**
+     * v1.11.0 (app 6.16.0): find periods that OVERRUN the next one — a period
+     * whose last bell falls after the following period's first bell. Only
+     * periods with a real extent (>= 2 distinct resolved times) count;
+     * single-bell markers and relative-only stubs are skipped, and back-to-back
+     * boundaries (end == next start) are NOT flagged, so normal passing-period
+     * gaps never trip it. Pure; sorts a COPY by start; input untouched. Returns
+     * [] when clean, else { name, endsAt, nextName, startsAt, overlapSeconds }
+     * per overrun, in schedule order. Detection only — the caller decides what
+     * to do (6.16.0 just warns; a resolver is a later slice).
+     */
+    function detectPeriodOverlaps(periods) {
+        if (!Array.isArray(periods)) return [];
+        const spans = [];
+        for (let i = 0; i < periods.length; i++) {
+            const p = periods[i];
+            if (!p || p.isEnabled === false || !Array.isArray(p.bells)) continue;
+            let min = null;
+            let max = null;
+            for (let j = 0; j < p.bells.length; j++) {
+                const t = p.bells[j] && p.bells[j].time;
+                if (typeof t !== 'string' || !t) continue;
+                const s = timeToSeconds(t);
+                if (s === null || s === undefined) continue;
+                if (min === null || s < min) min = s;
+                if (max === null || s > max) max = s;
+            }
+            if (min === null || max === null || min === max) continue; // no real extent
+            spans.push({ name: p.name, start: min, end: max });
+        }
+        spans.sort((a, b) => a.start - b.start);
+        const out = [];
+        for (let i = 0; i < spans.length - 1; i++) {
+            const cur = spans[i];
+            const next = spans[i + 1];
+            // v1.16.0 (app 6.20.2) NESTING IS LEGITIMATE, NOT A COLLISION.
+            // Lunch waves run INSIDE 4th period — true of every lunch at this
+            // school — advisory sits inside a block, etc. If either span is
+            // fully contained in the other, that's nesting: skip it. Only a
+            // PARTIAL overrun is a real problem. This was the false positive
+            // ("4th Period ends 12:08 PM, but Lunch A begins 11:36 AM").
+            if (next.end <= cur.end) continue;                            // next nested in cur
+            if (cur.start >= next.start && cur.end <= next.end) continue; // cur nested in next
+            if (cur.end > next.start) {
+                out.push({
+                    name: cur.name,
+                    endsAt: secondsToTime(cur.end),
+                    nextName: next.name,
+                    startsAt: secondsToTime(next.start),
+                    overlapSeconds: cur.end - next.start,
+                });
+            }
+        }
+        return out;
+    }
+
+    /**
+     * v1.12.0 (app 6.17.0): given RESOLVED periods and an overrun (period
+     * `overrunName` whose end passes the next period's start), compute the
+     * bell-time MOVES that resolve it under one strategy. Moves ONLY static
+     * bells (no `.relative`) — relative bells re-derive downstream, so they are
+     * never touched. Pure; returns { moves:[{bellId,from,to}], dayEndDeltaSeconds,
+     * warning }. The caller previews `moves` and applies them through the normal
+     * save path. Strategies:
+     *   'shrink' — move the next period's start bell(s) to the overrun's end
+     *              (next period gets shorter; day-end unchanged).
+     *   'push'   — shift the next period and everything after LATER by the
+     *              overlap (nothing shortens; day ends later).
+     *   'spread' — rigidly shift the following periods to close the overlap,
+     *              tightening the gaps AFTER each checked period so the day
+     *              still ends on time. Each period keeps its own length; the
+     *              slack comes out of the passing time between them. Warns if a
+     *              gap would go negative (i.e., it can't fully absorb there).
+     */
+    function planOverlapResolution(periods, overrunName, strategy, absorbNames, protectGaps) {
+        const empty = { moves: [], dayEndDeltaSeconds: 0, warning: null };
+        if (!Array.isArray(periods)) return empty;
+        const spans = [];
+        for (let i = 0; i < periods.length; i++) {
+            const p = periods[i];
+            if (!p || p.isEnabled === false || !Array.isArray(p.bells)) continue;
+            let min = null;
+            let max = null;
+            const statics = [];
+            for (let j = 0; j < p.bells.length; j++) {
+                const b = p.bells[j];
+                if (!b || typeof b.time !== 'string' || !b.time) continue;
+                const s = timeToSeconds(b.time);
+                if (s === null || s === undefined) continue;
+                if (min === null || s < min) min = s;
+                if (max === null || s > max) max = s;
+                if (!b.relative && b.bellId) statics.push({ bellId: b.bellId, sec: s, time: b.time });
+            }
+            if (min === null) continue;
+            spans.push({ name: p.name, start: min, end: max, statics: statics });
+        }
+        spans.sort(function (a, b) { return a.start - b.start; });
+        let pIdx = -1;
+        for (let i = 0; i < spans.length; i++) { if (spans[i].name === overrunName) { pIdx = i; break; } }
+        if (pIdx < 0 || pIdx + 1 >= spans.length) return { moves: [], dayEndDeltaSeconds: 0, warning: 'No following period to adjust.' };
+        const P = spans[pIdx];
+        const Q = spans[pIdx + 1];
+        const overlap = P.end - Q.start;
+        if (overlap <= 0) return empty;
+
+        const moves = [];
+        const addMove = function (bell, newSec) {
+            if (newSec === bell.sec) return;
+            moves.push({ bellId: bell.bellId, from: bell.time, to: secondsToTime(newSec) });
+        };
+
+        if (strategy === 'shrink') {
+            // v6.18.1: protect the passing period by default — the next period
+            // starts a passing-period AFTER the overrun's end, not right on it
+            // (kids still need to get to the room). The gap reused is the next
+            // period's own OUTGOING gap (passing periods are ~uniform), else the
+            // smallest positive gap in the schedule. Unset protectGaps to butt
+            // them together. Only the next period's start moves, so dismissal is
+            // unchanged either way.
+            const protect = protectGaps !== false;
+            let target = P.end;
+            let warning = null;
+            if (protect) {
+                let g = 0;
+                if (pIdx + 2 < spans.length && (spans[pIdx + 2].start - Q.end) > 0) {
+                    g = spans[pIdx + 2].start - Q.end;
+                }
+                if (g === 0) {
+                    let minGap = null;
+                    for (let i = 0; i < spans.length - 1; i++) {
+                        const gap = spans[i + 1].start - spans[i].end;
+                        if (gap > 0 && (minGap === null || gap < minGap)) minGap = gap;
+                    }
+                    if (minGap !== null) g = minGap;
+                }
+                target = P.end + g;
+                if (target >= Q.end) warning = Q.name + ' would have almost no time left — consider Spread or Push instead.';
+            }
+            let moved = false;
+            for (let k = 0; k < Q.statics.length; k++) {
+                if (Q.statics[k].sec === Q.start) { addMove(Q.statics[k], target); moved = true; }
+            }
+            return { moves: moves, dayEndDeltaSeconds: 0,
+                warning: moved ? warning : 'The next period has no movable (static) start bell to shrink.' };
+        }
+        if (strategy === 'push') {
+            for (let i = pIdx + 1; i < spans.length; i++) {
+                for (let k = 0; k < spans[i].statics.length; k++) addMove(spans[i].statics[k], spans[i].statics[k].sec + overlap);
+            }
+            return { moves: moves, dayEndDeltaSeconds: overlap, warning: null };
+        }
+        if (strategy === 'spread') {
+            const absorb = Array.isArray(absorbNames) ? absorbNames : [];
+            const followers = spans.slice(pIdx + 1);
+            const chosen = followers.filter(function (s) { return absorb.indexOf(s.name) !== -1; });
+            if (!chosen.length) return { moves: [], dayEndDeltaSeconds: 0, warning: 'Pick at least one period to absorb the overlap.' };
+            const protect = protectGaps !== false; // DEFAULT: protect passing periods -> take time out of the periods
+
+            if (protect) {
+                // Take the overlap out of the CHECKED periods' own length (move
+                // their end bell in), leaving every passing gap intact. Only a
+                // period with a movable static END bell distinct from its start
+                // can be shortened.
+                const shortenable = chosen.filter(function (s) {
+                    return s.end > s.start && s.statics.some(function (b) { return b.sec === s.end; });
+                });
+                if (!shortenable.length) {
+                    return { moves: [], dayEndDeltaSeconds: 0,
+                        warning: 'None of the checked periods can be shortened (no movable end bell). Try Shrink, or uncheck "Protect in-between times".' };
+                }
+                let warning = null;
+                const skipped = chosen.filter(function (s) { return shortenable.indexOf(s) === -1; });
+                if (skipped.length) warning = "Couldn't shorten " + skipped.map(function (s) { return s.name; }).join(', ') + ' (no movable end bell); spreading across the rest.';
+                const share = {};
+                const baseShare = Math.floor(overlap / shortenable.length);
+                let acc = 0;
+                shortenable.forEach(function (s, i) {
+                    const sh = (i === shortenable.length - 1) ? (overlap - acc) : baseShare;
+                    share[s.name] = sh; acc += sh;
+                    if (sh >= (s.end - s.start)) warning = 'Not enough room to shorten ' + s.name + ' by that much — it would collapse. Check more periods or use Push.';
+                });
+                // Each following period's START shifts right by (overlap minus
+                // shares already removed before it); a shortenable period's END
+                // additionally moves in by its own share (so the period gets
+                // shorter, not just later). Gaps between periods are preserved;
+                // the last period's net shift is 0, so dismissal is unchanged.
+                let sharesBefore = 0;
+                for (let i = 0; i < followers.length; i++) {
+                    const s = followers[i];
+                    const startDelta = overlap - sharesBefore;
+                    const myShare = share[s.name] || 0;
+                    for (let k = 0; k < s.statics.length; k++) {
+                        const b = s.statics[k];
+                        const d = (myShare && b.sec === s.end) ? (startDelta - myShare) : startDelta;
+                        addMove(b, b.sec + d);
+                    }
+                    sharesBefore += myShare;
+                }
+                return { moves: moves, dayEndDeltaSeconds: overlap - sharesBefore, warning: warning };
+            }
+
+            // Not protecting gaps: rigid per-period shift that tightens the gap
+            // AFTER each checked period (periods keep their length; passing time
+            // absorbs the overlap). Day-end holds only if a period follows the
+            // last checked one.
+            const share2 = {};
+            const baseShare2 = Math.floor(overlap / chosen.length);
+            let acc2 = 0;
+            chosen.forEach(function (s, i) {
+                const sh = (i === chosen.length - 1) ? (overlap - acc2) : baseShare2;
+                share2[s.name] = sh; acc2 += sh;
+            });
+            let delta = overlap;
+            let warning2 = null;
+            let prevEnd = null;
+            for (let i = pIdx + 1; i < spans.length; i++) {
+                const s = spans[i];
+                if (prevEnd !== null && (s.start + delta) < prevEnd) {
+                    warning2 = 'Not enough passing time to absorb it there without a new overlap. Try "Protect in-between times", or Shrink/Push.';
+                }
+                for (let k = 0; k < s.statics.length; k++) addMove(s.statics[k], s.statics[k].sec + delta);
+                prevEnd = s.end + delta;
+                if (share2[s.name]) delta -= share2[s.name];
+            }
+            return { moves: moves, dayEndDeltaSeconds: delta, warning: warning2 };
+        }
+        return { moves: [], dayEndDeltaSeconds: 0, warning: 'Unknown strategy.' };
+    }
+
     const BellEngine = {
-        VERSION: '1.8.0', // v1.3.1: exported so the status modal can report it
+        VERSION: '1.16.0', // v1.3.1: exported so the status modal can report it
+                           // (v6.16.0 fix: this constant had drifted — the
+                           // 1.9.0/1.10.0 bumps missed it; nothing in the
+                           // battery verifies it. Now correct.)
         escapeHtml,
         getBellId,
         formatTime12Hour,
@@ -714,13 +1157,17 @@
         calculateRelativeBellTime,
         toLocalDateString,
         resolveCalendarSchedule,
+        resolveScopedDesignation,
+        detectPeriodOverlaps,
+        planOverlapResolution,
         shiftTimeString,
         getActiveScheduleShiftSeconds,
         estimateClockDriftMs,
         applyBuildingBellTimeToPeriods,
         findPeriodEdgeAnchorBell,
         resolveCalendarTransforms,
-        applyRecipeToPeriods
+        applyRecipeToPeriods,
+        mergeCalendarEntry
     };
 
     global.BellEngine = BellEngine;

@@ -451,3 +451,68 @@ body.simplified-mode #bulk-select-all-master,
 body.simplified-mode .bulk-select-period {
     display: none !important;
 }
+
+/* ============================================================
+   V6.21.0 — BANNER CONTRAST IN DARK MODE
+   The three notification banners (designation v6.10.0, untagged-nudge
+   v6.15.0, overlap-warning v6.16.0) were built with literal light-palette
+   Tailwind utilities (bg-blue-100 / text-blue-900 etc.) instead of the
+   --theme-* variables the rest of the app themes through. In dark mode the
+   background darkened but the near-black text did not, leaving the untagged
+   nudge unreadable (owner report, 2026-08) and the designation banner just as
+   broken whenever it next fired. The overlap banner escaped only because
+   bg-red-600/text-white happens to work on both.
+
+   Fixed here rather than in index.html because styles.css is HAND-WRITTEN —
+   swapping the utilities for new Tailwind classes would force a CSS rebuild,
+   and these need to respond to data-theme anyway, which utilities cannot do.
+   The light-mode appearance is deliberately left exactly as it was.
+
+   If you add a fourth banner: give it an id ending -banner, add it below, and
+   check it in BOTH themes before shipping.
+   ============================================================ */
+:root[data-theme="dark"] #untagged-nudge-banner {
+    background-color: #1e3a5f;   /* deep blue, sits on the dark chrome */
+    border-bottom-color: #2f5c94;
+    color: #cfe4ff;              /* light blue-white — readable on the above */
+}
+:root[data-theme="dark"] #untagged-nudge-banner button {
+    color: #cfe4ff;
+}
+:root[data-theme="dark"] #untagged-nudge-banner button:hover {
+    background-color: #2f5c94;
+}
+
+:root[data-theme="dark"] #designation-banner {
+    background-color: #4a3410;   /* deep amber */
+    border-bottom-color: #7a5618;
+    color: #ffe3ad;
+}
+:root[data-theme="dark"] #designation-banner button {
+    color: #ffe3ad;
+}
+:root[data-theme="dark"] #designation-banner button:hover {
+    background-color: #7a5618;
+}
+
+/* overlap-warning-banner is bg-red-600/text-white — legible in both themes.
+   Listed here only so the next reader knows it was checked, not missed. */
+
+/* ============================================================
+   V6.22.0 — the fourth banner, per the instruction above.
+   #roster-unrostered-banner is built by 33-roster.js inside the Roster & Tags
+   modal to name people who have a presence doc but no roster row. It uses
+   bg-amber-100 / text-amber-900, which is correct in light mode and near-black
+   text on a pale box in dark mode — same failure as the two above, so it gets
+   the same treatment. Colours match #designation-banner so the two amber
+   surfaces agree.
+   ============================================================ */
+:root[data-theme="dark"] #roster-unrostered-banner {
+    background-color: #4a3410;   /* deep amber, matches #designation-banner */
+    border-color: #7a5618;
+    color: #ffe3ad;
+}
+:root[data-theme="dark"] #roster-unrostered-banner p {
+    color: #ffe3ad;              /* the text-amber-900 utility is !important-free,
+                                    but be explicit: the <p>s carry their own class */
+}

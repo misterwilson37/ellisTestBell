@@ -2,6 +2,800 @@
 
 Release history for the main app (src/js / index.html; script.js before 6.0.0). Sibling surfaces (clock.html, old.html, dashboard-config.html, service-worker.js) carry their own version notes in their file headers.
 
+## clock.html v1.8.0 — the clock plays each bell's OWN sound
+(Companion to app 6.25.1. Sibling surface; the app version is unchanged at
+6.25.1. SW CACHE_VERSION 1.38.0 so clocks pick it up.)
+
+- **FIX: `playBellSound()` took no argument** and played `config.sound` for
+  every bell it rang, so a bell the teacher had deliberately set to
+  "Silent / None" still rang on the clock. It now takes the bell's own sound and
+  honours `[SILENT]`. Owner's reasoning: if someone has chosen sounds per bell
+  on the website, the clock should play what they chose — silence included.
+- **`config.sound` is now the FALLBACK**, used for any bell with no sound of its
+  own, which is every bell on a never-customised schedule. The setup screen's
+  label changed to say so. Existing setups sound exactly as they did.
+- **Non-URL sounds fall back rather than failing**, mirroring `old.html`'s
+  long-standing guard: the app stores a sound as either a full download URL or a
+  Storage path, and `new Audio(path)` cannot resolve a bare path. On a signage
+  clock a failed load is indistinguishable from a broken bell, so it falls back.
+- **NO new control.** The owner asked for a per-schedule-line silent toggle
+  defaulting to silent; the per-column 🔔 checkbox already does exactly that and
+  already defaults to OFF. Inverting it would flip the meaning of `a1`…`a9`,
+  which are baked into every saved clock URL, silently turning audio ON for
+  anyone holding an old link.
+
+**Verification:** 7 checks against the extracted real function — `[SILENT]`
+plays nothing, a bell's own URL plays that URL, absent/empty/non-URL sounds fall
+back, and a clock with no fallback configured plays nothing instead of throwing.
+§5 battery green (74/74, 41 modules).
+
+## V6.25.1 — A bell set to "Silent / None" rang the DEFAULT bell
+(Owner: "I have a scheduled bell that's supposed to be silent. It's ringing the
+default bell every time (which is very confusing)." Patch bump: pure bug fix.)
+
+**Root cause, one line, no ambiguity.** The sound dropdowns have offered
+"Silent / None" since 5.32/5.33 — module 19 injects `<option value="[SILENT]">`
+into the Default Sounds optgroup of EVERY sound select, schedule bells included.
+`playBell()` never had a case for it. So `[SILENT]` was truthy, skipped the
+empty-soundName guard, and fell through to Case 3, which treats any
+unrecognised soundName as a Firebase Storage path. `ref(state.storage,
+'[SILENT]')` then `getBytes()` fails, the catch fires, and that handler's
+"fall back to default" rings `ellisBell.mp3`. A bell explicitly marked silent
+therefore rang the default bell — the loudest possible wrong answer, and worse
+than either intended outcome.
+
+- **FIX:** `playBell()` returns early on `[SILENT]`, before the synth cases.
+- **The empty-soundName fallback is deliberately UNCHANGED.** An empty sound
+  still rings the default. That asymmetry is intentional: empty means a field
+  was never set, and a bell that goes quiet because of a blank field is a silent
+  failure. `[SILENT]` is an explicit choice and is now honoured as one.
+- **CORROBORATION:** `old.html`, the ES5 legacy surface, has handled `[SILENT]`
+  correctly this whole time (`if (url === '[SILENT]') return;`). So the feature
+  was real and the modular app is what lacks it — either it never made the 6.0.0
+  modularization or it was dropped in it. Worth remembering when a feature
+  "works on the old page but not the app".
+- **NOT fixed, flagged on the roadmap:** `clock.html` ignores per-bell sounds
+  entirely — it plays one configured `config.sound` for every bell — so a silent
+  bell still rings on any clock column with audio enabled. That is a different
+  shape of problem (its audio model, not a missing case) and needs the owner's
+  call before changing.
+- A system notification is still sent for a silent bell (`maybeNotifyBell` is
+  untouched). That seems right — silent means no AUDIO, not invisible — but it
+  is a judgement call, so it is recorded here rather than assumed.
+
+**Verification:** §5 battery green (74/74, 41 modules). Plus a throwaway harness
+that evaluates the REAL `playBell` source against stubs: 7 checks — `[SILENT]`
+plays nothing, never reaches Firebase Storage, and never falls back; while the
+default bell, the built-in synths, the empty-sound fallback and the
+genuinely-broken-URL fallback all still behave exactly as before.
+One file changed. SW CACHE_VERSION 1.37.1.
+
+## V6.25.0 — Named queue steps; skip bells by name instead of blind
+(Owner, on the countdown line: "it feels more helpful for it to say 'hamburger
+time! (queue 1/2)'." And on skipping: "it got confusing to know which bells were
+being cancelled, when all you're saying is 'skip' or 'unskip' bell." Minor bump.)
+
+- **NEW: each queue step can carry a LABEL.** The countdown line now reads
+  `Hamburger time! (Queue 1/2)` rather than a bare `Queue (1/2)`. That line is
+  the same wide row that normally reads "until <bell name>!", so there is room.
+  The label is OPTIONAL and empty falls back to the old bare form, so an
+  existing saved queue is unchanged until it is edited. Labels ride inside the
+  `steps` array, which module 15 stores whole, so no new field to whitelist.
+- **NEW: the bell modal — skip/unskip the next five bells BY NAME.** Each row
+  shows the bell's name and time with its own Skip/Unskip button. A skipped bell
+  STAYS in the list, struck through, because otherwise there is nothing left to
+  press Unskip on. The modal stays open as you toggle, so fixing a mis-skip does
+  not mean reopening it.
+- **REPLACES both old buttons rather than adding a third.** "Skip Bell" hit
+  whichever bell was next and "Unskip" restored whichever was earliest, and
+  neither NAMED the bell until after the fact — precisely the wrong behaviour
+  during a schedule change. The single button now opens the modal, and its label
+  changes to "Skip / Unskip Bells…" while anything is skipped. The owner's
+  constraint was no more chaos on the main screen, so button count went 2 -> 1.
+- **NOT a PiP problem.** Document Picture-in-Picture runs in a separate window,
+  so opening this modal does not disturb a popped-out countdown.
+- `skipNextBell()` now delegates to a new `skipBell(bell)`, so the blind path and
+  the pick-from-a-list path share one implementation and cannot drift. Same
+  occurrence key, so skips still self-clear overnight.
+- **BUGFIX guarded on the way:** `updateMainPageSkipButtons()` opened with
+  `if (!skipBtn || !unskipBtn) return;`. Removing the unskip button would have
+  made that bail out every time, silently hiding the skip button forever. It now
+  guards on the skip button alone.
+
+**Verification:** §5 battery green (74/74, 41 modules). Plus a throwaway jsdom
+harness: 28 checks, including the exact countdown string, the unlabelled-step
+fallback, skipping the SECOND listed bell and asserting its neighbours are
+untouched, the struck-through-but-still-listed state, and the guard bug above.
+**NO CSS rebuild** — `line-through`, `max-h-80` and `last:border-b-0` are all
+absent from the built tailwind.css, so those three are done with inline styles.
+SW CACHE_VERSION 1.37.0.
+
+## V6.24.0 — Save a queue as a Quick Bell
+(Owner: "My class always starts with 15 minutes of typing... immediately after
+is 2.5 minutes of an image of Beethoven... I have the 15 minutes saved as a
+quick bell and the beethoven saved as a quickbell, but I don't have BOTH."
+Minor bump: a new feature. Builds directly on 6.23.0.)
+
+- **NEW: "Save as a Quick Bell" in the Quick Bell Queue modal.** Name the queue,
+  press Save, and it becomes one of the four Quick Bell buttons. Pressing that
+  button runs the whole sequence — each step with its own duration, sound and
+  graphic. The owner's real case: a delayed start now costs one click instead of
+  two, with no chance of forgetting the second half.
+- **A saved queue is an ORDINARY custom quick bell carrying a `steps` array.**
+  No parallel "saved queues" list. It lives in the same four slots, uses the
+  same icon/colour controls in Manage Quick Bells, the same broadcast tick, the
+  same backup/restore, the same Firestore document. Absent or empty `steps`
+  means an ordinary one-shot bell, so every existing quick bell is untouched.
+- **BUGFIX (pre-existing, found on the way): `alwaysBroadcast` did not survive a
+  reload.** The Firestore snapshot handler in module 15 rebuilds each quick bell
+  field by field from a WHITELIST, and `alwaysBroadcast` was never added when
+  V5.65.0 introduced it. The setting is read when rendering the button and when
+  launching, so ticking "broadcasts to all devices" worked until the next
+  refresh and then silently reverted to off. Now carried through — along with
+  `steps` and `queueRepeatTimes`. **The whitelist is commented as such now:** any
+  new quick-bell field must be added THERE as well as at its write site, or it
+  vanishes on reload.
+- **Deliberate limits, both recorded in module 12's header:**
+  (a) the button icon defaults to the FIRST step's graphic and the tooltip
+  duration is the WHOLE run's total — then it is editable in the ordinary
+  manager, so there is no second icon picker in the queue modal;
+  (b) **"until a bell rings" repeat mode is NOT saved.** It targets a bellId from
+  today's resolved schedule, which means nothing tomorrow. A saved queue always
+  repeats by numeric count; the modal says so under the Save field.
+- **The button icon is a DIAGONAL SPLIT of the queue's steps** — half a
+  hamburger, half a Beethoven — rather than whichever graphic happened to be
+  first. Bands are axis-aligned rects inside a clipPath rotated -45deg about the
+  centre; the square's diagonal is 100*sqrt(2), so a band of `DIAG/n` tiles it
+  exactly for any n, and at n=2 it is precisely half and half. A divider stroke
+  between bands keeps two dark graphics reading as two. Steps without an image
+  (the default "Q", custom text) fill their band with the bell's colours and the
+  step number — never a broken `<image>`.
+  **Capped at 3 bands** however many steps: past three, 44px of button divided
+  diagonally is confetti, and the step-count badge already says how many there
+  are. The icon is stored as a `[QUEUE_SPLIT]` SENTINEL, not baked in at save
+  time, so editing a step's graphic later updates the button automatically.
+- **Queue buttons are visually distinct:** a small step-count badge in the corner,
+  and the hover label reads "2 steps / 17m 30s" rather than a bare duration,
+  because the button runs a sequence and one time would understate it.
+- Launch reads the steps from `state.customQuickBells`, NOT from a `data-*`
+  attribute — steps are objects, and round 9's lesson about rebuilding state
+  from rendered DOM applies here too.
+
+**Verification:** §5 battery green (74/74, 41 modules). Plus a throwaway jsdom
+harness driving the real modules against the real DOM: 25 checks, including the
+owner's exact routine saved and relaunched, the 4-slot cap, the no-name refusal,
+and a round trip through module 15's actual mapper source proving `steps`,
+`queueRepeatTimes` and `alwaysBroadcast` now survive a reload while a plain bell
+still loads with `steps: null`. **NO CSS rebuild** (the badge is positioned with
+inline styles precisely to avoid one). NO rules change — `steps` is an additive
+field on an existing user-owned document. SW CACHE_VERSION 1.36.0.
+
+## V6.23.0 — Quick Bell Queue: a graphic per timer, not per queue
+(Owner: "I'd like to be able to add a queue of bells to the quickbells menu. So
+one bell with a graphic followed by another bell with a different graphic. Each
+with its own sound." Minor bump: a new feature.)
+
+**Most of this already existed.** The Quick Bell Queue (V5.55.0) has always run
+a sequence of timers with a DIFFERENT SOUND PER STEP. The missing half was the
+picture: one `queue-visual-select` at the bottom of the modal set a single
+graphic for the entire run, stashed in `state.queueVisual`. So a queue could
+say three different things and show one. "2 minutes to announcements" ->
+"line up" -> "go" was impossible as one queue.
+
+- **NEW: every timer row has its own "Graphic" dropdown**, beside its own
+  "Sound". A queue entry is now a complete little bell:
+  `{durationSeconds, sound, visual}`. Same option set the queue-level control
+  offered — Default "Q", Shared Visuals, My Visuals — and deliberately still no
+  "Upload..." entry: upload lives in the visual library, a queue row picks from
+  what is already there.
+- **The graphic is "before"-mode**, matching the rest of the app: a row's
+  picture is on screen WHILE that row counts down, and swaps the instant that
+  row rings and the next one starts. `advanceQueue()` increments `queueIndex`
+  before starting the next timer, so `queueIndex` always names the running
+  entry and `getQueueVisualHtml()` just reads it.
+- **Module 10 needed NO change.** Its visual key was already
+  `queue:<index>:<repeat>`, so the clock engine re-renders the cue on every
+  advance; it only ever asked `getQueueVisualHtml()` what to draw. This is why
+  the feature came in at five files — the queue's plumbing was right, it just
+  had one variable where it needed an array field.
+- **REMOVED: the queue-level "Visual Cue" control** (`#queue-visual-select` in
+  index.html, and the `queueVisualSelect` const + export in module 02). Keeping
+  it alongside per-row dropdowns would be two controls setting the same thing.
+  `state.queueVisual` SURVIVES but is now write-never: it is read only as a
+  fallback by `getQueueVisualHtml()` for an entry with no `visual` of its own.
+- **Row layout rebuilt** from one wrapping line into three labelled lines
+  (Length / Sound / Graphic) plus a header line carrying "Timer N" and the
+  delete button. The label column is one identical `w-16` on all three lines and
+  the trailing control is one identical `w-8 h-8 flex-shrink-0` on all three —
+  the preview button, the graphic thumbnail, and a same-size spacer on the
+  Length line — so every field begins and ends on the same two vertical rules.
+- **NEW: a 32x32 live thumbnail** of each row's chosen graphic, at the end of
+  the Graphic line. Five rows of identical-looking dropdown labels are hard to
+  proofread before you hit Start; five little pictures are not.
+- `renumberQueueTimerRows()` now finds the label via `.queue-timer-label`
+  instead of `querySelector('span')`. The row contains several spans now (the
+  h/m/s units) and the first one is no longer guaranteed to be the label.
+
+**Verification:** §5 battery green (74/74, 41 modules, check:esm/lint/css/sw all
+OK). Plus a throwaway jsdom harness (round-4 method, not shipped) that drove the
+real module against the real index.html DOM: 24 checks, including a three-step
+queue with three different graphics asserting three DIFFERENT rendered visuals,
+the no-visual backward-compatibility fallback, and the label/trailing-control
+alignment. **NO CSS rebuild needed** — every Tailwind class used was verified
+present in the built tailwind.css. NO rules change, NO new module.
+SW CACHE_VERSION 1.35.0.
+
+## V6.22.0 — The edit modal edits the BASE schedule (shift-rebase data bug)
+(RECONSTRUCTED in round 10 from the HANDOFF header, module 16's inline notes and
+module 14's `pristine` comments. Round 9 shipped this code but never wrote the
+entry, while module 16 tells its reader "see CHANGELOG V6.22.0 before changing
+any of it" — a dangling pointer. If round 9's own account survives anywhere,
+prefer it over this summary.)
+
+- **FIX (data corruption): saving any shared bell during an emergency shift
+  permanently rebased it for everyone.** The edit modal rebuilt its bell from
+  the rendered row's `data-*` attributes, and module 14 renders CALCULATED times
+  — shift and Verb B transforms already folded in. The shared save path writes
+  into `currentSchedule.periods`, the PRISTINE document. So a rename, a sound
+  change, an anchor change — any shared save while a shift was active — wrote
+  the *adjusted* time into the base, silently, for all ~50 users. 6.20.4 made it
+  MORE reachable by instructing admins to tick the confirm and save again.
+  Fixed via `findStoredSharedBell()` (populate the modal from the STORED bell)
+  and `resolveAllBellTimes({pristine: true})` (proximity check in base space).
+- **FIX: the time field is locked for derived bells**, and `updatePeriodsOnEdit`
+  now PRESERVES `relative`. It replaces rather than merges, and shared relative
+  bells do reach the static editor, so saving one flattened it to a fixed bell.
+- **Three fixes the owner reported from the wild:** the roster bulk-template
+  button overlapping its panel; the untagged nudge naming people structurally
+  absent from the roster list it opens; and that nudge's "4 people / 3 names"
+  count mismatch.
+- **LESSON (recorded in HANDOFF §9):** §4.6's "localSchedulePeriods stays
+  pristine" was true of the VARIABLE and false of the SCREEN. Anything rebuilt
+  from rendered DOM is in display space, not storage space.
+
+**Known NOT done:** the same bug exists on the school channel (5.79.x —
+`temporaryShift` landed in v5.74), where the owner is the only admin and so
+exactly the person who can trigger it. Building (5.69.5) predates the shift and
+is unaffected. SW 1.34.0, 74/74, 41 modules, no rules change, no CSS rebuild.
+
+## V6.21.0 — Duplicate a schedule; two affordance/contrast fixes
+(Owner: "I do not see a method of duplicating a schedule as an admin." Plus two
+follow-ups from the 6.20.4 deploy screenshots. Minor bump: a new feature.)
+
+- **NEW: Duplicate Selected Schedule** (Admin Zone, beside Rename). Deep-copies
+  the selected SHARED schedule's periods into a new one, prompts for a name
+  (defaults to "<name> (copy)"), logs a `duplicate-schedule` audit entry, and
+  switches to the new schedule. Previously the only route was export-to-JSON and
+  re-import. Six near-identical schedules run simultaneously here, differing
+  mainly by lunch wave, so this is the common case.
+  **DESIGN DECISION — identities regenerated, anchors preserved.** Every
+  `bellId` and `periodId` in the copy is NEW. `bellId` is the key a teacher's
+  personal overrides, mutes and skips are stored under, so reusing the source's
+  ids would make one teacher's nickname or muted bell on "Lunch A" silently
+  reappear on "Lunch B" — a cross-schedule bleed that would be brutal to
+  diagnose. Relative bells' `parentBellId` values are remapped to the copy's new
+  ids so chains survive. `buildingBellId` anchors ARE kept (an anchor means
+  "this bell IS that intercom moment," which the copy genuinely shares).
+  `temporaryShift` is NOT copied — an emergency shift is a fact about one
+  schedule on one day, never an inherited property. No rules change: the new doc
+  goes to `public/data/schedules` under the existing admin-write rule.
+- **FIX: "Rename Schedule" was greyed out for admins on shared schedules.**
+  `handleRenamePersonalSchedule()` bailed whenever `activePersonalScheduleId`
+  was null — i.e. on every shared schedule — leaving an admin looking at a
+  greyed button on a schedule they are entitled to rename, with no explanation.
+  The button is labelled plainly "Rename Schedule", so it now renames whatever
+  is selected: on a shared schedule it routes to
+  `openRenameSharedScheduleModal()`, which has handled both types since V5.45.1
+  and re-checks admin-mode itself. Same routing the inline pencil has used since
+  v5.68.0. No new authority — this button simply stops being the odd one out.
+- **FIX: banner text unreadable in dark mode.** `#untagged-nudge-banner`
+  (6.15.0) and `#designation-banner` (6.10.0) were built with literal
+  light-palette Tailwind (`bg-blue-100`/`text-blue-900`,
+  `bg-amber-100`/`text-amber-900`) rather than the `--theme-*` variables the app
+  themes through, so in dark mode the background darkened and the near-black
+  text did not. The owner's nudge banner was illegible; the designation banner
+  was equally broken and simply had not fired yet.
+  `#overlap-warning-banner` (`bg-red-600`/`text-white`) is legible in both and
+  is left alone — noted in the CSS so the next reader knows it was checked.
+  Fixed in **styles.css** (hand-written, so no CSS rebuild) with
+  `:root[data-theme="dark"]` overrides; light mode is byte-identical to before.
+- **service-worker.js 1.33.0** (no new modules; cache bump). NO rules change,
+  NO tailwind rebuild (`disabled:opacity-50` / `disabled:cursor-not-allowed`
+  were already compiled), `bell-engine.js` and `old.html` untouched. 74/74.
+
+## V6.20.4 — Admin CAN edit bell times (the four-round OPEN BUG, closed)
+(Owner confirmed the diagnosis live: ticking the checkbox made the time save
+immediately. Root cause was client-side and eight months old, not backend.)
+
+- **THE BUG.** `handleEditBellSubmit` (module 16) gated the ENTIRE shared-bell
+  save path on `wantsToOverrideForAll = isAdmin && overrideCheckbox.checked`.
+  Unticked, it took the personal-override path — and a personal override object
+  has fields for nickname, sound and visual and **no field for time**. An
+  admin's new time was therefore discarded, the modal closed, and
+  `closeEditBellModal()` cleared `editBellStatus` on the way out, so even the
+  "Customization saved." line was never readable. Silence, no error, no change.
+- **WHY ALL THREE CHANNELS.** The gate landed in **V5.66.2**, which was a
+  *sound* fix ("Admins see 'Override for all users' checkbox to optionally push
+  to shared bell") but placed the flag at the top of the whole save path. 5.66.2
+  predates 5.69.2, 6.11.0 and 6.20.x, so every channel carried it. The
+  cross-version repro was evidence of an OLD CLIENT BUG, not a backend one.
+- **WHY IT GOT WORSE IN 6.11.0.** The lock-note redesign added
+  "🔓 Admin: saving a new time changes this bell for every user of this
+  schedule" directly under an input whose value was being thrown away. The UI
+  began promising exactly what the code refused to do.
+- **FIX (module 16):** a time change that would land on a path that cannot
+  store it now REFUSES the save — modal stays open, typed time preserved,
+  status line names the confirm, focus moves to it. No auto-escalation: pushing
+  a bell to ~50 people stays a deliberate act. Comparison runs through
+  `normalizeTimeString` on both sides, so a browser returning `11:30` instead of
+  `11:30:00` from `type="time" step="1"` cannot make an unchanged time look
+  changed and block personal-only saves.
+- **FIX (module 16):** both save paths now call `showUserMessage`, since
+  `editBellStatus` dies with the modal. Personal: "Saved for you only — this
+  bell is unchanged for everyone else." Shared: "Saved for everyone on this
+  schedule." A save and a no-op no longer look identical.
+- **FIX (index.html):** the confirm is relabelled from "Override shared **sound**
+  for all users" to "Change this bell for **everyone** on this schedule", with a
+  sub-line stating that name/sound/visual stay personal when unticked and that
+  times require the box. The label now describes the whole modal, which is what
+  the control has actually governed since 5.66.2.
+- **REMOVED (index.html + module 16):** the `edit-bell-visual-override-checkbox`
+  ("Override shared visual for all users"). It was shown to admins but its
+  `.checked` was never read by any code — a dead control beside a live one.
+- **REMOVED (module 99):** a V4.95 listener that set
+  `editBellSoundInput.disabled = !checkbox.checked`. V5.66.2 made personal sound
+  overrides available to everyone, so this silently revoked sound editing from
+  any admin who ticked the box and then unticked it. The confirm decides WHO a
+  change reaches, never WHETHER a field is editable.
+- **FIX (module 16): false watchdog.** The 6.20.3 watchdog fired
+  `[Watchdog] ... (base=true, personal=false)` on EVERY shared-schedule
+  selection — twice per admin toggle, since `toggleAdminMode` re-enters
+  `setActiveSchedule`. The shared branch attaches no personal listener and so
+  never set `isPersonalScheduleLoaded`. Harmless (the latch short-circuits on
+  `activePersonalScheduleId`) but it was crying wolf in the one log a future
+  debugger reads. The flag is now set explicitly in the shared branch.
+- **FIX (module 16): real `onSnapshot` error callbacks** on the three listeners
+  that had none (standalone-personal, linked-base, linked-personal). §7 asked
+  for these. Each logs and then fails open, so an erroring listener can never
+  again wedge the latch in silence.
+- **tests/bell-engine.test.mjs RESTORED to 64 tests** (was 41 on GitHub). The
+  rounds 8–11 tests never reached the repo because the deploy manifest omits
+  `tests/`. 74/74 across both suites. See HANDOFF §9.
+- **service-worker.js 1.32.0** (no new modules; cache bump). NO rules change,
+  NO CSS rebuild (all classes used were already compiled), `bell-engine.js` and
+  `old.html` untouched.
+
+## V6.20.3 — Fail-open the schedule load latch (silent editor freeze)
+(Owner: "none of them are allowing me to change bell times" — on alpha 6.20.0,
+beta 6.11.0 AND 5.69.2, with NO console error. The one console line was
+`Delaying calculation: base and personal schedules have not both loaded`.)
+
+- **Root cause candidate identified.** recalculateAndRenderAll() bails out early
+  whenever state.activePersonalScheduleId is set and either isBaseScheduleLoaded
+  or isPersonalScheduleLoaded is still false. Both flags are only set inside
+  their onSnapshot success callbacks (module 16), and NEITHER listener has an
+  error callback — so a listener that never reports leaves the latch stuck
+  permanently. Result: nothing re-renders, bell edits appear impossible, and
+  NOTHING is logged as an error. That matches the report exactly, including why
+  it reproduces on 5.69.2 (the guard dates to v4.32, long predating round 7).
+- **Watchdog (module 16 setActiveSchedule, state.loadLatchWatchdogId)**: 6s after
+  a schedule switch, if either flag is still false, force BOTH true, log which
+  one failed, and recalculate. Rendering a possibly-incomplete schedule is far
+  better than a dead editor. Fail-open by design.
+- **Guard message now names the missing listener** (BASE / PERSONAL + the
+  personal id) instead of an unactionable one-liner.
+- **Carries 6.20.2** (nested periods are not collisions — lunch inside 4th;
+  overlap hook try/catch-guarded) **and 6.20.1** (update popup removed).
+- **Versions**: app 6.20.3; engine 1.16.0; service-worker 1.31.0. old.html
+  UNCHANGED. No rules change, no new module. 74/74.
+- **STILL UNKNOWN**: WHY a listener fails to report. The watchdog makes the app
+  usable and self-reporting; the `[Watchdog]` console line will name the culprit.
+
+## V6.20.2 — Nested periods are not collisions (false lunch overlap) + hard guard
+(Owner report: the overlap banner cried wolf on the exact edit they were making —
+"4th Period ends 12:08 PM, but Lunch A begins 11:36 AM". Root cause: lunch waves
+run INSIDE 4th period, and that is true of EVERY lunch; the detector treated
+containment as a collision. Nesting is legitimate schedule structure.)
+
+- **bell-engine 1.16.0 — detectPeriodOverlaps ignores NESTED spans.** If either
+  period is fully contained in the other (lunch inside 4th, advisory inside a
+  block), it is skipped. Only PARTIAL overruns are reported. +1 regression test
+  covering lunch-inside-4th, lunch moved earlier (the edit that triggered it),
+  and a genuine partial overrun still firing. 74/74.
+- **module 18 — the overlap hook is now wrapped in try/catch.** It is a cosmetic
+  warning bolted to the tail of the sacred render path; it must never be able to
+  take rendering or bell EDITING down with it. Never remove that guard.
+- **Carries 6.20.1** (never deployed): the "New version available!" popup is
+  removed in favour of a silent one-time reload on controllerchange.
+- **Versions**: app 6.20.2; engine 1.16.0; service-worker 1.30.0. old.html
+  UNCHANGED. No rules change, no new module.
+- **NOT fixed here — admin cannot edit bell times.** Reported across alpha
+  (6.20.0), beta (6.11.0) and 5.69.2. 5.69.2 predates every change in this
+  round, so a shared backend cause (rules / data / admin record) is far more
+  likely than app code. Admin DETECTION is confirmed working (the untagged-teacher
+  nudge and the Fix... button only render for a confirmed admin). Next step is the
+  browser console error on a failed save, not more code changes.
+
+# Ellis Web Bell — Changelog
+
+Release history for the main app (src/js / index.html; script.js before 6.0.0). Sibling surfaces (clock.html, old.html, dashboard-config.html, service-worker.js) carry their own version notes in their file headers.
+
+## V6.20.1 — Kill the "New version available!" popup (silent auto-update)
+(The PWA update toast — fixed once in 6.15.0 for hard-refresh — was still
+firing on a normal post-deploy BOOT, which is pure noise on an unattended
+clock. Owner reported it a second time, on a clock display. Removed.)
+
+- **module 99**: dropped the updatefound → "New version available! Refresh to
+  update." toast entirely. The service worker already skipWaiting()s +
+  clients.claim()s, so a new version takes control on its own; now the page
+  simply RELOADS ONCE, silently, on `controllerchange`. Guards: only when
+  wasControlledAtLoad (a genuine update — never a first install or a hard
+  refresh, which already has fresh code) AND no modal/editor is open (so an
+  admin mid-edit is never interrupted; they get the update on their next load).
+- **Net effect**: clocks self-update seamlessly after a deploy — no dialog, no
+  one tapping OK. Interactive users get a brief one-time reload (or the deferred
+  update next load if they're mid-edit).
+- **Rollout note**: clients still on 6.20.0 show the old popup ONE last time as
+  they pick up 6.20.1 (they're running the old code at that instant); hard-
+  refreshing a clock once on deploy avoids even that.
+- **Versions**: app 6.20.1; service-worker 1.29.0 (cache bump); bell-engine
+  unchanged (1.15.0); old.html unchanged. 73/73 tests. No rules change.
+
+## V6.20.0 — Wall-clock feed (reader half): the clocks follow the calendar
+(Phase 2 / the payoff. First change to old.html all round — the ES5 legacy
+hallway-clock/TV page — kept minimal and fail-open. md5 re-recorded:
+b8dd5f5a4c8fed0765c982a9ccc43204 → e56f1e4c50c597cfe9e5618e0b53c732.)
+
+- **old.html now reads config/clock_feeds** (the public doc the 6.19.0
+  publisher writes). New ES5 fetchClockFeeds() caches the feed map via the
+  existing parseFields REST parser; loadPublicSchedule, for its pinned public
+  schedule, prefers feeds[thisScheduleId] when its date === today, rendering
+  those already-transformed periods instead of the base. Everything downstream
+  — relative-bell resolution, the emergency shift, rendering — is unchanged;
+  the clock never does recipe math. Fail-OPEN: any error/404/absence just shows
+  the base schedule.
+- **Emergency shift on top of the feed**: feed periods (un-shifted) get
+  applyShiftToScheduleData with the base doc's temporaryShift, so a same-day
+  shift AND a transform compose correctly (recipe-then-shift, matching the app).
+- **Reaches running TVs automatically**: the feed is fetched right before each
+  load at both call sites (dropdown pick + the existing 5-minute auto-refresh),
+  so a clock that's been on since morning picks up a midday pep-rally change
+  within the refresh cycle — same path the emergency shift already rides.
+- **BUGFIX (pre-existing, found while here)**: the 5-minute refresh's public
+  branch stored the schedule as `data: fields` WITHOUT applying the emergency
+  shift (the initial load applied it) — so shifts were silently dropped on
+  refresh. Now mirrors the boot path (applyShiftToScheduleData(fields)).
+- **No firestore.rules change** (config already public-read). No new module.
+- **Versions**: app 6.20.0 (index triple); service-worker 1.28.0 (cache bump);
+  bell-engine UNCHANGED (1.15.0). 73/73 tests; old.html main script syntax-
+  checked; ES5 verified (no const/let/arrow/template literals).
+- Deploying old.html: it's a standalone page the TVs load directly — cache-bust
+  it (e.g. append ?v=620) so the dumb clients pick up the new file.
+
+## V6.19.0 — Wall-clock feed (publisher half)
+(Phase 1 of getting the hallway TVs/clocks to follow the calendar. This half
+is the authenticated PUBLISHER + opt-in UI; the old.html READER is 6.20.0. No
+rules change — config is already public-read.)
+
+- **The clocks are dumb by design** (old.html: unauthenticated ES5, can't do
+  recipe math), so an authenticated ADMIN precomputes and publishes the answer.
+  When a transform is active for today and opted into clocks, the app applies
+  it with the existing engine and writes the flat, resolved periods to the
+  public **config/clock_feeds** doc, keyed by schedule id, dated. config/{id}
+  is already `allow read: if true` + admin-write, so NO firestore.rules change.
+- **"Show on clocks" picker (module 34)**: authoring a transform now offers a
+  checklist of shared schedules whose hallway clocks should reflect it —
+  EXPLICIT, per owner (no tag/uid inference, consistent with Layer 3). Stored
+  as clockScheduleIds on the transform entry; leave unchecked to change only
+  people's apps.
+- **Publisher (module 20 publishClockFeeds)**: runs on every calendar/schedule/
+  day trigger (via refreshActiveTransforms); admin-only (writes fail for others
+  by rule, so it no-ops). Composes all of today's clock-targeting recipes per
+  schedule onto that schedule's base periods. Resets a schedule's feed to base
+  if its transform was removed earlier the same day (so a cancelled change
+  stops showing before midnight); stale (old-dated) feeds are ignored by the
+  reader.
+- **Verifiable in the Firestore console** without touching old.html: publish a
+  reclaim-FLEX transform ticked for the 7th-grade clock, then look at
+  config/clock_feeds — feeds.<7th-id> should hold the transformed periods dated
+  today.
+- **Versions**: app 6.19.0 (index triple); service-worker 1.27.0 (cache bump);
+  bell-engine UNCHANGED (1.15.0). 73/73 tests. No rules change, no new module.
+- **NEXT (6.20.0)**: the small ES5 change so old.html reads config/clock_feeds
+  and renders today's feed when present — the reader half. First touch of
+  old.html all round; md5 re-recorded then.
+
+## V6.18.1 — Shrink protects passing periods too
+(Follow-up to owner feedback: "Shrink" was the one resolver strategy that
+consumed the passing period. Fixed.)
+
+- **engine 1.15.0**: planOverlapResolution 'shrink' now honors protectGaps
+  (default TRUE). Instead of butting the next period's start right against the
+  overrun's end (zero passing period), it leaves a passing period — reusing
+  that period's own outgoing gap (passing periods are ~uniform), or the
+  smallest positive gap in the schedule as a fallback. Only the next period's
+  start moves, so dismissal is unchanged either way; uncheck the box to butt
+  them together. Passing periods remain a MEASURED quantity (next.start −
+  this.end), never a stored field.
+- **UI (module 37 + index.html)**: the "Protect in-between times" checkbox
+  moved out of the spread-only box and now governs BOTH Shrink and Spread
+  (hidden for Push, which preserves every gap inherently).
+- **Versions**: app 6.18.1; service-worker 1.26.0 (cache bump); bell-engine
+  1.15.0. 73/73 tests. No rules change, no new modules.
+
+## V6.18.0 — "Reclaim a period" (the FLEX magic trick)
+(The "guest speaker won't stop talking — kill FLEX and give the day back"
+tool. A per-day Verb B transformation recipe: ephemeral, non-destructive,
+reversible by deleting the calendar entry, and NEVER a saved schedule or a
+dropdown entry.)
+
+- **bell-engine.js 1.14.0 — applyRecipeToPeriods gains the 'reclaim'
+  archetype** ({ type:'reclaim', periodName }). Removes the named period for
+  the day and redistributes the time it occupied — **[previous period's end →
+  reclaimed period's end]**, which is the reclaimed duration PLUS the incoming
+  passing period — evenly across every surviving period, with **dismissal
+  pinned**. Sacrifices the INCOMING passing period, PRESERVES the OUTGOING one
+  (so the two periods that become adjacent still get a passing period). Because
+  freed = incoming gap + reclaimed length is handed back as extra duration and
+  the day-end is fixed, each remaining class comes out a little longer — the
+  net-positive the owner wanted. Pure, tested (last-period and mid-period
+  cases: FLEX 22 min + 4-min passing = 26 freed; day ends the same). Static
+  bells only; relatives re-derive.
+- **Recipe builder (module 34)**: a third recipe type, "Remove a period & give
+  its time to the rest of the day," with a period-name field (datalist of
+  known period names). Authored in the day-of modal and flows through the grid
+  like any transform. describeRecipe (module 20) labels it.
+- **Rides the existing Verb B pipeline** — resolveCalendarTransforms already
+  carries any transform recipe; module 14 applies it pre-merge at
+  resolveAllBellTimes. No new wiring, no rules change, no new module.
+- **Versions**: app 6.18.0 (index triple); service-worker 1.25.0 (cache bump);
+  bell-engine 1.14.0. 73/73 tests.
+- **Known v1 edge (documented, HANDOFF §7)**: a relative bell anchored INTO
+  the reclaimed period orphans to its fallback for that day. Folding such
+  anchors onto a surviving neighbor is a future refinement.
+
+## V6.17.1 — Resolver tweaks (protect passing periods; demote "push")
+(Amends the never-deployed 6.17.0 per owner feedback. Deploy THIS, not 6.17.0.)
+
+- **"Protect in-between times" checkbox on Spread, DEFAULT ON.** Passing
+  periods are the minimum kids need to get around (and use the bathroom) —
+  non-negotiable. When on (default), the overlap comes out of the CHECKED
+  periods' own length; every passing gap stays intact and dismissal is pinned.
+  Uncheck to revert to the old gap-tightening behavior. engine 1.13.0 adds the
+  protectGaps flag to planOverlapResolution (default true).
+- **"Push everything later" demoted to the THIRD option** (it changes
+  dismissal for the whole building — realistically never used) and gated
+  behind a deliberately dramatic confirm ("…Think of the children! The
+  parents! The bus drivers! … the TEACHERS!") before it moves the end of day.
+- **Order now**: Shrink (default) · Spread (protect-gaps default) · Push (with
+  confirm).
+- **Versions**: app 6.17.1; service-worker 1.24.0 (cache bump); bell-engine
+  1.13.0. 71/71 tests. No rules change, no new modules.
+
+## V6.17.0 — Collision resolver + bolder overlap banner
+(The "fix it" half of 6.16.0's detector — the feature the owner dreamed up —
+plus making the warning loud now that it's actionable.)
+
+- **Bolder banner (module 37 + index.html)**: the overlap warning went from a
+  thin pale strip to a bold red bar with a white **Fix…** button. Only shown
+  to an admin editing a SHARED schedule (a personal-overlay user can't
+  accidentally rewrite the shared base). Dismiss still hides it until the
+  overrun set changes.
+- **Resolver modal (module 37)** with PREVIEW-before-apply — you always see
+  the exact bell-time changes before anything is written. Three strategies:
+  - **Shrink the next period** — its start moves to the overrun's end; it's
+    shorter; the day ends on time. (One bell; simplest.)
+  - **Push later** — the next period and everything after shift later by the
+    overlap; nothing shortens; the day ends later.
+  - **Spread across periods I choose** — checkboxes of the following periods;
+    the overlap is split evenly and the gaps after the checked periods tighten
+    so each period keeps its length and the day still ends on time. Warns if a
+    gap can't absorb its share.
+- **bell-engine.js 1.12.0 — planOverlapResolution(periods, overrunName,
+  strategy, absorbNames)** (pure, tested, all three strategies): returns the
+  bell moves + day-end delta + any warning. Moves ONLY static bells; relative
+  bells are never touched and re-derive downstream.
+- **Apply path (module 18)**: on Apply, module 37 hands the moves to module 18
+  via an event (no import cycle); module 18 rewrites the named static bells in
+  state.localSchedulePeriods and writes `periods` — the source of truth,
+  exactly as the delete-period path does (no new save path invented) — logs a
+  'resolve-overlap' audit entry, and the shared listener recalcs, which clears
+  the banner if resolved.
+- **Versions**: app 6.17.0 (index triple); service-worker 1.23.0 (cache bump,
+  no new modules); bell-engine 1.12.0. 70/70 tests. No firestore.rules change.
+- **Note**: "spread" v1 tightens the GAPS between the checked periods (each
+  keeps its own length). If the owner wants the periods THEMSELVES to shorten
+  (lose instructional minutes), that's a labeled refinement — the preview
+  makes the current behavior explicit before applying.
+
+## V6.16.0 — Period overrun detection (the "you're cutting into 4th" warning)
+(First, SAFE half of the collision resolver the owner dreamed up. Detection
+is read-only; the destructive shrink/spread auto-fix is a deliberately
+separate later slice — it moves bells on the sacred live-edit path, so the
+detector earns real-world trust first.)
+
+- **bell-engine.js 1.11.0 — detectPeriodOverlaps(periods)** (pure, tested):
+  flags any period whose LAST bell runs past the NEXT period's FIRST bell.
+  Only periods with a real extent (≥2 distinct times) count — single-bell
+  markers and relative-only stubs are skipped — and back-to-back boundaries
+  (end == next start) are NOT flagged, so ordinary passing-period gaps never
+  trip it. Returns the offending pairs with times + overlap seconds.
+- **NEW module 37-overlap-warning.js** — after each recalc, if admin-mode is
+  on, runs the detector on state.calculatedPeriodsList (the very periods
+  being displayed) and shows a dismissible RED banner: "⚠ 3rd Period ends
+  10:44 AM, but 4th Period begins 10:38 AM — a 6-minute overlap." Strictly
+  read-only; never moves a bell. Dismiss hides it until the overrun SET
+  changes (fix-and-rebreak still re-warns; an unchanged warning stays hidden).
+  Hooked via one additive line at the tail of recalculateAndRenderAll
+  (module 18) — display only, cannot affect editing or ringing.
+- **BUGFIX — engine VERSION constant drift**: BellEngine.VERSION had silently
+  stuck at '1.8.0' since the 1.9.0/1.10.0 header bumps never updated the
+  constant (a str-replace that missed, and nothing in the battery verifies
+  it — the status modal has been under-reporting). Corrected to 1.11.0.
+- **Versions**: app 6.16.0 (index triple); service-worker 1.22.0 (NEW module
+  → CORE_ASSETS now 41, cache bump); bell-engine 1.11.0. 69/69 tests. No
+  firestore.rules change.
+- **DEFERRED (next slice, documented)**: the interactive resolver — shrink
+  the next period, spread the overflow across periods you pick (checkboxes),
+  cancel, or allow-anyway. It rewrites bells on the live schedule, so it gets
+  its own careful release once the detector is proven on real schedules.
+
+## V6.15.0 — Untagged-teacher nudge + hard-refresh update-toast bugfix
+(Two things: the operational glue that pairs with the home schedule, and a
+fix for a long-standing annoyance the owner flagged.)
+
+- **Untagged nudge (NEW module 36-untagged-nudge.js)** — an admin can't
+  preload every teacher; people trickle onto the roster over the first
+  weeks. On admin sign-in, a one-time cross-reference of presence ∩ roster
+  finds anyone who has SIGNED IN (a non-clock presence report) but has NO
+  TAG yet, and shows a dismissible blue banner ("N people have signed in
+  but have no tags yet …"). Its Review button opens the existing Roster &
+  Tags modal — no authoring duplicated. Admin-only (gated on the
+  server-confirmed admin flag; the check only runs on an
+  `ellis-admin-confirmed` event module 15 fires for real admins). Reads
+  only; never resolves a tag into a target (Layer 3 invariant intact).
+  Flow: Ms. Johnson signs in → admin is nudged → tag her + set her home
+  schedule (or re-run the 6.14.0 template) → module 20's home listener
+  lands her on the right schedule.
+- **BUGFIX — spurious "New version available!" on hard refresh (module
+  99).** The PWA update toast checked `navigator.serviceWorker.controller`
+  LIVE at the new worker's `statechange`. Because the SW uses
+  skipWaiting + clients.claim, a hard refresh (which loads uncontrolled
+  and pulls the latest from the network) would have the freshly-installed
+  worker race to claim the page, flipping `controller` truthy, so the
+  toast fired even though the user already had the newest code. Fix:
+  capture `wasControlledAtLoad` ONCE, up front, before any new worker can
+  claim, and gate the toast on that. Hard refresh → uncontrolled at load →
+  no toast (you have latest). Normal reload served from the old cache →
+  controlled at load → toast stays useful ("you're on the old version,
+  refresh"). First-ever install is uncontrolled too, so it stays silent.
+  skipWaiting/claim untouched, so the wall-clock TVs still auto-update.
+- **State**: new server-confirmed `state.isAdmin` (distinct from the
+  manual admin-mode toggle), set in module 15's auth handler.
+- **Versions**: app 6.15.0 (index triple); service-worker 1.21.0 (NEW
+  module → CORE_ASSETS now 40, cache bump); bell-engine UNCHANGED (1.10.0).
+  68/68 tests. No firestore.rules change (presence + roster reads already
+  admin/authed).
+
+## V6.14.0 — Home Schedule (invariant-safe per-teacher default)
+(A teacher's "normal day" schedule, so 6th-grade teachers land on the
+6th-grade schedule without picking it each morning — and the CDC teacher,
+who carries all three grade tags, is set to one schedule explicitly, once.
+Opt-in and backward-compatible: teachers with no home set behave exactly
+as before. Honors the Layer 3 invariant — explicit per-uid defaults, never
+runtime tag resolution.)
+
+- **roster/{uid}.defaultScheduleId** (new optional field) — a teacher's
+  home shared schedule. Admin-set. No rules change (roster is already
+  self-readable / admin-writable; the field is additive).
+- **Resolution (module 20, restructured)**: order is now (1) scoped
+  calendar designation → mandate, auto-follow + I1 banner on deviation;
+  (2) school-wide exception/weekday default → mandate (rare at Ellis);
+  (3) HOME schedule → SILENT auto-load, no banner. Home is a convenience,
+  not a building mandate: it never overrides a same-day manual pick and
+  NEVER yanks a personal-schedule user off their overlay. Steps 1+2
+  reproduce the old resolution exactly; step 3 is the new per-teacher
+  layer, reachable even with no calendar doc. A live listener on the
+  user's own roster doc means an admin setting a default takes effect at
+  once.
+- **bell-engine.js 1.10.0** — resolveScopedDesignation extracted (the
+  scoped-mandate half of resolveCalendarSchedule) so module 20 can tell a
+  bannered mandate from the silent home default. resolveCalendarSchedule
+  behavior unchanged (now calls the extraction). +1 test (68/68).
+- **Roster UI (module 33)**: each person gets a Home schedule picker;
+  a bulk template panel sets the home default for everyone matching a
+  tag/name filter (with a count + confirm to eyeball first) — the
+  "6th → 6th-grade schedule" one-click, re-runnable as new people are
+  tagged.
+- **Select all shown / Clear (module 34)** in the designation people
+  picker — quality-of-life for designating a whole filtered group.
+- **Versions**: app 6.14.0 (index triple); service-worker 1.20.0 (cache
+  bump — no new modules, CORE_ASSETS unchanged); bell-engine 1.10.0.
+  No firestore.rules change.
+- **Deferred (documented)**: alerting the admin when a signed-in teacher
+  has no tag/home yet (the "Ms. Johnson finally logged in" nudge) is the
+  next slice — it pairs with this and rides on presence + roster.
+
+## V6.13.0 — The Prefill Grid (Layer 4 "plan the weeks" — view + edit + repeat-weekly)
+(First of Layer 4's two planning UIs. The day-of modal covers I2 chaos;
+the grid covers "plan ahead when we can." New module 35. Rotation-cycle
+generators — slip-forward / calendar-locked — are the documented NEXT
+slice; deliberately out of scope here as they're aspirational/for other
+schools per the design doc.)
+
+- **New module 35-schedule-grid.js** — a desktop-grade "Plan Ahead"
+  calendar modal. A navigable 6-week grid (← Today →, paging 4 weeks)
+  reads config/schedule_calendar (getDoc snapshot, like module 34) and
+  summarizes each date's base designation(s) (▸ schedule name) and
+  transform(s) (⚡ via the shared describeRecipe). Clicking any day opens
+  the existing day-of modal (module 34) PRESET to that date — all
+  authoring (base + the Verb B recipe builder) is reused, not
+  reimplemented. The grid hides while the editor is up and reshows +
+  refreshes when it closes, wired by DOM CustomEvents so module 34 never
+  imports the grid (no cycle).
+- **Repeat-weekly generator** — copy one date's whole plan onto every
+  same-weekday date through a chosen end date. Each copied entry routes
+  through the engine's mergeCalendarEntry, so re-designating the same
+  people on a target date that already has a plan does the correct
+  last-write-wins thing (and transforms compose).
+- **bell-engine.js 1.9.0** — mergeCalendarEntry extracted: the base-dedup
+  / transform-append rule that was inline (and untested) in module 34
+  since 6.11.0 now lives in one pure, tested place, shared by the modal
+  and the grid's copy-forward. Behavior identical; module 34 rewired to
+  call it. +1 test (67/67).
+- **Module 34** — open() now accepts an optional preset date; exports
+  openDesignationModal(dateStr) for the grid; emits ellis-calendar-changed
+  on save/remove and ellis-designation-closed on close. Day-of behavior
+  unchanged (preset defaults to today).
+- **Versions**: app 6.13.0 (index triple); service-worker 1.19.0 (NEW
+  module → CORE_ASSETS now 39 modules, cache bump); bell-engine 1.9.0.
+  No firestore.rules change (config/schedule_calendar already covered).
+
+## V6.12.0 — Verb B wired (Layer 4 transformation recipes go live)
+(The engine functions that shipped dormant in 6.11.0 now have callers —
+same wake-the-resolver step 6.10.0 did for Verb A. No engine change, no
+rules change, no new modules. Mostly UI.)
+
+- **Resolution path (state.js + module 20 + module 14)**: the day's
+  transformation recipes for THIS user resolve into a new
+  `state.activeCalendarTransforms` and apply to COPIES of the base
+  periods in `resolveAllBellTimes`, before the shared/personal merge —
+  the same pristine-copy discipline as the emergency shift, so
+  `localSchedulePeriods` is never mutated (edit modals stay honest).
+  Recipes compose in resolution order; the emergency shift, if any,
+  still rides on top (recipe = planned structure, shift = day-of blanket
+  nudge). Relative bells — shared AND personal — re-derive from the moved
+  parents downstream, so Layer 2 overlays survive a transform for free.
+  Module 20 refreshes the recipe set on every calendar/schedule/day
+  trigger, INDEPENDENT of base designation (Verb B needs no Verb A), and
+  only re-renders when the set actually changes.
+- **I1 banner (module 20)**: the amber designation banner now surfaces
+  active transforms too — "Today's bells are adjusted: …", or appended to
+  a base-deviation notice. Follow is hidden in transform-only mode (there
+  is no base to follow). `describeRecipe` is exported so the modal's entry
+  list and the banner share one summary string and can't drift.
+- **Recipe builder (module 34 + index.html)**: the day-of Designation
+  modal gains a mode toggle — "Designate a base schedule" (Verb A, as
+  before) vs "Apply a transformation" (Verb B). The transform builder
+  authors both archetypes: SHIFT (minutes earlier/later, optional
+  from/until bounds) and SHORTEN (shorten periods after a time by N
+  minutes each, optionally naming a period to extend — a datalist
+  suggests period names across all admin schedules). Same Layer 3 people
+  picker (explicit checked uids stored, never tags). Transforms COMPOSE:
+  no dedup on save — a person can carry several, and be base-designated
+  too; Remove takes one back.
+- **Wall-clock precompute NOT in scope**: app clients resolve recipes at
+  runtime (module 14). Precomputing resolved times into the calendar doc
+  for the ES5 REST wall clocks remains the last Layer 4 slice
+  (follow-along), still unstarted.
+- **+1 test (66/66)**: a pipeline test folds resolveCalendarTransforms
+  output through sequential applyRecipeToPeriods exactly as module 14
+  does — pins compose-in-order and the no-op-preserves-base-reference
+  contract the wiring leans on.
+- **Versions**: app 6.12.0 (index triple bumped); service-worker 1.18.0
+  (cache bump only — no new modules, CORE_ASSETS unchanged); bell-engine
+  UNCHANGED at 1.8.0. No firestore.rules change.
+
 ## V6.11.0 — Anchor-strip fix, dedup, firstSeen; Verb B engine (dormant)
 (Bugfix + ride-along release. Verb B's ENGINE lands and is fully tested
 but nothing calls it yet — same pattern as 6.10.0 shipping

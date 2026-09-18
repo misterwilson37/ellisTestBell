@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bell Schedule Clock v1.7.0</title>
+    <title>Bell Schedule Clock v1.8.0</title>
     <!-- Clock Display v1.7.0 -->
     <!-- v1.7.0 (2026-07, app 6.5.0): presence reporting for TVs/grids
          (DESIGN-CALENDAR-V2.md Layer 1 open question, now closed): a 5-min
@@ -32,6 +32,14 @@
          - Added --carolina-blue-sky (#8FC3E8) variable for future dark-mode UI
            that needs a brighter accent than Carolina proper.
          - Auth section and setup-panel backgrounds adjusted for the lighter bg. -->
+    <!-- v1.8.0: Bells now play THEIR OWN sound, not one sound for all of them.
+         playBellSound() takes the bell's sound and honours "Silent / None"
+         ([SILENT]); the picker above is now the FALLBACK for bells with no
+         sound set, so existing setups are unchanged. Companion to app 6.25.1,
+         which fixed the same silent-bell bug in the main app's playBell().
+         NOTE: the per-column 🔔 checkbox already gives all-or-nothing audio per
+         schedule line and already defaults to OFF, so a refresh stays quiet
+         without any new control. -->
     <!-- v1.3.2: Audit pass — shared firebase-config.js; service worker registration; removed stale cross-refs to sibling versions; version in <title> -->
     <!-- v1.3.1: Fix grid overflow in narrow frames (minmax(0,1fr) + min-width:0 + wrappable labels) -->
     <!-- v1.3.0: Support up to 9 schedules with automatic grid layout -->
@@ -601,7 +609,7 @@
         
         <!-- Sound selector (shown for logged-in users) - between columns and buttons -->
         <div id="sound-selector-section" class="mb-4 mt-2" style="display: none;">
-            <label class="block text-sm font-medium text-gray-400 mb-2">🔊 Bell Sound (for all audio-enabled columns):</label>
+            <label class="block text-sm font-medium text-gray-400 mb-2">🔊 Fallback Bell Sound (used when a bell has no sound of its own):</label>
             <select id="setup-sound" class="w-full px-3 py-2 border border-gray-600 rounded-lg bg-black text-white">
                 <option value="ellisBell.mp3">Ellis Bell (Default)</option>
                 <option value="Bell">Bell</option>
@@ -1003,9 +1011,39 @@
         }
         
         // Play bell sound
-        function playBellSound() {
+        // v1.8.0: Honour the bell's OWN sound, including "Silent / None".
+        //
+        // Until now this took no argument and played config.sound for EVERY
+        // bell, so a bell the teacher had deliberately set silent still rang
+        // here. If someone has gone to the trouble of choosing sounds per bell
+        // on the website, this should play what they chose — silence included.
+        //
+        // config.sound stays as the FALLBACK for a bell with no sound of its
+        // own, which is every bell on a schedule that was never customised, so
+        // existing setups sound exactly as they did.
+        //
+        // The non-http guard mirrors old.html's long-standing logic: the main
+        // app stores a sound as either a full download URL or a Storage PATH,
+        // and `new Audio(path)` cannot resolve a bare path. Anything that is
+        // not an absolute URL falls back rather than failing silently — which
+        // on a signage clock would look identical to a broken bell.
+        function playBellSound(bellSound) {
+            // Explicitly silent: the teacher chose this. Do nothing.
+            if (bellSound === '[SILENT]') {
+                console.log('Silent bell - not playing');
+                return;
+            }
+
+            let url = bellSound || config.sound;
+
+            // Storage paths and other non-URLs cannot be played directly here.
+            if (!url || url.indexOf('http') !== 0) {
+                url = config.sound;
+            }
+            if (!url) return;
+
             try {
-                const audio = new Audio(config.sound);
+                const audio = new Audio(url);
                 audio.play().catch(err => {
                     console.log('Audio play failed (user interaction may be required):', err);
                 });
@@ -1050,7 +1088,7 @@
                         if (bell.time === currentTimeStr && !playedBells.has(bellKey)) {
                             console.log(`🔔 Playing bell: ${period.name} at ${bell.time}`);
                             playedBells.add(bellKey);
-                            playBellSound();
+                            playBellSound(bell.sound); // v1.8.0: per-bell sound
                             return; // Only play one bell at a time
                         }
                     }

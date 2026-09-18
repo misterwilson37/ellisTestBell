@@ -1,7 +1,53 @@
 /**
  * Ellis Web Bell - Service Worker
- * Version: 1.17.0
+ * Version: 1.38.0
  *
+ * v1.29.0 changelog (2026-07, app 6.20.1): no new modules — cache bump for the
+ *   PWA update-UX fix: the "New version available! Refresh to update." popup is
+ *   GONE (it nagged unattended clocks on every post-deploy boot). Replaced with
+ *   a silent one-time reload on controllerchange (genuine updates only, never
+ *   while a modal is open). Edited module 99.
+ * v1.28.0 changelog (2026-07, app 6.20.0): no new modules — cache bump for the
+ *   wall-clock feed READER: old.html reads config/clock_feeds (ES5). Also fixed
+ *   the refresh path dropping the emergency shift.
+ * v1.27.0 changelog (2026-07, app 6.19.0): no new modules — cache bump for
+ *   the wall-clock feed (publisher half): admins publish transformed periods
+ *   to the public config/clock_feeds doc; "Show on clocks" picker in the
+ *   transform builder. NO rules change (config is already public-read). The
+ *   old.html reader is the next release. Edited 20/34 + index.html.
+ * v1.26.0 changelog (2026-07, app 6.18.1): no new modules — cache bump: the
+ *   resolver's "Shrink" now protects passing periods by default too (engine
+ *   1.15.0), and the "Protect in-between times" checkbox governs Shrink +
+ *   Spread. Edited 37 + index.html + bell-engine.
+ * v1.25.0 changelog (2026-07, app 6.18.0): no new modules — cache bump for
+ *   the "Reclaim a period" Verb B recipe (engine 1.14.0 reclaim archetype +
+ *   recipe-builder option in module 34 + describeRecipe in 20). One-day,
+ *   non-destructive, never a dropdown entry.
+ * v1.24.0 changelog (2026-07, app 6.17.1): no new modules — cache bump for
+ *   resolver tweaks: spread protects passing periods by default (engine 1.13.0
+ *   protectGaps), "Push later" demoted to 3rd with a dismissal-change confirm.
+ * v1.23.0 changelog (2026-07, app 6.17.0): no new modules — cache bump for
+ *   the collision RESOLVER (engine 1.12.0 planOverlapResolution + edited
+ *   18/37 + index.html; the overlap banner is now bold + actionable).
+ * v1.22.0 changelog (2026-07, app 6.16.0): + 37-overlap-warning.js (read-only
+ *   period-overrun detector for the editor). NEW MODULE -> CORE_ASSETS now
+ *   41 modules. Cache bump also ships engine 1.11.0 (+detectPeriodOverlaps,
+ *   +VERSION-constant fix) and the module 18 render hook + index.html banner.
+ * v1.21.0 changelog (2026-07, app 6.15.0): + 36-untagged-nudge.js (admin
+ *   nudge for signed-in staff without tags). NEW MODULE: added to
+ *   CORE_ASSETS (40 modules). Cache bump also ships the hard-refresh
+ *   update-toast bugfix (client-side, module 99) + home-schedule follow-ups.
+ * v1.20.0 changelog (2026-07, app 6.14.0): no new modules — cache bump to
+ *   ship the home-schedule feature (engine 1.10.0 + edited 15/20/33/34 +
+ *   index.html). CORE_ASSETS unchanged.
+ * v1.19.0 changelog (2026-07, app 6.13.0): + 35-schedule-grid.js (Layer 4
+ *   prefill grid — plan weeks ahead). NEW MODULE: added to CORE_ASSETS
+ *   (39 modules). Cache bump ships it plus the edited 14/20/34 + engine
+ *   1.9.0 (mergeCalendarEntry) + index.html.
+ * v1.18.0 changelog (2026-07, app 6.12.0): no new modules — cache bump
+ *   to ship Verb B wiring (edited 14/20/34 + state.js + index.html):
+ *   calendar transformation recipes now resolve at runtime and transform
+ *   the active base's bells. CORE_ASSETS unchanged.
  * v1.17.0 changelog (2026-07, app 6.11.0): no new modules — cache bump
  *   to ship edited 28/29/30/16/34 + bell-engine 1.8.0 (anchor-strip fix,
  *   designation dedup, firstSeen, dormant Verb B engine, UI notes).
@@ -111,7 +157,7 @@
  *   to fetch them).
  */
 
-const CACHE_VERSION = '1.17.0';
+const CACHE_VERSION = '1.38.0';
 // v1.8.0: derived — bumping CACHE_VERSION is the ONLY bump needed; the
 // activate handler evicts every cache whose name differs from this one.
 const CACHE_NAME = 'ellis-web-bell-' + CACHE_VERSION;
@@ -162,6 +208,9 @@ const CORE_ASSETS = [
     '/src/js/32-personal-anchor-migration.js',
     '/src/js/33-roster.js',
     '/src/js/34-day-designation.js', // v1.11.0 (app 6.4.0, presence)
+    '/src/js/35-schedule-grid.js', // v1.19.0 (app 6.13.0, prefill grid)
+    '/src/js/36-untagged-nudge.js', // v1.21.0 (app 6.15.0, untagged nudge)
+    '/src/js/37-overlap-warning.js', // v1.22.0 (app 6.16.0, overlap detector)
   '/src/js/99-init-and-listeners.js',
   '/src/js/main.js',
   '/src/js/state.js',

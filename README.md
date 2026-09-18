@@ -7,10 +7,10 @@ A real-time, synchronized school bell schedule and timer system. Built for a sch
 | File | What it is | Firebase SDK | Notes |
 |---|---|---|---|
 | `index.html` + `src/js/` | The main teacher-facing app: countdown, schedule editing, quick bells, queues, themes, PiP, broadcast, share codes | v11 modular (ES modules) | Native ES modules since 6.0.0 — src/js/ IS production, entry point `src/js/main.js` |
-| `clock.html` | Multi-schedule grid clock (up to 3x3) for Yodeck TV kiosks | v9 compat | Relative-bell math comes from the shared `bell-engine.js` as of v1.5.0 (its old local copy had silently diverged) |
+| `clock.html` | Multi-schedule grid clock (up to 3x3) for Yodeck TV kiosks | v9 compat | Relative-bell math comes from the shared `bell-engine.js` as of v1.5.0 (its old local copy had silently diverged). As of v1.8.0 each bell plays ITS OWN sound, honouring "Silent / None"; the setup screen's picker is the fallback. Configured entirely by URL params (`a1`…`a9` are the per-column audio toggles) — so any new param must default to today's behaviour or saved clock URLs change meaning |
 | `old.html` | Legacy self-contained clock for old iPads / Kindle Fires (iOS 9-era browsers) | None — raw Firestore REST API, **unauthenticated** | ES5 only, no modules. This is why `personal_schedules` must stay publicly readable in firestore.rules |
 | `dashboard-config.html` | Admin tool for the signage dashboard config | v9 compat | Intentionally not cached by the service worker |
-| `signage/` (not in this repo snapshot) | dashboard.html, dashclock.html, dashright.html + crest PNGs for TVs | — | Referenced by service-worker CORE_ASSETS |
+| `signage/` | dashboard.html, dashright.html, dashclock.html + crest PNGs for TVs | v9 compat | **IS in this repo** (the older "not in this snapshot" note was wrong). House scores come from a published Google Sheet CSV whose URL lives in the dashboard config. The right column is DUPLICATED between dashboard.html and dashright.html — change both together. Size in `cqw`, never `vw`/`vh`: that bug has been fixed twice |
 
 ## ⚠️ The Build Rule (the one people forget)
 

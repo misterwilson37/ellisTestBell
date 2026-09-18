@@ -1443,6 +1443,38 @@
         
         var publicSchedules = [];
         
+        // v6.20.0: WALL-CLOCK FEED READER (ES5, iOS 9 safe). Dumb clocks can't
+        // do recipe math, so an authenticated admin publishes today's already-
+        // TRANSFORMED periods to the public config/clock_feeds doc (module 20's
+        // publishClockFeeds). We fetch + cache that map here; loadPublicSchedule
+        // prefers today's feed over the base schedule. config/{id} is public-
+        // read (firestore.rules), so no auth. Fail-OPEN: any error/absence just
+        // leaves the base schedule showing.
+        var clockFeeds = {};
+        function fetchClockFeeds(cb) {
+            var path = '/artifacts/' + APP_ID + '/public/data/config/clock_feeds';
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', FIRESTORE_BASE + path, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            var parsed = parseFields(data.fields || {});
+                            clockFeeds = parsed.feeds || {};
+                        } catch (e) {
+                            console.log('[ClockFeed] parse error:', e);
+                        }
+                    } else if (xhr.status === 404) {
+                        clockFeeds = {}; // nothing published yet — perfectly fine
+                    }
+                    if (typeof cb === 'function') cb();
+                }
+            };
+            xhr.onerror = function() { if (typeof cb === 'function') cb(); };
+            xhr.send();
+        }
+
         function fetchPublicSchedules() {
             var listPath = '/artifacts/' + APP_ID + '/public/data/schedules';
             var xhr = new XMLHttpRequest();
@@ -1525,8 +1557,24 @@
             showStatus('Loading ' + selectedSchedule.name + '...', '');
             scheduleName = selectedSchedule.name;
             
-            // Extract bells from the public schedule
-            bells = extractBellsFromSchedule(selectedSchedule.data);
+            // v6.20.0: if an admin published a feed for THIS schedule dated
+            // today, render those (already-transformed) periods instead of the
+            // base. We still apply the emergency shift on top (recipe-then-
+            // shift, matching the app). Copy first — applyShiftToScheduleData
+            // mutates bell times in place, and the cache may be reused.
+            var scheduleData = selectedSchedule.data;
+            var feed = clockFeeds[scheduleId];
+            if (feed && feed.date === localDateStr(new Date()) && feed.periods && feed.periods.length) {
+                var feedPeriods = JSON.parse(JSON.stringify(feed.periods));
+                scheduleData = applyShiftToScheduleData({
+                    periods: feedPeriods,
+                    temporaryShift: selectedSchedule.data ? selectedSchedule.data.temporaryShift : null
+                });
+                console.log('[ClockFeed] Using today\'s published schedule for ' + scheduleId);
+            }
+
+            // Extract bells from the (feed-or-base) schedule
+            bells = extractBellsFromSchedule(scheduleData);
             
             console.log('Public schedule bells:', bells);
             
@@ -2286,7 +2334,7 @@
         publicScheduleSelect.onchange = function() {
             var selectedId = publicScheduleSelect.value;
             if (selectedId) {
-                loadPublicSchedule(selectedId);
+                fetchClockFeeds(function() { loadPublicSchedule(selectedId); }); // v6.20.0
             }
         };
         
@@ -2360,12 +2408,12 @@
                                         publicSchedules.push({
                                             id: schedId,
                                             name: fields.name || fields.scheduleName || schedId,
-                                            data: fields
+                                            data: applyShiftToScheduleData(fields)
                                         });
                                     }
                                     
                                     populatePublicScheduleDropdown();
-                                    loadPublicSchedule(publicId);
+                                    fetchClockFeeds(function() { loadPublicSchedule(publicId); }); // v6.20.0
                                 } catch (e) {
                                     console.error('Error refreshing public schedule:', e);
                                 }

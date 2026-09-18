@@ -7,7 +7,7 @@
          always match — this <title>, the visible <h1> banner, and the comment on
          the last line of this file. Update all three together. (z = fix/tweak,
          y = new feature, x = major shift with the owner's sign-off.) -->
-    <title>Ellis Web Bell 6.11.0</title>
+    <title>Ellis Web Bell 6.25.1</title>
 
     <!-- V5.51.0: PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -273,6 +273,45 @@
         <span id="designation-text" class="flex-grow"></span>
         <button type="button" id="designation-follow" class="px-2 py-1 text-amber-900 hover:bg-amber-200 rounded-lg font-medium underline">Follow</button>
         <button type="button" id="designation-dismiss" class="px-2 py-1 text-amber-900 hover:bg-amber-200 rounded-lg font-bold" title="Dismiss for this session">&times;</button>
+    </div>
+
+    <!-- v6.15.0: untagged-teacher nudge (admins only; shown by module 36) -->
+    <div id="untagged-nudge-banner" class="hidden kiosk-hide bg-blue-100 border-b border-blue-300 text-blue-900 px-4 py-2 text-sm flex items-center justify-between gap-4">
+        <span id="untagged-nudge-text" class="flex-grow"></span>
+        <button type="button" id="untagged-nudge-review" class="px-2 py-1 text-blue-900 hover:bg-blue-200 rounded-lg font-medium underline">Review</button>
+        <button type="button" id="untagged-nudge-dismiss" class="px-2 py-1 text-blue-900 hover:bg-blue-200 rounded-lg font-bold" title="Dismiss for this session">&times;</button>
+    </div>
+
+    <!-- v6.16.0: period overrun warning (admins editing); v6.17.0: bolder + Fix -->
+    <div id="overlap-warning-banner" class="hidden kiosk-hide bg-red-600 border-b-2 border-red-800 text-white px-4 py-3 text-base font-medium flex items-center justify-between gap-4 shadow-md">
+        <span id="overlap-warning-text" class="flex-grow"></span>
+        <button type="button" id="overlap-warning-fix" class="px-4 py-1.5 bg-white text-red-700 font-semibold rounded-lg shadow hover:bg-red-50">Fix…</button>
+        <button type="button" id="overlap-warning-dismiss" class="px-2 py-1 text-white hover:bg-red-700 rounded-lg font-bold text-lg" title="Dismiss until it changes">&times;</button>
+    </div>
+
+    <!-- v6.17.0: overlap resolver modal -->
+    <div id="overlap-resolver-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-lg">
+            <h3 class="text-2xl font-medium mb-2">Resolve schedule overlap</h3>
+            <p id="overlap-resolver-summary" class="text-sm text-gray-600 mb-4"></p>
+            <div class="space-y-2 mb-4">
+                <label class="flex items-start gap-2 text-sm"><input type="radio" name="overlap-strategy" value="shrink" class="mt-1" checked> <span id="overlap-strategy-shrink-label">Shrink the next period (it starts later; day ends on time)</span></label>
+                <label class="flex items-start gap-2 text-sm"><input type="radio" name="overlap-strategy" value="spread" class="mt-1"> <span>Spread it across periods I choose (day ends on time)</span></label>
+                <label class="flex items-start gap-2 text-sm"><input type="radio" name="overlap-strategy" value="push" class="mt-1"> <span>Push everything later &mdash; <em>changes dismissal for the whole building</em></span></label>
+            </div>
+            <div id="overlap-resolver-protect-row" class="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="overlap-resolver-protect" class="mt-1" checked> <span><strong>Protect in-between times</strong> — keep the passing periods (kids still get time to move &amp; use the bathroom). The minutes come out of the periods instead. Uncheck to let the gaps absorb it.</span></label>
+            </div>
+            <div id="overlap-resolver-spread-fields" class="hidden mb-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p class="text-sm text-gray-600 mb-2">Which following periods should absorb the overlap? It's split evenly among the ones you check.</p>
+                <div id="overlap-resolver-absorb" class="space-y-1 max-h-40 overflow-y-auto"></div>
+            </div>
+            <div id="overlap-resolver-preview" class="mb-4 border-t pt-3"></div>
+            <div class="flex justify-end gap-3">
+                <button type="button" id="overlap-resolver-cancel" data-btn="cancel">Cancel</button>
+                <button type="button" id="overlap-resolver-apply" data-btn="primary">Apply fix</button>
+            </div>
+        </div>
     </div>
 
 
@@ -645,6 +684,13 @@
 				        <span id="edit-time-note-locked" class="hidden text-gray-500">🔒 Only admin can change anchor bell times</span>
 				        <span id="edit-time-note-admin" class="hidden text-amber-600">🔓 Admin: saving a new time changes this bell for every user of this schedule.</span>
 				        <span id="edit-time-note-anchor" class="hidden text-gray-500"></span>
+				        <!-- V6.22.0: shown when the stored (base) time differs from
+				             the time on today's clocks, i.e. an emergency shift or a
+				             calendar transform is active. Filled in by module 16. -->
+				        <span id="edit-time-note-rebased" class="hidden block mt-1 text-amber-600"></span>
+				        <!-- V6.22.0: shown for a shared bell stored as RELATIVE — its
+				             time is derived from a parent bell, so the field is locked. -->
+				        <span id="edit-time-note-relative" class="hidden block mt-1 text-gray-500">🔗 This bell's time is calculated from another bell, so it can't be typed here. Delete and re-add it to change how it's anchored.</span>
 				    </div>
 				</div>
                 <div>
@@ -725,19 +771,19 @@
 
             <!-- NEW in 4.21: Override sound checkbox for shared bells -->
             <!-- Override shared sound checkbox -->
+			<!-- V6.20.4: THE ADMIN CONFIRM. This one checkbox governs the whole
+			     modal: unticked, everything you change here is yours alone;
+			     ticked, everything you change here changes for every user of
+			     this schedule. It was labelled "Override shared SOUND for all
+			     users" from 5.66.2 to 6.20.3 while actually gating name, visual
+			     AND time — which is how admin time edits came to vanish without
+			     a word. Keep the label describing the whole modal, not one field. -->
 			<div id="edit-bell-override-container" class="mb-4 hidden">
 			    <label class="flex items-center space-x-2 cursor-pointer">
 			        <input type="checkbox" id="edit-bell-override-checkbox" class="h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
-			        <span class="text-sm text-gray-700">Override shared sound for all users</span>
+			        <span class="text-sm text-gray-700">Change this bell for <strong>everyone</strong> on this schedule</span>
 			    </label>
-			</div>
-
-			<!-- NEW 5.20: Override visual checkbox (admin only) -->
-			<div id="edit-bell-visual-override-container" class="mb-4 hidden">
-			    <label class="flex items-center space-x-2 cursor-pointer">
-			        <input type="checkbox" id="edit-bell-visual-override-checkbox" class="h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
-			        <span class="text-sm text-gray-700">Override shared visual for all users</span>
-			    </label>
+			    <p class="text-xs text-gray-500 mt-1 ml-6">Leave unticked and your changes to the name, sound and visual apply only to you. Bell <em>times</em> are shared — changing a time requires this box.</p>
 			</div>
 
             <!-- V6.5.0: Building Bells anchor (admin + shared bell only; applies
@@ -1043,6 +1089,21 @@
             <div class="mb-4">
                 <button type="button" id="roster-seed-btn" data-btn="primary">Seed from presence</button>
             </div>
+            <!-- v6.14.0: bulk home-schedule template -->
+            <div class="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Set a home schedule in bulk</label>
+                <p class="text-xs text-gray-500 mb-2">Filter by tag or name, pick a schedule, and set it as the home default for everyone who matches. You'll see the count before it applies. Each person gets an explicit default — no tag is resolved later, so the CDC teacher (all three grades) is set directly, once.</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <!-- V6.22.0: min-w-0 lets the two fields shrink (an <input>'s
+                         default min-width is its ~20-character intrinsic size, which
+                         forced this row wider than the panel); flex-shrink-0 +
+                         whitespace-nowrap stop the button collapsing to its longest
+                         word and wrapping onto three lines. -->
+                    <input type="text" id="roster-template-filter" placeholder="Filter (e.g. 6th)" class="flex-grow min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm">
+                    <select id="roster-template-schedule" class="flex-grow min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-sm"></select>
+                    <button type="button" id="roster-template-apply" data-btn="primary" class="flex-shrink-0 whitespace-nowrap">Set for all matching</button>
+                </div>
+            </div>
             <div id="roster-list"></div>
             <p id="roster-status" class="text-blue-600 text-sm mt-4 hidden"></p>
             <div class="mt-6 flex justify-end gap-3">
@@ -1058,10 +1119,65 @@
             <p class="text-sm text-gray-500 mb-4">Filter by tag or name, eyeball the list, check the people you mean. What's saved is the checked list — never the tag.</p>
             <div class="flex flex-col sm:flex-row gap-3 mb-4">
                 <input type="date" id="designation-date" class="px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
-                <select id="designation-schedule" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></select>
+                <select id="designation-mode" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                    <option value="base">Designate a base schedule</option>
+                    <option value="transform">Apply a transformation (Verb B)</option>
+                </select>
+            </div>
+            <!-- v6.12.0: base-schedule group (Verb A) -->
+            <div id="designation-base-group" class="mb-4">
+                <select id="designation-schedule" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></select>
+            </div>
+            <!-- v6.12.0: transformation recipe builder (Verb B) -->
+            <div id="designation-transform-group" class="hidden mb-4 space-y-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <select id="designation-recipe-type" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                    <option value="shift">Shift a time range earlier or later</option>
+                    <option value="shorten">Shorten periods to extend another</option>
+                    <option value="reclaim">Remove a period &amp; give its time to the rest of the day</option>
+                </select>
+                <div id="designation-shift-fields" class="space-y-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="number" id="designation-shift-mins" min="1" placeholder="Minutes" class="w-full sm:w-28 px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                        <select id="designation-shift-dir" class="px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                            <option value="later">later</option>
+                            <option value="earlier">earlier</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <label class="text-sm text-gray-600 flex-1">From (optional)<input type="time" id="designation-shift-from" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></label>
+                        <label class="text-sm text-gray-600 flex-1">Until (optional)<input type="time" id="designation-shift-until" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></label>
+                    </div>
+                    <p class="text-xs text-gray-500">Leave both blank to move every bell. Only shared bells move; personal reminder bells follow automatically.</p>
+                </div>
+                <div id="designation-shorten-fields" class="hidden space-y-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <label class="text-sm text-gray-600 flex-1">Shorten periods after<input type="time" id="designation-shorten-after" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></label>
+                        <label class="text-sm text-gray-600 flex-1">By (minutes each)<input type="number" id="designation-shorten-mins" min="1" placeholder="e.g. 10" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></label>
+                    </div>
+                    <label class="text-sm text-gray-600 block">Extend this period (by name, optional)
+                        <input type="text" id="designation-shorten-extend" list="designation-period-names" placeholder="e.g. FLEX" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                    </label>
+                    <datalist id="designation-period-names"></datalist>
+                    <p class="text-xs text-gray-500">Reclaimed minutes cascade forward; the extend period grows by the total. Any schedule with a like-named period follows one recipe.</p>
+                </div>
+                <div id="designation-reclaim-fields" class="hidden space-y-2">
+                    <label class="text-sm text-gray-600 block">Period to remove for the day (by name)
+                        <input type="text" id="designation-reclaim-period" list="designation-period-names" placeholder="e.g. FLEX" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm">
+                    </label>
+                    <p class="text-xs text-gray-500">The period disappears for the day and the time it held — including the passing period leading into it — is split evenly across every remaining period. Dismissal stays put, so the other classes each get a little longer. The passing period <em>after</em> the removed one is preserved.</p>
+                </div>
+                <div class="border-t pt-3 mt-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Show on clocks (optional)</label>
+                    <p class="text-xs text-gray-500 mb-2">Tick the schedules whose hallway TVs/clocks should reflect this change for the day. Leave all unchecked to change only people's apps.</p>
+                    <div id="designation-clock-targets" class="space-y-1 max-h-32 overflow-y-auto"></div>
+                </div>
             </div>
             <div id="designation-entries" class="mb-4"></div>
             <input type="text" id="designation-filter" placeholder="Filter people by tag or name (e.g. 8th, CDC)" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm mb-2">
+            <div class="flex gap-3 mb-2">
+                <button type="button" id="designation-select-all" class="text-xs text-blue-700 hover:underline">Select all shown</button>
+                <button type="button" id="designation-clear-all" class="text-xs text-gray-600 hover:underline">Clear</button>
+            </div>
             <div id="designation-people" class="space-y-2 mb-4 max-h-[30vh] overflow-y-auto"></div>
             <div class="flex justify-end gap-3">
                 <button type="button" id="designation-add" data-btn="primary">Designate Checked People</button>
@@ -1069,6 +1185,36 @@
             <p id="designation-status" class="text-blue-600 text-sm mt-4 hidden"></p>
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" id="designation-close" data-btn="cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- v6.13.0: Prefill calendar grid (design Layer 4) -->
+    <div id="grid-modal" data-modal class="hidden">
+        <div data-modal-panel class="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <h3 class="text-2xl font-medium mb-2">Plan Ahead</h3>
+            <p class="text-sm text-gray-500 mb-4">Click any day to designate a schedule or apply a transformation for that date. Weeks you don't touch simply run the normal schedule.</p>
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <div class="flex items-center gap-2">
+                    <button type="button" id="grid-prev" class="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-100" title="Earlier">&larr;</button>
+                    <button type="button" id="grid-today" class="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Today</button>
+                    <button type="button" id="grid-next" class="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-100" title="Later">&rarr;</button>
+                </div>
+                <span id="grid-title" class="text-sm font-medium text-gray-700"></span>
+            </div>
+            <div id="grid-body" class="mb-4"></div>
+            <div class="border-t pt-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Repeat weekly</label>
+                <p class="text-xs text-gray-500 mb-2">Copy one day's whole plan onto every same weekday through an end date. Existing plans on those days are respected (re-designating the same people replaces just their designation).</p>
+                <div class="flex flex-col sm:flex-row sm:items-end gap-2">
+                    <label class="text-sm text-gray-600 flex-1">Copy this day<input type="date" id="grid-repeat-source" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></label>
+                    <label class="text-sm text-gray-600 flex-1">…to every same weekday through<input type="date" id="grid-repeat-end" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm"></label>
+                    <button type="button" id="grid-repeat-apply" data-btn="primary">Repeat</button>
+                </div>
+                <p id="grid-status" class="text-blue-600 text-sm mt-3 hidden"></p>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" id="grid-close" data-btn="cancel">Close</button>
             </div>
         </div>
     </div>
@@ -1597,7 +1743,7 @@
     <!-- MODIFIED in 4.49: Widened main container from 2xl to 4xl -->
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
         <header class="text-center mb-8 kiosk-hide">
-            <h1 id="app-banner-title" class="text-4xl font-bold text-blue-700">Ellis Web Bell 6.11.0</h1>
+            <h1 id="app-banner-title" class="text-4xl font-bold text-blue-700">Ellis Web Bell 6.25.1</h1>
             <p class="text-lg text-gray-600">A real-time, synchronized bell schedule</p>
             <!-- V5.44.0: Clock Display Link, V5.47.3: Added Dashboard Link -->
             <div class="mt-2 flex items-center justify-center gap-3 text-sm">
@@ -1695,12 +1841,12 @@
                         </div>
                         <!-- Action buttons - right aligned in status row -->
                         <div class="flex gap-2">
-                            <button id="skip-bell-btn" class="px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 hidden" title="Skip the next scheduled bell (just this once)">
+                            <button id="skip-bell-btn" class="px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 hidden" title="Choose which of the next five bells to skip or restore">
                                 Skip Bell
                             </button>
-                            <button id="unskip-bell-btn" class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 hidden">
-                                Unskip
-                            </button>
+                            <!-- V6.25.0: the separate Unskip button is GONE. Both
+                                 skip and unskip now happen in #bell-manager-modal,
+                                 which names each bell instead of acting blind. -->
                             <button id="cancel-quick-bell-btn" class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 hidden">
                                 Cancel Timer
                             </button>
@@ -1925,6 +2071,15 @@
                 <p class="text-xs text-gray-500 mt-1">"These people run schedule X today (or on a future date)." Their apps auto-follow at day change; anyone who chose a schedule manually today sees a gentle banner instead of being yanked.</p>
             </div>
 
+            <!-- V6.13.0: Prefill calendar grid (design Layer 4, plan weeks ahead) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Plan Ahead (calendar grid)</label>
+                <button type="button" id="grid-open-btn" class="px-6 py-2 bg-blue-700 text-white font-medium rounded-lg shadow-md hover:bg-blue-800">
+                    Open Planning Grid
+                </button>
+                <p class="text-xs text-gray-500 mt-1">See several weeks at a glance, click any day to designate a schedule or apply a transformation, and repeat a day's plan onto every same weekday through a chosen date.</p>
+            </div>
+
             <!-- V5.74.0: Emergency schedule shift (today only) -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Schedule Shift (today only)</label>
@@ -2023,6 +2178,16 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Rename Current Schedule</label>
                     <button type="button" id="rename-schedule-btn" class="w-full px-4 py-2 bg-yellow-500 text-white font-medium rounded-lg shadow-md hover:bg-yellow-600 transition-colors">
                         Rename Selected Schedule
+                    </button>
+                </div>
+                <!-- V6.21.0: duplicate the selected SHARED schedule. Disabled
+                     unless admin-mode is on and a shared schedule is selected
+                     (module 16 owns the disabled state; the handler re-checks
+                     admin-mode, and firestore.rules is the real gate). -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Duplicate Current Schedule</label>
+                    <button type="button" id="duplicate-schedule-btn" class="w-full px-4 py-2 bg-yellow-500 text-white font-medium rounded-lg shadow-md hover:bg-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Duplicate Selected Schedule
                     </button>
                 </div>
                 <div>
@@ -3024,13 +3189,23 @@
 
                 <hr class="my-4 border-gray-200">
 
-                <!-- Visual Cue Selection -->
-                <div class="mb-6">
-                    <label for="queue-visual-select" class="block text-sm font-medium text-gray-700 mb-1">Visual Cue</label>
-                    <select id="queue-visual-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
-                        <option value="[DEFAULT_Q]">Default "Q" (Queue)</option>
-                        <!-- More options populated by JS -->
-                    </select>
+                <!-- Visual Cue Selection — REMOVED in 6.23.0. Each timer row
+                     now carries its own "Graphic" dropdown (module 12), so a
+                     queue can show a different picture per step. A single
+                     queue-wide control alongside per-row ones would be two
+                     places setting the same thing. -->
+
+                <!-- V6.24.0: Save this queue as a reusable Quick Bell button.
+                     The name field is only read by Save; Start ignores it. -->
+                <div class="mb-6 pt-4 border-t border-gray-200">
+                    <label for="queue-save-name-input" class="block text-sm font-medium text-gray-700 mb-1">Save as a Quick Bell</label>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="queue-save-name-input" maxlength="40" placeholder="Name this queue, e.g. Typing + Beethoven" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <button type="button" id="queue-save-btn" class="flex-shrink-0 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+                            Save
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Saves to a Quick Bell button you can press any day. Uses the repeat COUNT above; "until a bell rings" is not saved, since it points at today's schedule.</p>
                 </div>
 
                 <!-- Action Buttons -->
@@ -3040,6 +3215,20 @@
                     </button>
                     <button type="button" id="queue-start-btn" class="flex-1 py-2 px-4 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors font-medium">
                         Start Queue
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- V6.25.0: Bell modal — skip/unskip the next five bells BY NAME. -->
+        <div id="bell-manager-modal" data-modal class="hidden">
+            <div data-modal-panel class="max-w-md">
+                <h3 class="text-2xl font-medium mb-1">Next five bells</h3>
+                <p class="text-sm text-gray-600 mb-4">Skip a bell for today only. Skipped bells stay listed so you can restore them. Everything resets overnight.</p>
+                <div id="bell-manager-list" class="mb-6 overflow-y-auto" style="max-height:20rem;"></div>
+                <div class="flex gap-3">
+                    <button type="button" id="bell-manager-close-btn" class="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                        Done
                     </button>
                 </div>
             </div>
@@ -3357,4 +3546,4 @@ HOW TO ADD A NEW ADMIN:
 The new admin will have admin privileges (including the "Make Public" button) the next time they refresh the app.
 -->
 
-<!-- Version 6.11.0 -->
+<!-- Version 6.25.1 -->

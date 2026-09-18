@@ -7,8 +7,9 @@ all channels read the same live Firestore docs; Building Bells writes
 ordinary period times old clients already render; relative bells resolve
 live (parentBellId through the pure engine); and save paths round-trip
 objects by spread, so additive fields survive old editors. NO dual
-maintenance. Sole remaining gate before Building Bells: the 5.79.x
-save-path audit below (expected result: zero changes needed). Owner may
+maintenance. ~~Sole remaining gate before Building Bells: the 5.79.x
+save-path audit below~~ (ANSWERED — and Building Bells SHIPPED 6.5.0,
+round 5 "Bourdon"). Owner may
 start any evening; nothing here is season-blocked. This document is the spec §7's Stage 27
 pointed at; it MERGES the formerly separate "Emergency shift v2" and
 "admin broadcast/dashboard" roadmap items, because the design conversation
@@ -76,7 +77,10 @@ teacher lists), never globally.
 Build order is dependency order. Each layer ships alone and is useful
 alone.
 
-### Shared concept — Building Bells (new, small, do first)
+### Shared concept — Building Bells — SHIPPED 6.5.0
+(As designed, plus: explicit exact-time "Anchor matching" assist,
+anchor select in the edit-bell modal with detach-on-divergence, delete
+strips anchors, per-schedule audit entries. See CHANGELOG V6.5.0.)
 
 The 6 intercom bells become first-class named entities:
 `config/building_bells` (additive doc). Admin schedules gain OPTIONAL
@@ -102,7 +106,17 @@ exists). Limitation: old.html is unauthenticated and cannot write
 presence — wall clocks appear via clock.html only (see Open Questions).
 This layer is also rollout telemetry for the 6.x line itself.
 
-### Layer 2 — Identity anchors (derivation hardening)
+### Layer 2 — Identity anchors (derivation hardening) — SLICES 1+2+3 SHIPPED 6.6.0–6.8.0
+(Slice 1: periodId foundation — stable ids on shared periods,
+identity-first resolution in engine 1.5.0 with name fallback,
+idempotent admin backfill skipping ambiguous duplicates. Slice 2:
+personal-anchor migration — client-side silent stamping + the review
+modal for duplicated names; all period-creation sites stamp at birth.
+Slice 3: the full identity shape stored (baseScheduleId at all stamp
+sites; edge maps to parentAnchorType, deliberately not dual-written)
++ findPeriodEdgeAnchorBell extracted/tested in engine 1.6.0.
+Remaining: alternate-base transfer w/ I4 notice — build as Layer 4's
+first bite, since it needs the designation mechanism.)
 
 Upgrade personal-schedule anchors from TIME-keyed to IDENTITY-keyed:
 { baseScheduleId, periodId, edge: start|end, offsetSeconds } as NEW
@@ -122,7 +136,7 @@ anchor. Consequences:
   grade period edge no longer drags 8th grade along by wall-clock
   coincidence.
 
-### Layer 3 — Tags + roster
+### Layer 3 — SHIPPED 6.9.0 (tags+capabilities split; rules-enforced; invariant carved into rules/module/UI copy) — Tags + roster
 
 Users carry multiple tags (grade, subject, CDC, plus CAPABILITY tags —
 e.g. `may-break-anchors`, granted narrowly per the owner's ineptitude
@@ -136,7 +150,10 @@ priority rules, and the aspirational-related-arts teacher gets caught
 by eyeball. CDC (all three grades in one room) needs no special rule
 as a result.
 
-### Layer 4 — The calendar (two verbs) + day-of tools
+### Layer 4 — The calendar (two verbs) + day-of tools — VERB A SHIPPED 6.10.0
+(Engine 1.7.0 scoped resolution; module 20 revived w/ I1 banner + I4
+count; 34-day-designation.js day-of modal = the Layer 3 picker's first
+use. Remaining: Verb B recipes, prefill grid + generators.)
 
 `config/schedule_calendar` (doc path RESERVED since v5.73.0; new
 schema, additive). Per date, a list of entries; each entry =
@@ -170,10 +187,10 @@ precomputed transformation results where feasible.
 
 ## 3. Sequencing
 
-1. Building Bells (small; immediately fixes drift-correction workflow)
-2. Layer 1 dashboard (independent; telemetry for everything after)
-3. Layer 2 identity anchors + migration (the long pole; everything
-   below stands on it)
+1. ~~Building Bells~~ DONE 6.5.0
+2. ~~Layer 1 dashboard~~ DONE 6.4.0 (+ 5.69.5 backport)
+3. Layer 2 identity anchors + migration (the long pole) — slices
+   1+2+3 DONE 6.6.0–6.8.0 (alternate-base transfer folds into Layer 4)
 4. Layer 3 tags + roster
 5. Layer 4 calendar (verbs, prefill grid, day-of modal)
 6. clock.html / old.html follow-along
@@ -190,10 +207,10 @@ precomputed transformation results where feasible.
   v2 work takes over alpha. Map channels -> repos -> domains in
   HANDOFF §2 next session (alpha/beta/school all on the one Firestore
   per I0 — confirmed).
-- ~~clock.html auth status~~ ANSWERED 2026-07-19: clock.html DOES load
-  firebase-auth-compat and signs in, so TVs/grids CAN report presence.
-  Adding it = small clock.html edit (surface: 'clock'); deferred from
-  the 6.4.0 pass by choice, not necessity.
+- ~~clock.html auth status / presence~~ CLOSED 6.5.0: clock.html 1.7.0
+  reports presence (surface 'clock'), ANONYMOUS sessions only — a
+  signed-in browser already reports via the app under the same uid, and
+  both surfaces writing would flap its census row.
 - Presence heartbeat interval vs. Firestore write costs at ~50 users.
 - Recipe archetype list beyond the first two (gather during Layer 4).
 - Whether alternate-base transfer notices should list dropped personal
